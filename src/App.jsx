@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 // Import your page components
@@ -11,6 +11,43 @@ import Login from "./pages/Login"; // If you have authentication
 import Home from "./pages/Home"; // Front page with whitepaper or intro
 
 function App() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  if (!unlocked) {
+    return (
+      <div style={{ textAlign: "center", marginTop: "20%" }}>
+        <h2>Login</h2>
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          style={{ marginRight: "10px" }}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ marginRight: "10px" }}
+        />
+        <button
+          onClick={() => {
+            if (username === "dfeen87" && password === "bleigh1!") {
+              setUnlocked(true);
+            } else {
+              alert("Invalid username or password");
+            }
+          }}
+        >
+          Unlock
+        </button>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <Routes>
