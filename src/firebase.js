@@ -16,7 +16,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAS6QDkw9jZxb_TXcZUv_D4NB8qcPF5SLY",
   authDomain: "heroic-tide-428421-q7.firebaseapp.com",
   projectId: "heroic-tide-428421-q7",
-  storageBucket: "heroic-tide-428421-q7.firebasestorage.app",
+  storageBucket: "heroic-tide-428421-q7.appspot.com",
   messagingSenderId: "105378934751",
   appId: "1:105378934751:web:28897b3d83884e6c411e6a",
   measurementId: "G-Q4JVFC4LMM",
