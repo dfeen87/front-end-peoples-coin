@@ -9,6 +9,9 @@ COPY build/ /usr/share/nginx/html/
 # Replace default nginx.conf to listen on port 8080
 RUN sed -i 's/listen       80;/listen       8080;/' /etc/nginx/conf.d/default.conf
 
+# Verify the nginx config change
+RUN cat /etc/nginx/conf.d/default.conf
+
 # Expose port 8080 for Cloud Run
 EXPOSE 8080
 
