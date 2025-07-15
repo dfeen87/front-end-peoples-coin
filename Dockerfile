@@ -1,15 +1,17 @@
-# Use nginx to serve the static files
 FROM nginx:alpine
 
-# Clean nginx default html
+# Remove default nginx static files
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy the build folder
+# Copy build folder contents into nginx html folder
 COPY build/ /usr/share/nginx/html/
 
-# Expose port 80
-EXPOSE 80
+# Replace default nginx.conf to listen on port 8080
+RUN sed -i 's/listen       80;/listen       8080;/' /etc/nginx/conf.d/default.conf
 
-# Run nginx
+# Expose port 8080 for Cloud Run
+EXPOSE 8080
+
+# Run nginx in foreground
 CMD ["nginx", "-g", "daemon off;"]
 
