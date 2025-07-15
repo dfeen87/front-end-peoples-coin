@@ -5,7 +5,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "start": "vite preview --port $PORT",
+    "start": "vite preview --port ${PORT:-8080}",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
