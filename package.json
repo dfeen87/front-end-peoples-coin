@@ -5,7 +5,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "start": "vite preview --port ${PORT:-8080}",
+    "start": "serve -s dist -l 8080}",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
@@ -16,7 +16,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router": "^7.5.3",
-    "react-router-dom": "^7.6.3"
+    "react-router-dom": "^7.6.3",
+    "serve": "^14.2.4"
   },
   "devDependencies": {
     "@react-router/dev": "^7.5.3",
