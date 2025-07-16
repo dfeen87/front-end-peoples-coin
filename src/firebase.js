@@ -132,3 +132,5 @@ export function formatWalletBalance(coins, loves) {
   }
 }
 
+export { db, auth };
+
