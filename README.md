@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+<<<<<<< HEAD  
 # front-end-peoples-coin
 =======
 # Welcome to React Router!
