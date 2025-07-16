@@ -3,15 +3,21 @@ FROM nginx:alpine
 # Remove default nginx static files
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy the built frontend files into nginx html folder
+# Copy built frontend files
 COPY dist/ /usr/share/nginx/html/
 
-# Copy your custom nginx config to override default settings (make sure the path matches your project)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx config template
+COPY nginx.conf.template /etc/nginx/conf.d/default.conf.template
 
-# Expose port 8080 as per your nginx config and Firebase environment
+# Copy startup script
+COPY run.sh /run.sh
+
+# Make script executable
+RUN chmod +x /run.sh
+
+# Expose 8080
 EXPOSE 8080
 
-# Run nginx in the foreground
-CMD ["nginx", "-g", "daemon off;"]
+# Run nginx via run.sh
+CMD ["/run.sh"]
 
