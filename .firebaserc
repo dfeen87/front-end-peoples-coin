@@ -1,4 +1,15 @@
 {
+  "projects": {},
+  "targets": {
+    "heroic-tide-428421-q7": {
+      "hosting": {
+        "brightacts-site": [
+          "brightacts-static"
+        ]
+      }
+    }
+  },
+  "etags": {},
   "hosting": {
     "site": "brightacts-static",
     "public": "build",
