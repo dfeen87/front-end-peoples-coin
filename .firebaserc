@@ -1,14 +1,15 @@
 {
   "projects": {
-    "default": "heroic-tide-428421-q7"
+    "default": "brightacts-frontend"
   },
   "targets": {
-    "heroic-tide-428421-q7": {
+    "brightacts-frontend": {
       "hosting": {
         "brightacts-site": [
-          "brightacts-static"
+          "brightacts-frontend"
         ]
       }
     }
-  }
+  },
+  "etags": {}
 }
