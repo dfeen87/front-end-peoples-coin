@@ -5,7 +5,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "start": "vite build && serve",
+    "start": "serve",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
