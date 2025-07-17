@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "target": "brightacts-static",
+    "target": "brightacts-site",
     "public": "build",
     "ignore": [
       "firebase.json",
@@ -14,4 +14,4 @@
       }
     ]
   }
-} 
+}

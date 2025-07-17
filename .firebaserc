@@ -1,5 +1,7 @@
 {
-  "projects": {},
+  "projects": {
+    "default": "heroic-tide-428421-q7"
+  },
   "targets": {
     "heroic-tide-428421-q7": {
       "hosting": {
@@ -8,21 +10,5 @@
         ]
       }
     }
-  },
-  "etags": {},
-  "hosting": {
-    "site": "brightacts-static",
-    "public": "build",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
   }
 }
