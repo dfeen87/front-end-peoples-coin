@@ -1,23 +1,23 @@
-FROM nginx:alpine
+# Stage 1: Build the application using a Node.js environment
+FROM node:20 AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
-# Remove default nginx static files
-RUN rm -rf /usr/share/nginx/html/*
+# Stage 2: Create the final, lean production image
+FROM node:20-alpine
+WORKDIR /app
 
-# Copy built frontend files
-COPY dist/ /usr/share/nginx/html/
+# Copy the built application from the 'builder' stage
+COPY --from=builder /app/dist ./dist
 
-# Copy nginx config template
-COPY nginx.conf.template /etc/nginx/conf.d/default.conf.template
+# It's good practice to copy over package.json in case the server needs it
+COPY package.json ./
 
-# Copy startup script
-COPY run.sh /run.sh
-
-# Make script executable
-RUN chmod +x /run.sh
-
-# Expose 8080
+# The port your application will run on
 EXPOSE 8080
 
-# Run nginx via run.sh
-CMD ["/run.sh"]
-
+# The command that will run your application server
+CMD ["node", "dist/server/index.js"]
