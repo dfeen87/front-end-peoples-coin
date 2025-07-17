@@ -1,5 +1,17 @@
 {
-  "projects": {
-    "default": "heroic-tide-428421-q7"
+  "hosting": {
+    "site": "brightacts-static",
+    "public": "build",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
   }
 }
