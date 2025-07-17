@@ -5,7 +5,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "start": "serve dist/server/index.js",
+    "start": "serve dist/server/index.js -p $PORT",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
