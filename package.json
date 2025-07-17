@@ -5,6 +5,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "start": "vite build && serve",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
@@ -30,4 +31,3 @@
     "vite-tsconfig-paths": "^5.1.4"
   }
 }
-
