@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "brightacts-frontend"
+  },
+  "targets": {
+    "brightacts-frontend": {
+      "hosting": {
+        "brightacts-site": [
+          "brightacts-frontend"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

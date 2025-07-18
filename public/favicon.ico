@@ -1,0 +1,14 @@
+from PIL import Image
+
+# Load the PNG that was generated earlier
+png_path = "/mnt/data/A_favicon_in_the_form_of_a_32x32_pixel_digital_gra.png"
+ico_path = "/mnt/data/favicon.ico"
+
+# Open the PNG
+img = Image.open(png_path)
+
+# Convert to .ico and save
+img.save(ico_path, format='ICO')
+
+ico_path
+
