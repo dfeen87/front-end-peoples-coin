@@ -11,22 +11,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Use Node.js version 20 (or whatever your project requires, ensure it's compatible with your app)
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      # Flutter specific setup (THIS SECTION IS CRITICAL)
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2 # Action to set up Flutter SDK
         with:
-          node-version: '20'
+          flutter-version: '3.32.7' # <--- YOUR EXACT FLUTTER VERSION HERE
+          channel: 'stable'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
-      - name: Build application
-        run: npm run build
+      - name: Build Flutter web application
+        run: flutter build web --release # Builds your Flutter web app
 
+      # Deploy to Firebase Hosting
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BRIGHTACTS_FRONTEND }} # <-- This should be your new secret name
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BRIGHTACTS_FRONTEND }} # <-- Your new secret name
           channelId: live
-          projectId: brightacts-frontend # <-- This should be your new Firebase Project ID
+          projectId: brightacts-frontend # <-- Your new Firebase Project ID
+          # Ensure firebase.json's 'public' folder is correctly set to 'build/web'
