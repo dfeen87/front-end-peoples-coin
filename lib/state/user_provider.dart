@@ -2,7 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 import '../models/user_account.dart';
-import '../services/api_client.dart';
+import '../service/api_client.dart';
 import '../models/goodwill_action.dart';
 
 class UserProvider with ChangeNotifier {

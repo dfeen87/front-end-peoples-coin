@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/goodwill_action.dart'; // For the response model
 import '../models/goodwill_action_to_send.dart'; // For the request model
-import '../services/api_client.dart'; // For backend submission
+import '../service/api_client.dart'; // For backend submission
 
 /// Manages the process of submitting a goodwill action, including
 /// potential on-device AI processing before sending to the backend.

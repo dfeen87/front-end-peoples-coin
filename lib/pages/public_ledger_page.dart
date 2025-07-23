@@ -4,11 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/ledger_provider.dart';
 import '../widgets/public_action_card.dart';
-// NEW: We need to import the MatrixText widget's file or main.dart if it's still there.
-// For now, I'll assume it's in a separate file as good practice.
-// If you haven't moved it yet, change the import to: import '../../main.dart';
-import '../widgets/matrix_text.dart';
-
+import '../widgets/matrix_text.dart'; // Correct import path for MatrixText
 
 class PublicLedgerPage extends StatefulWidget {
   const PublicLedgerPage({super.key});
@@ -47,7 +43,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   MatrixText(
-                    text: "Action Type Placeholder",
+                    targetText: "Action Type Placeholder", // CORRECTED
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -55,7 +51,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> {
                     speed: const Duration(milliseconds: 80),
                   ),
                   MatrixText(
-                    text: "XX Loves",
+                    targetText: "XX Loves", // CORRECTED
                     style: TextStyle(
                         color: Colors.amber[600],
                         fontSize: 16,
@@ -70,7 +66,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                    MatrixText(
-                    text: "0x000...0000",
+                    targetText: "0x000...0000", // CORRECTED
                     style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
@@ -78,9 +74,9 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> {
                     speed: const Duration(milliseconds: 80),
                   ),
                   MatrixText(
-                    text: "Date Plchldr",
-                     style: const TextStyle(color: Colors.white54, fontSize: 12, fontFamily: 'monospace'),
-                     speed: const Duration(milliseconds: 80),
+                    targetText: "Date Plchldr", // CORRECTED
+                    style: const TextStyle(color: Colors.white54, fontSize: 12, fontFamily: 'monospace'),
+                    speed: const Duration(milliseconds: 80),
                   ),
                 ],
               ),

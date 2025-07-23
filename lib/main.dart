@@ -1,27 +1,27 @@
-// main.dart - Final Version with all card navigation connected
+// lib/main.dart - Final Version with all card navigation connected
 
 import 'dart:async';
-import 'dart:math';
+import 'dart:math'; // Keep Random for now, but it's not needed here after MatrixText move
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:animated_digit/animated_digit.dart';
-import 'package.url_launcher/url_launcher.dart' as url_launcher;
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
 // Your other imports...
 import 'models/user_account.dart';
-import 'services/api_client.dart';
+import 'service/api_client.dart';
 import 'state/user_provider.dart';
 import 'state/proposal_provider.dart';
 import 'state/goodwill_processing_provider.dart';
-import 'state/ledger_provider.dart'; // <-- New import
+import 'state/ledger_provider.dart';
 import 'pages/submit_goodwill_page.dart';
 import 'pages/my_portfolio_page.dart';
 import 'pages/governance_page.dart';
 import 'pages/my_wallet_page.dart';
-import 'pages/public_ledger_page.dart'; // <-- New import
+import 'pages/public_ledger_page.dart';
 import 'pages/sign_in_page.dart';
 import 'state/auth_provider.dart' as MyAppAuthProvider;
 
@@ -29,6 +29,7 @@ import 'firebase_options.dart';
 import 'widgets/dynamic_nebula_background.dart';
 import 'utils/app_constants.dart';
 import 'widgets/navigation_card.dart';
+import 'widgets/matrix_text.dart'; // NEW: Import MatrixText from its dedicated file
 
 // Your constants...
 class AppDurations {
@@ -44,7 +45,6 @@ class AppColors {
   static const wallet = Color(0xFF6A5ACD);
   static final buttonPrimary = Colors.amber[800];
 }
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,6 +68,7 @@ void main() async {
           ),
         ),
         ChangeNotifierProvider<ProposalProvider>(
+          // CORRECTED: Pass the PeoplesCoinApiClient instance
           create: (context) => ProposalProvider(
             Provider.of<PeoplesCoinApiClient>(context, listen: false),
           ),
@@ -77,7 +78,6 @@ void main() async {
             Provider.of<PeoplesCoinApiClient>(context, listen: false),
           ),
         ),
-        // Add the new LedgerProvider here
         ChangeNotifierProvider<LedgerProvider>(
           create: (context) => LedgerProvider(
             Provider.of<PeoplesCoinApiClient>(context, listen: false),
@@ -159,8 +159,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       if (userId != null) {
         context.read<UserProvider>().fetchUser(userId);
       }
-      // Note: We fetch proposals and other data inside their respective pages now
-      // to avoid loading everything at once.
     });
 
     _pages = [
@@ -428,7 +426,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   .headlineMedium
                   ?.copyWith(fontSize: 24, fontFamily: 'monospace'),
               isLoading: data.isLoading,
-              speed: const Duration(milliseconds: 100),
+              speed: const Duration(milliseconds: 182),
             ),
             const SizedBox(height: 8),
             Row(
@@ -598,6 +596,8 @@ class SettingsDialog extends StatelessWidget {
   }
 }
 
+/*
+// Original MatrixText from main.dart, moved to lib/widgets/matrix_text.dart
 class MatrixText extends StatefulWidget {
   final String targetText;
   final bool isLoading;
@@ -684,3 +684,4 @@ class _MatrixTextState extends State<MatrixText> {
     );
   }
 }
+*/

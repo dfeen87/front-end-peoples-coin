@@ -1,76 +1,141 @@
 // lib/state/proposal_provider.dart
-
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../models/proposal.dart';
-import '../models/proposal_to_send.dart'; // Import the model for sending
 import '../models/vote_to_send.dart';
-import '../services/api_client.dart';
+import '../models/proposal_to_send.dart';
+import '../service/api_client.dart'; // MODIFIED: Assuming your file is api_client.dart (singular)
 
 class ProposalProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
 
-  // State for the list of proposals
+  // --- State Variables for Proposal List ---
   List<Proposal> _proposals = [];
   bool _isFetchingProposals = false;
-  String? _proposalsError;
+  String? _listError;
 
-  // State for a single, selected proposal
+  // --- State Variables for Selected Proposal Details ---
   Proposal? _selectedProposal;
   bool _isFetchingDetails = false;
   String? _detailsError;
+
+  // --- State Variables for Actions ---
+  bool _isSubmittingProposal = false;
   bool _isSubmittingVote = false;
 
-  // NEW: State for creating a proposal
-  bool _isSubmittingProposal = false;
-
-  // Public getters for the list
+  // --- GETTERS ---
   List<Proposal> get proposals => _proposals;
   bool get isFetchingProposals => _isFetchingProposals;
-  bool get hasListError => _proposalsError != null;
-  String? get listError => _proposalsError;
+  bool get hasListError => _listError != null;
+  String? get listError => _listError;
 
-  // Public getters for details and voting
   Proposal? get selectedProposal => _selectedProposal;
   bool get isFetchingDetails => _isFetchingDetails;
   bool get hasDetailsError => _detailsError != null;
   String? get detailsError => _detailsError;
+
+  bool get isSubmittingProposal => _isSubmittingProposal;
   bool get isSubmittingVote => _isSubmittingVote;
 
-  // NEW: Public getter for creating a proposal
-  bool get isSubmittingProposal => _isSubmittingProposal;
-
+  // --- CONSTRUCTOR ---
   ProposalProvider(this._apiClient);
 
+  // --- METHODS ---
+
   Future<void> fetchProposals({String? status}) async {
-    // ... (existing method)
+    _isFetchingProposals = true;
+    _listError = null;
+    notifyListeners();
+
+    try {
+      final fetchedProposals = await _apiClient.listProposals(status: status);
+      _proposals = fetchedProposals;
+    } catch (e) {
+      _listError = 'Failed to load proposals: ${e.toString()}';
+      print('Error fetching proposals: $_listError');
+    } finally {
+      _isFetchingProposals = false;
+      notifyListeners();
+    }
   }
 
   Future<void> fetchProposalDetails(String proposalId) async {
-    // ... (existing method)
-  }
-
-  Future<bool> submitVote(VoteToSend vote) async {
-    // ... (existing method)
-  }
-
-  // NEW: Method to create a new proposal
-  Future<Map<String, dynamic>> createProposal(ProposalToSend proposal) async {
-    _isSubmittingProposal = true;
+    _isFetchingDetails = true;
+    _detailsError = null;
     notifyListeners();
-    Map<String, dynamic> result = {'success': false, 'error': 'An unknown error occurred.'};
+
     try {
-      result = await _apiClient.createProposal(proposal);
-      if (result['success']) {
-        // After a successful submission, refresh the proposals list
-        await fetchProposals(status: 'ACTIVE');
+      _selectedProposal = await _apiClient.getProposalDetails(proposalId);
+      if (_selectedProposal == null) {
+        _detailsError = 'Proposal not found.';
       }
     } catch (e) {
-      print("Proposal creation failed: $e");
-      result = {'success': false, 'error': e.toString()};
+      _detailsError = 'Failed to load proposal details: ${e.toString()}';
+      print('Error fetching proposal details: $_detailsError');
+    } finally {
+      _isFetchingDetails = false;
+      notifyListeners();
+    }
+  }
+
+  // MODIFIED: createProposal now returns Future<Map<String, dynamic>>
+  Future<Map<String, dynamic>> createProposal(ProposalToSend proposal) async {
+    _isSubmittingProposal = true;
+    _detailsError = null;
+    notifyListeners();
+
+    try {
+      final result = await _apiClient.createProposal(proposal); // This already returns Map
+      if (result['success'] == true) { // Check for boolean true from map
+        print('Proposal created successfully!');
+        await fetchProposals(status: 'ACTIVE');
+        return {'success': true}; // Return a map as expected by UI
+      } else {
+        final errorMessage = result['error'] ?? 'Unknown error creating proposal.';
+        _detailsError = errorMessage;
+        print('API Error creating proposal: $_detailsError');
+        return {'success': false, 'error': errorMessage}; // Return a map as expected by UI
+      }
+    } catch (e) {
+      final errorMessage = 'An unexpected error occurred: ${e.toString()}';
+      _detailsError = errorMessage;
+      print('Caught Error creating proposal: $_detailsError');
+      return {'success': false, 'error': errorMessage}; // Return a map as expected by UI
     } finally {
       _isSubmittingProposal = false;
       notifyListeners();
     }
-    return result;
+  }
+
+  // MODIFIED: submitVote now returns Future<Map<String, dynamic>>
+  Future<Map<String, dynamic>> submitVote(VoteToSend vote) async {
+    _isSubmittingVote = true;
+    _detailsError = null;
+    notifyListeners();
+
+    try {
+      final result = await _apiClient.submitVote(vote); // This already returns Map
+      if (result['success'] == true) { // Check for boolean true from map
+        print('Vote submitted successfully!');
+        if (_selectedProposal != null) {
+          await fetchProposalDetails(_selectedProposal!.id);
+        } else {
+          await fetchProposals(status: 'ACTIVE');
+        }
+        return {'success': true}; // Return a map as expected by UI
+      } else {
+        final errorMessage = result['error'] ?? 'Unknown error submitting vote.';
+        _detailsError = errorMessage;
+        print('API Error submitting vote: $_detailsError');
+        return {'success': false, 'error': errorMessage}; // Return a map as expected by UI
+      }
+    } catch (e) {
+      final errorMessage = 'An unexpected error occurred: ${e.toString()}';
+      _detailsError = errorMessage;
+      print('Caught Error submitting vote: $_detailsError');
+      return {'success': false, 'error': errorMessage}; // Return a map as expected by UI
+    } finally {
+      _isSubmittingVote = false;
+      notifyListeners();
+    }
   }
 }

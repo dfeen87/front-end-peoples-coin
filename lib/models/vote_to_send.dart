@@ -1,29 +1,26 @@
+// lib/models/vote_to_send.dart
 import 'package:flutter/foundation.dart';
 
-/// A simplified model for sending a new vote to the API.
-/// This is based on the SubmitVoteSchema in the backend.
 @immutable
 class VoteToSend {
-  final String proposalId;
   final String voterUserId;
-  final String voteChoice; // "YES", "NO", or "ABSTAIN"
-  final double voteWeight;
+  final String proposalId;
+  final String voteValue; // ADDED: Field for vote value
+  final String? rationale;
 
   const VoteToSend({
-    required this.proposalId,
     required this.voterUserId,
-    required this.voteChoice,
-    required this.voteWeight,
+    required this.proposalId,
+    required this.voteValue, // ADDED: Named parameter for vote value
+    this.rationale,
   });
 
-  /// Converts this object into a JSON map for the API request body.
   Map<String, dynamic> toJson() {
     return {
-      'proposal_id': proposalId,
       'voter_user_id': voterUserId,
-      'vote_choice': voteChoice,
-      // The backend expects a numeric/decimal, so we send the double.
-      'vote_weight': voteWeight,
+      'proposal_id': proposalId,
+      'vote_value': voteValue, // ADDED: Include vote_value in JSON
+      'rationale': rationale,
     };
   }
 }

@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:firebase_auth_platform_interface/src/auth_provider.dart' as fb_auth_platform_provider;
 
 import '../models/user_account.dart';
-import '../services/api_client.dart';
+import '../service/api_client.dart';
 
 /// Manages user authentication state using Firebase Auth and integrates with reCAPTCHA Enterprise.
 /// Also handles fetching the associated UserAccount data immediately upon successful authentication.

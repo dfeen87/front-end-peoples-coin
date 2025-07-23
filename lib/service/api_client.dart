@@ -1,3 +1,4 @@
+// lib/service/api_client.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -169,7 +170,7 @@ class PeoplesCoinApiClient {
       throw Exception('Failed to get proposal details: $e');
     }
   }
-  
+
   /// Fetches all goodwill actions for a specific user.
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
     final uri = Uri.parse('$_baseUrl/api/v1/users/$userId/goodwill-actions');
@@ -191,7 +192,7 @@ class PeoplesCoinApiClient {
       throw Exception('Failed to get user goodwill actions: $e');
     }
   }
-  
+
   /// Fetches the public ledger of verified goodwill actions.
   Future<List<PublicLedgerEntry>> getPublicLedger() async {
     // NOTE: Replace '/api/v1/ledger/public' with your actual endpoint if different.

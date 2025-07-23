@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/public_ledger_entry.dart';
-import '../services/api_client.dart';
+import '../service/api_client.dart';
 
 class LedgerProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;

@@ -1,6 +1,6 @@
 // lib/widgets/public_action_card.dart
 
-import 'package.flutter/material.dart';
+import 'package:flutter/material.dart'; // Keep only one import
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/public_ledger_entry.dart';
