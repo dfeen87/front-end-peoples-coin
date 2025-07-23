@@ -14,7 +14,7 @@ import '../models/public_ledger_entry.dart';
 class PeoplesCoinApiClient {
   final String _baseUrl;
 
-  PeoplesCoinApiClient({String? baseUrl}) : _baseUrl = baseUrl ?? "http://34.48.162.147:5000";
+  PeoplesCoinApiClient({String? baseUrl}) : _baseUrl = baseUrl ?? "https://34.48.162.147:5000";
 
   /// Checks if the backend API is healthy and reachable.
   Future<bool> isApiHealthy() async {

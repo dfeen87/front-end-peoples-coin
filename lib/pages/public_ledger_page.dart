@@ -31,7 +31,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> {
         color: Colors.white.withOpacity(0.05),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10.0),
-          side: BorderSide(color: Colors.white.withOpacity(0.15)),
+          side: const BorderSide(color: Colors.transparent),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
