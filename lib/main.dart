@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:animated_digit/animated_digit.dart';
-import 'package:url_launcher/url_launcher.dart' as url_launcher;
+import 'package.url_launcher/url_launcher.dart' as url_launcher;
 
 // Your other imports...
 import 'models/user_account.dart';
@@ -16,8 +16,12 @@ import 'services/api_client.dart';
 import 'state/user_provider.dart';
 import 'state/proposal_provider.dart';
 import 'state/goodwill_processing_provider.dart';
+import 'state/ledger_provider.dart'; // <-- New import
 import 'pages/submit_goodwill_page.dart';
 import 'pages/my_portfolio_page.dart';
+import 'pages/governance_page.dart';
+import 'pages/my_wallet_page.dart';
+import 'pages/public_ledger_page.dart'; // <-- New import
 import 'pages/sign_in_page.dart';
 import 'state/auth_provider.dart' as MyAppAuthProvider;
 
@@ -70,6 +74,12 @@ void main() async {
         ),
         ChangeNotifierProvider<GoodwillProcessingProvider>(
           create: (context) => GoodwillProcessingProvider(
+            Provider.of<PeoplesCoinApiClient>(context, listen: false),
+          ),
+        ),
+        // Add the new LedgerProvider here
+        ChangeNotifierProvider<LedgerProvider>(
+          create: (context) => LedgerProvider(
             Provider.of<PeoplesCoinApiClient>(context, listen: false),
           ),
         ),
@@ -149,7 +159,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       if (userId != null) {
         context.read<UserProvider>().fetchUser(userId);
       }
-      context.read<ProposalProvider>().fetchProposals(status: 'ACTIVE');
+      // Note: We fetch proposals and other data inside their respective pages now
+      // to avoid loading everything at once.
     });
 
     _pages = [
@@ -159,8 +170,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             'View active proposals, create new ones, and cast your votes.',
         icon: Icons.gavel,
         cardColor: AppColors.governance,
-        expandedContent:
-            _cardContent(context, 'Governance Forms (Not implemented)'),
+        expandedContent: _cardContent(
+          context,
+          "View Proposals",
+          pageToOpen: const GovernancePage(),
+        ),
       ),
       NavigationCard(
         title: 'My Portfolio',
@@ -190,15 +204,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         description: 'View all recorded acts of goodwill on the blockchain.',
         icon: Icons.public,
         cardColor: AppColors.ledger,
-        expandedContent:
-            _cardContent(context, 'Public Ledger Forms (Not implemented)'),
+        expandedContent: _cardContent(
+          context,
+          "View Ledger",
+          pageToOpen: const PublicLedgerPage(),
+        ),
       ),
       NavigationCard(
         title: 'My Wallet',
         description: 'Manage your Loves balance, send, and receive.',
         icon: Icons.wallet,
         cardColor: AppColors.wallet,
-        expandedContent: _cardContent(context, 'Wallet Forms (Not implemented)'),
+        expandedContent: _cardContent(
+          context,
+          "Open Wallet",
+          pageToOpen: const MyWalletPage(),
+        ),
       ),
     ];
   }
@@ -267,7 +288,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _cardContent(BuildContext context, String buttonText,
       {Widget? pageToOpen}) {
-    // If a page isn't provided, create a default content widget.
     final Widget contentToShow = pageToOpen ??
         Center(
             child: Text(buttonText,
@@ -612,7 +632,7 @@ class _MatrixTextState extends State<MatrixText> {
   @override
   void didUpdateWidget(covariant MatrixText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isLoading != oldWidget.isLoading) {
+    if (widget.isLoading != oldWidget.isLoading || widget.targetText != oldWidget.targetText) {
       _updateTextForLoadingState(widget.isLoading);
     }
   }

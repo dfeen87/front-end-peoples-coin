@@ -20,6 +20,8 @@ dependencies:
   shimmer: ^3.0.0
   animated_digit: ^3.2.2
   intl: ^0.18.1
+  qr_flutter: ^4.1.0
+  flutter_bloc: ^8.1.2 
 
 dev_dependencies:
   flutter_test:

@@ -8,6 +8,7 @@ import '../models/goodwill_action.dart';
 import '../models/proposal.dart';
 import '../models/vote.dart';
 import '../models/user_account.dart';
+import '../models/public_ledger_entry.dart';
 
 class PeoplesCoinApiClient {
   final String _baseUrl;
@@ -31,7 +32,6 @@ class PeoplesCoinApiClient {
   }
 
   /// Fetches user account details by user ID.
-  /// Returns null if not found or error occurs.
   Future<UserAccount?> getUserById(String userId) async {
     final uri = Uri.parse('$_baseUrl/api/v1/users/$userId');
     try {
@@ -169,25 +169,18 @@ class PeoplesCoinApiClient {
       throw Exception('Failed to get proposal details: $e');
     }
   }
-
-  // NEW: Method to fetch all goodwill actions for a specific user.
+  
+  /// Fetches all goodwill actions for a specific user.
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
-    // Assuming an endpoint like /api/v1/users/{userId}/goodwill-actions
     final uri = Uri.parse('$_baseUrl/api/v1/users/$userId/goodwill-actions');
     try {
       final response = await http.get(
         uri,
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        // You may need to add Authorization headers here if your endpoint is protected
-        // headers: {
-        //   'Content-Type': 'application/json; charset=UTF-8',
-        //   'Authorization': 'Bearer YOUR_AUTH_TOKEN',
-        // },
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // Assuming the API returns a list of actions under a key, e.g., 'actions'
         final List<dynamic> actionList = data['actions'];
         return actionList.map((json) => GoodwillAction.fromJson(json)).toList();
       } else {
@@ -196,6 +189,30 @@ class PeoplesCoinApiClient {
     } catch (e) {
       print("Failed to get user goodwill actions: $e");
       throw Exception('Failed to get user goodwill actions: $e');
+    }
+  }
+  
+  /// Fetches the public ledger of verified goodwill actions.
+  Future<List<PublicLedgerEntry>> getPublicLedger() async {
+    // NOTE: Replace '/api/v1/ledger/public' with your actual endpoint if different.
+    final uri = Uri.parse('$_baseUrl/api/v1/ledger/public');
+    try {
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Assuming the API returns a list under a key, e.g., 'entries'
+        final List<dynamic> entryList = data['entries'];
+        return entryList.map((json) => PublicLedgerEntry.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load public ledger (HTTP ${response.statusCode})');
+      }
+    } catch (e) {
+      print("Failed to get public ledger: $e");
+      throw Exception('Failed to get public ledger: $e');
     }
   }
 }
