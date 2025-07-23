@@ -4,9 +4,8 @@ import '../services/api_client.dart'; // Make sure this import path is correct
 
 /// Manages the state of the user account.
 ///
-/// This class will hold the current user's data and provide methods
-/// to fetch or update it.
-/// It uses ChangeNotifier to notify any widgets
+/// This class holds the current user's data and provides methods
+/// to fetch or update it. It uses ChangeNotifier to notify any widgets
 /// that are listening when the user data changes.
 class UserProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
@@ -20,6 +19,10 @@ class UserProvider with ChangeNotifier {
   UserAccount? get userAccount => _userAccount;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  
+  // NEW: Add the missing hasError getter.
+  // This will return `true` if an error message exists, and `false` otherwise.
+  bool get hasError => _error != null;
 
   UserProvider(this._apiClient);
 

@@ -1,59 +1,47 @@
-import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 import 'dart:math';
+import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
 
 class NebulaBackgroundPainter extends CustomPainter {
-  final Animation<Offset> animation; // Animation is now for an Offset (x,y shift)
+  // UPDATED: The painter now accepts a direct Offset for the center.
+  final Offset center;
   final List<Color> colors;
   final double noiseIntensity;
 
   NebulaBackgroundPainter({
-    required this.animation,
-    this.colors = const [
-      Color(0xFF8A2BE2), // BlueViolet (deep purple)
-      Color(0xFFFF1493), // DeepPink
-      Color(0xFF00BFFF), // DeepSkyBlue
-      Color(0xFFDA70D6), // Orchid (lighter purple)
-    ],
-    this.noiseIntensity = 0.05,
-  }) : super(repaint: animation);
+    required this.center, // Changed from 'animation'
+    required this.colors,
+    required this.noiseIntensity,
+  }) : super(repaint: ValueNotifier<Offset>(center)); // Use a ValueNotifier for repaint
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-
-    // Create a radial gradient for the base nebula shape
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    
+    // Create the gradient using the new 'center' property
     final gradient = RadialGradient(
+      center: Alignment(center.dx * 2 - 1, center.dy * 2 - 1), // Convert 0-1 to -1-1
+      radius: 1.5,
       colors: colors,
-      stops: const [0.0, 0.3, 0.6, 1.0],
-      // Use the animated offset directly for the center
-      center: FractionalOffset(
-        0.5 + animation.value.dx, // Shift X based on animation
-        0.5 + animation.value.dy, // Shift Y based on animation
-      ),
-      radius: 1.2,
-    ).createShader(rect);
-
-    canvas.drawRect(
-      rect,
-      Paint()..shader = gradient,
     );
 
-    // Optional: Add a subtle noise layer for more organic texture
-    final random = Random();
-    final noisePaint = Paint()
-      ..color = Colors.white.withOpacity(noiseIntensity)
-      ..strokeWidth = 1.0;
+    canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
 
-    for (int i = 0; i < size.width * size.height * 0.0001; i++) {
+    // Optional: Add noise for texture
+    final random = Random(123); // Use a fixed seed for consistent noise
+    for (int i = 0; i < 5000 * noiseIntensity; i++) {
       final x = random.nextDouble() * size.width;
       final y = random.nextDouble() * size.height;
-      canvas.drawPoints(ui.PointMode.points, [Offset(x, y)], noisePaint);
+      final color = Color.fromRGBO(255, 255, 255, random.nextDouble() * 0.2);
+      canvas.drawCircle(Offset(x, y), 0.5, Paint()..color = color);
     }
   }
 
   @override
   bool shouldRepaint(covariant NebulaBackgroundPainter oldDelegate) {
-    return oldDelegate.animation != animation || oldDelegate.colors != colors;
+    // Repaint only if the center position or other properties change.
+    return oldDelegate.center != center ||
+        oldDelegate.colors != colors ||
+        oldDelegate.noiseIntensity != noiseIntensity;
   }
 }
