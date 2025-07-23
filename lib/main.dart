@@ -1,4 +1,4 @@
-// main.dart - Final Version with Bug Fix for disappearing text
+// main.dart - Final Version with all card navigation connected
 
 import 'dart:async';
 import 'dart:math';
@@ -17,6 +17,7 @@ import 'state/user_provider.dart';
 import 'state/proposal_provider.dart';
 import 'state/goodwill_processing_provider.dart';
 import 'pages/submit_goodwill_page.dart';
+import 'pages/my_portfolio_page.dart';
 import 'pages/sign_in_page.dart';
 import 'state/auth_provider.dart' as MyAppAuthProvider;
 
@@ -145,11 +146,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
       final String? userId = authProvider.user?.uid;
-
       if (userId != null) {
         context.read<UserProvider>().fetchUser(userId);
       }
-
       context.read<ProposalProvider>().fetchProposals(status: 'ACTIVE');
     });
 
@@ -160,14 +159,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             'View active proposals, create new ones, and cast your votes.',
         icon: Icons.gavel,
         cardColor: AppColors.governance,
-        expandedContent: _cardContent(context, 'Governance Forms (TBD)'),
+        expandedContent:
+            _cardContent(context, 'Governance Forms (Not implemented)'),
       ),
       NavigationCard(
         title: 'My Portfolio',
         description: 'Track your personal acts of goodwill and contributions.',
         icon: Icons.account_balance_wallet,
         cardColor: AppColors.portfolio,
-        expandedContent: _cardContent(context, 'Portfolio Forms (TBD)'),
+        expandedContent: _cardContent(
+          context,
+          "View My Acts",
+          pageToOpen: const MyPortfolioPage(),
+        ),
       ),
       NavigationCard(
         title: 'Record Act',
@@ -175,29 +179,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             'Share a new act of kindness or contribution and earn Loves.',
         icon: Icons.favorite,
         cardColor: AppColors.recordAct,
-        expandedContent: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Log your positive actions to earn Loves in the BrightActs ecosystem.',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 15),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  _showSlidingFormOverlay(context, const SubmitGoodwillPage());
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.buttonPrimary,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Submit a Bright Act',
-                    style: TextStyle(fontSize: 16)),
-              ),
-            ),
-          ],
+        expandedContent: _cardContent(
+          context,
+          "Submit a Bright Act",
+          pageToOpen: const SubmitGoodwillPage(),
         ),
       ),
       NavigationCard(
@@ -205,14 +190,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         description: 'View all recorded acts of goodwill on the blockchain.',
         icon: Icons.public,
         cardColor: AppColors.ledger,
-        expandedContent: _cardContent(context, 'Public Ledger Forms (TBD)'),
+        expandedContent:
+            _cardContent(context, 'Public Ledger Forms (Not implemented)'),
       ),
       NavigationCard(
         title: 'My Wallet',
         description: 'Manage your Loves balance, send, and receive.',
         icon: Icons.wallet,
         cardColor: AppColors.wallet,
-        expandedContent: _cardContent(context, 'Wallet Forms (TBD)'),
+        expandedContent: _cardContent(context, 'Wallet Forms (Not implemented)'),
       ),
     ];
   }
@@ -223,7 +209,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
-  Future<void> _showSlidingFormOverlay(BuildContext context, Widget content) async {
+  Future<void> _showSlidingFormOverlay(
+      BuildContext context, Widget content) async {
     setState(() {
       _showMenuBars = false;
       _showCards = false;
@@ -239,8 +226,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         final curve =
             CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
         return SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0.0, -1.0), end: Offset.zero)
-              .animate(curve),
+          position:
+              Tween<Offset>(begin: const Offset(0.0, -1.0), end: Offset.zero)
+                  .animate(curve),
           child: FadeTransition(opacity: animation, child: child),
         );
       },
@@ -277,7 +265,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     });
   }
 
-  Widget _cardContent(BuildContext context, String message) {
+  Widget _cardContent(BuildContext context, String buttonText,
+      {Widget? pageToOpen}) {
+    // If a page isn't provided, create a default content widget.
+    final Widget contentToShow = pageToOpen ??
+        Center(
+            child: Text(buttonText,
+                style: const TextStyle(color: Colors.white, fontSize: 20)));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -290,14 +285,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           child: ElevatedButton(
             onPressed: () {
               HapticFeedback.lightImpact();
-              _showSlidingFormOverlay(context, Center(child: Text(message,
-                        style: const TextStyle(color: Colors.white, fontSize: 20))));
+              _showSlidingFormOverlay(context, contentToShow);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.buttonPrimary,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Explore', style: TextStyle(fontSize: 16)),
+            child: Text(buttonText, style: const TextStyle(fontSize: 16)),
           ),
         ),
       ],
@@ -319,7 +313,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final double verticalMargin = screenWidth >= AppBreakpoints.desktop ? 40.0 : 20.0;
+    final double verticalMargin =
+        screenWidth >= AppBreakpoints.desktop ? 40.0 : 20.0;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -392,8 +387,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           return const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('// CONNECTION INTERRUPTED', style: TextStyle(color: Colors.redAccent, fontSize: 24, fontFamily: 'monospace')),
-              Text('  Could not load user data.', style: TextStyle(color: Colors.white70)),
+              Text('// CONNECTION INTERRUPTED',
+                  style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 24,
+                      fontFamily: 'monospace')),
+              Text('  Could not load user data.',
+                  style: TextStyle(color: Colors.white70)),
             ],
           );
         }
@@ -418,10 +418,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         .textTheme
                         .titleLarge
                         ?.copyWith(fontSize: 18)),
-
                 if (data.isLoading)
-                   Text("******", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
-
+                  Text("******",
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontSize: 18)),
                 if (!data.isLoading && data.userAccount != null)
                   AnimatedDigitWidget(
                     value: data.userAccount!.balance,
@@ -433,7 +435,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     curve: Curves.easeOut,
                     fractionDigits: 2,
                   ),
-
                 Text(' Loves',
                     style: Theme.of(context)
                         .textTheme
@@ -476,11 +477,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       duration: AppDurations.fast,
       child: BottomNavigationBar(
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'Governance'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.gavel), label: 'Governance'),
           BottomNavigationBarItem(
               icon: Icon(Icons.account_balance_wallet), label: 'Portfolio'),
           BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Share'),
-          BottomNavigationBarItem(icon: Icon(Icons.public), label: 'Ledger'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.public), label: 'Ledger'),
           BottomNavigationBarItem(icon: Icon(Icons.wallet), label: 'Wallet'),
         ],
         currentIndex: _selectedIndex,
@@ -512,9 +515,12 @@ class SettingsDialog extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Settings & Info', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text('Settings & Info',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
-              
               _buildLinkButton(
                 context: context,
                 text: 'Docs & Codebase',
@@ -523,22 +529,21 @@ class SettingsDialog extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               _buildLinkButton(
-                context: context,
-                text: 'Get Support',
-                icon: Icons.support_agent,
-                onPressed: () { /* TODO: Implement support logic */ }
-              ),
-
+                  context: context,
+                  text: 'Get Support',
+                  icon: Icons.support_agent,
+                  onPressed: () {}),
               const SizedBox(height: 20),
               Divider(color: Colors.white.withOpacity(0.3)),
               const SizedBox(height: 10),
-
               TextButton.icon(
                 icon: const Icon(Icons.logout, color: Colors.redAccent),
-                label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
+                label: const Text('Sign Out',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 16)),
                 onPressed: () async {
                   HapticFeedback.heavyImpact();
-                  final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
+                  final authProvider =
+                      context.read<MyAppAuthProvider.AuthProvider>();
                   await authProvider.signOut();
                   Navigator.of(context).pop();
                 },
@@ -560,21 +565,18 @@ class SettingsDialog extends StatelessWidget {
     return TextButton.icon(
       icon: Icon(icon, color: Colors.amber[700]),
       label: Text(text, style: TextStyle(color: Colors.white, fontSize: 16)),
-      onPressed: onPressed ?? () async {
-        if (url != null) {
-          final uri = Uri.parse(url);
-          if (await url_launcher.canLaunchUrl(uri)) {
-            await url_launcher.launchUrl(uri);
-          }
-        }
-      },
+      onPressed: onPressed ??
+          () async {
+            if (url != null) {
+              final uri = Uri.parse(url);
+              if (await url_launcher.canLaunchUrl(uri)) {
+                await url_launcher.launchUrl(uri);
+              }
+            }
+          },
     );
   }
 }
-
-//================================================================================
-// UPDATED WIDGET: A smarter MatrixText widget that handles its own state.
-//================================================================================
 
 class MatrixText extends StatefulWidget {
   final String targetText;
@@ -595,7 +597,8 @@ class MatrixText extends StatefulWidget {
 }
 
 class _MatrixTextState extends State<MatrixText> {
-  static const _chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890*#@!?';
+  static const _chars =
+      'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890*#@!?';
   final _random = Random();
   Timer? _timer;
   late String _displayedText;
@@ -650,7 +653,8 @@ class _MatrixTextState extends State<MatrixText> {
   @override
   Widget build(BuildContext context) {
     final textToDisplay = _displayedText.split('').asMap().entries.map((e) {
-      final targetChar = e.key < widget.targetText.length ? widget.targetText[e.key] : '';
+      final targetChar =
+          e.key < widget.targetText.length ? widget.targetText[e.key] : '';
       return targetChar == ' ' ? ' ' : e.value;
     }).join();
 

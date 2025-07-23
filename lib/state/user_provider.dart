@@ -1,42 +1,45 @@
-import 'package:flutter/foundation.dart';
-import '../models/user_account.dart'; // Make sure this import path is correct
-import '../services/api_client.dart'; // Make sure this import path is correct
+// lib/state/user_provider.dart
 
-/// Manages the state of the user account.
-///
-/// This class holds the current user's data and provides methods
-/// to fetch or update it. It uses ChangeNotifier to notify any widgets
-/// that are listening when the user data changes.
+import 'package:flutter/foundation.dart';
+import '../models/user_account.dart';
+import '../services/api_client.dart';
+import '../models/goodwill_action.dart';
+
 class UserProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
 
-  // Private backing fields for the state
+  // Existing state for user account
   UserAccount? _userAccount;
   bool _isLoading = false;
   String? _error;
 
-  // Public getters to access the state safely
+  // State for the user's portfolio of goodwill actions
+  List<GoodwillAction> _userActions = [];
+  bool _isFetchingActions = false;
+  String? _actionsError;
+
+  // Public getters for user account
   UserAccount? get userAccount => _userAccount;
   bool get isLoading => _isLoading;
-  String? get error => _error;
-  
-  // NEW: Add the missing hasError getter.
-  // This will return `true` if an error message exists, and `false` otherwise.
   bool get hasError => _error != null;
+
+  // Public getters for the portfolio
+  List<GoodwillAction> get userActions => _userActions;
+  bool get isFetchingActions => _isFetchingActions;
+  bool get hasActionsError => _actionsError != null;
+  String? get actionsError => _actionsError;
 
   UserProvider(this._apiClient);
 
-  /// Fetches the user account data from the API.
   Future<void> fetchUser(String userId) async {
     _isLoading = true;
     _error = null;
-    notifyListeners(); // Notify UI that we are now loading
+    notifyListeners();
 
     try {
-      // In a real app, you'd call your API client here to fetch user data:
-      // _userAccount = await _apiClient.getUserDetails(userId);
-      // For now, we'll simulate a user account.
-      await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
+      // NOTE: This is still using mock data for the user account.
+      // You can update this to use a real API call later.
+      await Future.delayed(const Duration(seconds: 1));
       _userAccount = UserAccount(
         id: userId,
         firebaseUid: 'firebase_uid_$userId',
@@ -52,7 +55,24 @@ class UserProvider with ChangeNotifier {
       _error = "Failed to fetch user data: $e";
     } finally {
       _isLoading = false;
-      notifyListeners(); // Notify UI that loading is complete (with data or error)
+      notifyListeners();
+    }
+  }
+
+  // UPDATED: This method now calls the API client to fetch live data.
+  Future<void> fetchUserActions(String userId) async {
+    _isFetchingActions = true;
+    _actionsError = null;
+    notifyListeners();
+
+    try {
+      // This is the new, live API call, replacing the mock data.
+      _userActions = await _apiClient.getUserGoodwillActions(userId);
+    } catch (e) {
+      _actionsError = "Failed to fetch your Bright Acts: $e";
+    } finally {
+      _isFetchingActions = false;
+      notifyListeners();
     }
   }
 }
