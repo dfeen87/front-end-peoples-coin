@@ -1,13 +1,16 @@
-// main.dart - Enhanced Version with Header Animation
+// main.dart - Final Version with Bug Fix for disappearing text
 
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shimmer/shimmer.dart';
+import 'package:animated_digit/animated_digit.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
+// Your other imports...
 import 'models/user_account.dart';
 import 'services/api_client.dart';
 import 'state/user_provider.dart';
@@ -22,6 +25,7 @@ import 'widgets/dynamic_nebula_background.dart';
 import 'utils/app_constants.dart';
 import 'widgets/navigation_card.dart';
 
+// Your constants...
 class AppDurations {
   static const fast = Duration(milliseconds: 300);
   static const medium = Duration(milliseconds: 400);
@@ -36,13 +40,12 @@ class AppColors {
   static final buttonPrimary = Colors.amber[800];
 }
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  print('Firebase initialized!');
-
   runApp(
     MultiProvider(
       providers: [
@@ -329,9 +332,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // NEW: This is the enhancement you requested.
-                // This AnimatedSlide widget wraps the header, making it disappear
-                // in sync with the AppBar when a form is opened.
                 AnimatedSlide(
                   offset: _showMenuBars ? Offset.zero : const Offset(0, -1),
                   duration: AppDurations.fast,
@@ -388,52 +388,61 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         userAccount: provider.userAccount
       ),
       builder: (context, data, _) {
-        if (data.isLoading) {
-          return Shimmer.fromColors(
-            baseColor: Colors.grey[850]!,
-            highlightColor: Colors.grey[700]!,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                    width: 200.0, height: 28.0, color: Colors.white,
-                    margin: const EdgeInsets.only(bottom: 8)),
-                Container(width: 250.0, height: 22.0, color: Colors.white),
-              ],
-            ),
-          );
-        }
-
         if (data.hasError) {
           return const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Oops!', style: TextStyle(color: Colors.redAccent, fontSize: 24)),
-              Text('Could not load your data.', style: TextStyle(color: Colors.white70)),
+              Text('// CONNECTION INTERRUPTED', style: TextStyle(color: Colors.redAccent, fontSize: 24, fontFamily: 'monospace')),
+              Text('  Could not load user data.', style: TextStyle(color: Colors.white70)),
             ],
           );
         }
 
-        if (data.userAccount != null) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Welcome, ${data.userAccount!.username ?? 'User'}!',
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineMedium
-                      ?.copyWith(fontSize: 24)),
-              Text(
-                  'Your Balance: ${data.userAccount!.balance.toStringAsFixed(2)} Loves',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontSize: 18)),
-            ],
-          );
-        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            MatrixText(
+              targetText: 'Welcome, ${data.userAccount?.username ?? 'User'}!',
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineMedium
+                  ?.copyWith(fontSize: 24, fontFamily: 'monospace'),
+              isLoading: data.isLoading,
+              speed: const Duration(milliseconds: 100),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Text('Your Balance: ',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontSize: 18)),
 
-        return const SizedBox.shrink();
+                if (data.isLoading)
+                   Text("******", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
+
+                if (!data.isLoading && data.userAccount != null)
+                  AnimatedDigitWidget(
+                    value: data.userAccount!.balance,
+                    textStyle: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontSize: 18, color: Colors.white),
+                    duration: const Duration(seconds: 1),
+                    curve: Curves.easeOut,
+                    fractionDigits: 2,
+                  ),
+
+                Text(' Loves',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontSize: 18)),
+              ],
+            ),
+          ],
+        );
       },
     );
   }
@@ -559,6 +568,95 @@ class SettingsDialog extends StatelessWidget {
           }
         }
       },
+    );
+  }
+}
+
+//================================================================================
+// UPDATED WIDGET: A smarter MatrixText widget that handles its own state.
+//================================================================================
+
+class MatrixText extends StatefulWidget {
+  final String targetText;
+  final bool isLoading;
+  final TextStyle? style;
+  final Duration speed;
+
+  const MatrixText({
+    super.key,
+    required this.targetText,
+    required this.isLoading,
+    this.style,
+    this.speed = const Duration(milliseconds: 50),
+  });
+
+  @override
+  State<MatrixText> createState() => _MatrixTextState();
+}
+
+class _MatrixTextState extends State<MatrixText> {
+  static const _chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890*#@!?';
+  final _random = Random();
+  Timer? _timer;
+  late String _displayedText;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateTextForLoadingState(widget.isLoading);
+  }
+
+  @override
+  void didUpdateWidget(covariant MatrixText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isLoading != oldWidget.isLoading) {
+      _updateTextForLoadingState(widget.isLoading);
+    }
+  }
+
+  void _updateTextForLoadingState(bool isLoading) {
+    _timer?.cancel();
+    if (isLoading) {
+      _startScrambleAnimation();
+    } else {
+      setState(() {
+        _displayedText = widget.targetText;
+      });
+    }
+  }
+
+  void _startScrambleAnimation() {
+    _displayedText = _generateRandomString(widget.targetText.length);
+    _timer = Timer.periodic(widget.speed, (timer) {
+      if (mounted) {
+        setState(() {
+          _displayedText = _generateRandomString(widget.targetText.length);
+        });
+      }
+    });
+  }
+
+  String _generateRandomString(int length) {
+    return String.fromCharCodes(Iterable.generate(
+        length, (_) => _chars.codeUnitAt(_random.nextInt(_chars.length))));
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textToDisplay = _displayedText.split('').asMap().entries.map((e) {
+      final targetChar = e.key < widget.targetText.length ? widget.targetText[e.key] : '';
+      return targetChar == ' ' ? ' ' : e.value;
+    }).join();
+
+    return Text(
+      widget.isLoading ? textToDisplay : widget.targetText,
+      style: widget.style,
     );
   }
 }

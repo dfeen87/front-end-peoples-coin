@@ -18,6 +18,7 @@ dependencies:
   http: ^1.2.1
   url_launcher: ^6.2.2
   shimmer: ^3.0.0
+  animated_digit: ^3.2.2
 
 dev_dependencies:
   flutter_test:
