@@ -12,8 +12,9 @@ dependencies:
     sdk: flutter
 
   # Firebase
-  firebase_core: ^3.2.0
-  firebase_auth: ^5.1.1
+  firebase_core: ^3.3.0
+  firebase_auth: ^5.2.0
+  firebase_app_check: ^0.3.0
 
   # State Management
   # Note: You have both provider and riverpod. Usually only one is needed.
@@ -26,7 +27,7 @@ dependencies:
 
   # UI & Utilities
   cupertino_icons: ^1.0.8
-  http: ^1.2.2
+  http: ^1.2.3
   url_launcher: ^6.3.0
   shimmer: ^3.0.0
   animated_digit: ^3.2.2
@@ -39,6 +40,7 @@ dev_dependencies:
     sdk: flutter
   # The latest version of flutter_lints is 4.0.0
   flutter_lints: ^4.0.0
+
 
 flutter:
   uses-material-design: true
