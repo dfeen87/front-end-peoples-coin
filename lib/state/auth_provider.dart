@@ -35,7 +35,7 @@ class AuthProvider with ChangeNotifier {
         notifyListeners();
 
         try {
-          // Use updated `getUserById` method
+          // Fetch UserAccount from API using firebaseUser.uid
           _userAccount = await _apiClient.getUserById(firebaseUser.uid);
         } catch (e) {
           print('Error fetching user account: $e');
@@ -58,9 +58,11 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      // Mock reCAPTCHA token (replace with actual implementation if needed)
       final String recaptchaToken = 'mock_recaptcha_token_${DateTime.now().millisecondsSinceEpoch}';
       print('reCAPTCHA token obtained (mocked for web): $recaptchaToken');
 
+      // Mock sign-in for your specific test account
       if (email == "dfeen87@brightacts.com" && password == "bleigh1!") {
         _user = UserMock(email: email);
 
@@ -116,7 +118,7 @@ class AuthProvider with ChangeNotifier {
   }
 }
 
-/// Mock User class
+/// Mock User class for testing login without Firebase backend
 class UserMock implements fb_auth.User {
   @override
   final String email;
@@ -163,27 +165,27 @@ class UserMock implements fb_auth.User {
 
   @override
   Future<fb_auth.User> unlink(String providerId) async {
-    throw UnimplementedError('unlink has not been implemented for UserMock.');
+    throw UnimplementedError('unlink not implemented for UserMock.');
   }
 
   @override
   Future<fb_auth.UserCredential> linkWithProvider(fb_auth_platform_provider.AuthProvider provider) async {
-    throw UnimplementedError('linkWithProvider has not been implemented for UserMock.');
+    throw UnimplementedError('linkWithProvider not implemented for UserMock.');
   }
 
   @override
   Future<fb_auth.UserCredential> reauthenticateWithProvider(fb_auth_platform_provider.AuthProvider provider) async {
-    throw UnimplementedError('reauthenticateWithProvider has not been implemented for UserMock.');
+    throw UnimplementedError('reauthenticateWithProvider not implemented for UserMock.');
   }
 
   @override
   Future<fb_auth.UserCredential> linkWithPopup(fb_auth_platform_provider.AuthProvider provider) async {
-    throw UnimplementedError('linkWithPopup has not been implemented for UserMock.');
+    throw UnimplementedError('linkWithPopup not implemented for UserMock.');
   }
 
   @override
   Future<void> linkWithRedirect(fb_auth_platform_provider.AuthProvider provider) async {
-    throw UnimplementedError('linkWithRedirect has not been implemented for UserMock.');
+    throw UnimplementedError('linkWithRedirect not implemented for UserMock.');
   }
 
   @override
@@ -198,47 +200,47 @@ class UserMock implements fb_auth.User {
 
   @override
   Future<fb_auth.UserCredential> linkWithCredential(fb_auth.AuthCredential credential) {
-    throw UnimplementedError('linkWithCredential has not been implemented for UserMock.');
+    throw UnimplementedError('linkWithCredential not implemented for UserMock.');
   }
 
   @override
   Future<void> delete() {
-    throw UnimplementedError('delete has not been implemented for UserMock.');
+    throw UnimplementedError('delete not implemented for UserMock.');
   }
 
   @override
   Future<void> updateEmail(String newEmail) {
-    throw UnimplementedError('updateEmail has not been implemented for UserMock.');
+    throw UnimplementedError('updateEmail not implemented for UserMock.');
   }
 
   @override
   Future<void> updatePassword(String newPassword) {
-    throw UnimplementedError('updatePassword has not been implemented for UserMock.');
+    throw UnimplementedError('updatePassword not implemented for UserMock.');
   }
 
   @override
   Future<void> updateProfile({String? displayName, String? photoURL}) {
-    throw UnimplementedError('updateProfile has not been implemented for UserMock.');
+    throw UnimplementedError('updateProfile not implemented for UserMock.');
   }
 
   @override
   Future<void> updateDisplayName(String? displayName) {
-    throw UnimplementedError('updateDisplayName has not been implemented for UserMock.');
+    throw UnimplementedError('updateDisplayName not implemented for UserMock.');
   }
 
   @override
   Future<void> updatePhotoURL(String? photoURL) {
-    throw UnimplementedError('updatePhotoURL has not been implemented for UserMock.');
+    throw UnimplementedError('updatePhotoURL not implemented for UserMock.');
   }
 
   @override
   Future<void> updatePhoneNumber(fb_auth.PhoneAuthCredential credential) {
-    throw UnimplementedError('updatePhoneNumber has not been implemented for UserMock.');
+    throw UnimplementedError('updatePhoneNumber not implemented for UserMock.');
   }
 
   @override
   Future<void> verifyBeforeUpdateEmail(String newEmail, [fb_auth.ActionCodeSettings? actionCodeSettings]) {
-    throw UnimplementedError('verifyBeforeUpdateEmail has not been implemented for UserMock.');
+    throw UnimplementedError('verifyBeforeUpdateEmail not implemented for UserMock.');
   }
 
   @override

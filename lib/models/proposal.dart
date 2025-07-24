@@ -59,6 +59,24 @@ class Proposal {
     );
   }
 
+  /// Serialize this Proposal instance to JSON map.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'proposer_user_id': proposerUserId,
+      'title': title,
+      'description': description,
+      'status': status.toString().split('.').last.toUpperCase(),
+      'vote_start_time': voteStartTime?.toIso8601String(),
+      'vote_end_time': voteEndTime?.toIso8601String(),
+      'required_quorum': requiredQuorum,
+      'proposal_type': proposalType,
+      'details': details,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
   /// Helper function to safely convert a string to a ProposalStatus enum.
   static ProposalStatus _statusFromString(String? status) {
     switch (status?.toUpperCase()) {
@@ -75,3 +93,4 @@ class Proposal {
     }
   }
 }
+

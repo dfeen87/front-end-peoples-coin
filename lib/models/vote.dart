@@ -34,4 +34,18 @@ class Vote {
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
   }
+
+  /// Converts the Vote instance into a JSON map.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'voter_user_id': voterUserId,
+      'proposal_id': proposalId,
+      'vote_value': voteValue,
+      'rationale': rationale,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
 }
+

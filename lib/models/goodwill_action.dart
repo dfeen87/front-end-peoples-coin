@@ -1,12 +1,8 @@
-// lib/models/goodwill_action.dart
-
-// This enum should match the one in your Dart code.
-// If it's in another file, you can remove this and import it instead.
 enum GoodwillStatus {
   pendingVerification,
   verified,
   rejected,
-  unknown // A fallback for safety
+  unknown, // A fallback for safety
 }
 
 class GoodwillAction {
@@ -32,23 +28,22 @@ class GoodwillAction {
     required this.updatedAt,
   });
 
-  // NEW: A factory constructor to create a GoodwillAction from a JSON map.
+  /// Factory constructor to create a GoodwillAction from a JSON map.
   factory GoodwillAction.fromJson(Map<String, dynamic> json) {
     return GoodwillAction(
-      id: json['id'],
-      performerUserId: json['performer_user_id'],
-      actionType: json['action_type'],
-      description: json['description'],
-      contextualData: json['contextual_data'] ?? {},
-      lovesValue: json['loves_value'],
-      // This safely handles the status enum from a string.
-      status: _statusFromString(json['status']),
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      id: json['id'] as String,
+      performerUserId: json['performer_user_id'] as String,
+      actionType: json['action_type'] as String,
+      description: json['description'] as String,
+      contextualData: (json['contextual_data'] as Map<String, dynamic>?) ?? {},
+      lovesValue: json['loves_value'] as int,
+      status: _statusFromString(json['status'] as String),
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
     );
   }
 
-  // Helper function to safely convert a string to our GoodwillStatus enum.
+  /// Helper to safely convert a string to GoodwillStatus enum.
   static GoodwillStatus _statusFromString(String status) {
     switch (status.toUpperCase()) {
       case 'PENDING_VERIFICATION':
@@ -61,4 +56,20 @@ class GoodwillAction {
         return GoodwillStatus.unknown;
     }
   }
+
+  /// Converts the GoodwillAction instance into a JSON map.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'performer_user_id': performerUserId,
+      'action_type': actionType,
+      'description': description,
+      'contextual_data': contextualData,
+      'loves_value': lovesValue,
+      'status': status.toString().split('.').last.toUpperCase(),
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
 }
+
