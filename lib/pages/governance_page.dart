@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/proposal_provider.dart';
 import '../widgets/proposal_card.dart'; // Assuming you have a ProposalCard widget
-// Import the new content class for creating proposals
 import 'create_proposal_page.dart'; // This will be the file containing CreateProposalPageContent
 
 class GovernancePage extends StatefulWidget {
@@ -71,7 +70,7 @@ class _GovernancePageState extends State<GovernancePage> {
           itemCount: proposalProvider.proposals.length,
           itemBuilder: (context, index) {
             final proposal = proposalProvider.proposals[index];
-            // Assuming ProposalCard takes a Proposal object and handles its own UI
+            // Assuming ProposalCard takes a Proposal object
             return ProposalCard(proposal: proposal);
           },
         );
@@ -81,7 +80,6 @@ class _GovernancePageState extends State<GovernancePage> {
 
   // Builds the create proposal form view (content from CreateProposalPage)
   Widget _buildCreateProposalForm() {
-    // Note: The CreateProposalPage itself was modified to NOT have a Scaffold/AppBar
     return CreateProposalPageContent( // Ensure this class name matches your create_proposal_page.dart
       onFormCompleted: _onProposalFormCompleted, // Pass the callback
     );
@@ -95,6 +93,7 @@ class _GovernancePageState extends State<GovernancePage> {
         title: Text(_showCreateForm ? 'Create New Proposal' : 'Governance'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        automaticallyImplyLeading: false, // <<< ADDED THIS LINE
         actions: [
           // Show different actions based on view
           _showCreateForm // If currently showing the form
