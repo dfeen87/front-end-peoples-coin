@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 // TODO: Make sure this path points to your REAL sign-in page.
-import 'sign_in_screen.dart'; 
+import '../screens/sign_in_screen.dart';
 import '../widgets/dynamic_nebula_background.dart';
 
 // The class is renamed to avoid confusion with the real sign-in page.

@@ -9,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:animated_digit/animated_digit.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
+import 'package:brightacts_frontend_app/pages/sign_in_page.dart'; 
 
 // Your other imports...
 import 'models/user_account.dart';
@@ -119,15 +120,9 @@ class BrightActsApp extends StatelessWidget {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
         ),
       ),
-      home: Consumer<MyAppAuthProvider.AuthProvider>(
-        builder: (context, authProvider, child) {
-          if (authProvider.user != null) {
-            return const HomePage();
-          } else {
-            return const SignInPage();
-          }
-        },
-      ),
+
+      home: const DevGatePage(),
+      
       routes: {},
     );
   }
