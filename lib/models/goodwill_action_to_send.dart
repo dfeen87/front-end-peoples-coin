@@ -1,33 +1,34 @@
+// lib/models/goodwill_action_to_send.dart
 import 'package:flutter/foundation.dart';
 
-/// A simplified model for sending a new goodwill action to the API.
+/// A model for sending a new goodwill action to the API.
 @immutable
 class GoodwillActionToSend {
-  final String userId;
+  final String performerUserId; // Correct parameter name
   final String actionType;
   final String description;
-  final DateTime timestamp;
   final int lovesValue;
-  final Map<String, dynamic> contextualData;
+  final Map<String, dynamic>? contextualData;
+  final DateTime timestamp; // ADDED: Field for timestamp (from your existing code)
 
   const GoodwillActionToSend({
-    required this.userId,
+    required this.performerUserId, // Correct parameter name in constructor
     required this.actionType,
     required this.description,
-    required this.timestamp,
     required this.lovesValue,
-    this.contextualData = const {},
+    this.contextualData,
+    required this.timestamp, // ADDED: Parameter in constructor
   });
 
   /// Converts this object into a JSON map for the API request body.
   Map<String, dynamic> toJson() {
     return {
-      'user_id': userId,
+      'performer_user_id': performerUserId, // Correct JSON key
       'action_type': actionType,
       'description': description,
-      'timestamp': timestamp.toUtc().toIso8601String(),
       'loves_value': lovesValue,
-      'contextual_data': contextualData,
+      'contextual_data': contextualData ?? {},
+      'timestamp': timestamp.toIso8601String(), // Convert DateTime to ISO 8601 string
     };
   }
 }
