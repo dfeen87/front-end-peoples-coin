@@ -1,8 +1,8 @@
 // lib/widgets/public_action_card.dart
 
-import 'package:flutter/material.dart'; // Keep only one import
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart'; // Make sure this import is present
 import '../models/public_ledger_entry.dart';
 
 class PublicActionCard extends StatelessWidget {
@@ -74,15 +74,15 @@ class PublicActionCard extends StatelessWidget {
                         Clipboard.setData(
                             ClipboardData(text: entry.performerWalletAddress));
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Wallet address copied!')),
+                          const SnackBar(content: Text('Wallet address copied!')),
                         );
                       },
                     ),
                   ],
                 ),
                 Text(
-                  DateFormat.yMMMd().format(entry.createdAt),
+                  // MODIFIED: Added time to the date format
+                  DateFormat.yMMMd().add_jm().format(entry.createdAt),
                   style: const TextStyle(color: Colors.white54, fontSize: 12),
                 ),
               ],

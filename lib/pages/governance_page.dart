@@ -93,9 +93,8 @@ class _GovernancePageState extends State<GovernancePage> {
         title: Text(_showCreateForm ? 'Create New Proposal' : 'Governance'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false, // <<< ADDED THIS LINE
+        automaticallyImplyLeading: false, // Prevents implicit back button
         actions: [
-          // Show different actions based on view
           _showCreateForm // If currently showing the form
               ? IconButton(
                   icon: const Icon(Icons.close), // Close button for the form
@@ -115,10 +114,10 @@ class _GovernancePageState extends State<GovernancePage> {
                 ),
         ],
       ),
+      resizeToAvoidBottomInset: false, // <<< ADDED THIS LINE: Prevents layout jumps
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 500), // Fade duration
         transitionBuilder: (Widget child, Animation<double> animation) {
-          // FadeTransition for the requested fade effect
           return FadeTransition(opacity: animation, child: child);
         },
         // Use a KeyedSubtree to ensure AnimatedSwitcher sees a different widget and animates
@@ -126,15 +125,6 @@ class _GovernancePageState extends State<GovernancePage> {
             ? KeyedSubtree(key: const ValueKey('createForm'), child: _buildCreateProposalForm())
             : KeyedSubtree(key: const ValueKey('proposalList'), child: _buildProposalList()),
       ),
-      // If you want a FAB, you can still add it here
-      // floatingActionButton: _showCreateForm ? null : FloatingActionButton(
-      //   onPressed: () {
-      //     setState(() {
-      //       _showCreateForm = true;
-      //     });
-      //   },
-      //   child: const Icon(Icons.add),
-      // ),
     );
   }
 }

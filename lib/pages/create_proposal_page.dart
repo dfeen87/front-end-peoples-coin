@@ -96,7 +96,7 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Proposal created successfully!')),
           );
-          widget.onFormCompleted(); // IMPORTANT: Call the callback to close/hide the form
+          widget.onFormCompleted(); // Call the callback on success to close the form
         }
       } else {
         if (mounted) {
@@ -110,39 +110,42 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
 
   @override
   Widget build(BuildContext context) {
-    // IMPORTANT: No Scaffold or AppBar here! This widget is now just the form content
     return Consumer<ProposalProvider>(
       builder: (context, provider, child) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Proposal Title',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
+        // --- START SizedBox block (Line 115 approx) ---
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.7, // Adjust this multiplier as needed to fit your form
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            physics: const NeverScrollableScrollPhysics(), // Keep this
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'Proposal Title',
+                      labelStyle: TextStyle(color: Colors.white70),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white54),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white),
+                      ),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white),
-                    ),
+                    style: const TextStyle(color: Colors.white),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a title.';
+                      }
+                      return null;
+                    },
+                    onSaved: (value) {
+                      _title = value!;
+                    },
                   ),
-                  style: const TextStyle(color: Colors.white),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a title.';
-                    }
-                    return null;
-                  },
-                  onSaved: (value) {
-                    _title = value!;
-                  },
-                ),
-                const SizedBox(height: 16.0),
+                  const SizedBox(height: 16.0),
                 TextFormField(
                   decoration: const InputDecoration(
                     labelText: 'Description',
@@ -234,19 +237,19 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
                         : const Text('Submit Proposal'),
                   ),
                 ),
-                // NEW: Add a Cancel Button for the form
                 const SizedBox(height: 16.0),
                 Center(
                   child: TextButton(
-                    onPressed: provider.isSubmittingProposal ? null : widget.onFormCompleted, // Call completed callback on cancel
+                    onPressed: provider.isSubmittingProposal ? null : widget.onFormCompleted,
                     child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
                   ),
                 ),
               ],
             ),
           ),
-        );
-      },
-    );
+        ),
+      ); // END of SizedBox widget (Line 249 approx)
+      }, // END of builder callback
+    ); // END of Consumer widget
   }
 }

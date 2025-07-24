@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/ledger_provider.dart';
 import '../widgets/public_action_card.dart';
-import '../widgets/matrix_text.dart'; // Correct import path for MatrixText
+// import '../widgets/matrix_text.dart'; // No longer needed as _buildLoadingSkeleton is removed
 
 class PublicLedgerPage extends StatefulWidget {
   const PublicLedgerPage({super.key});
@@ -22,70 +22,8 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> {
     });
   }
 
-  // UPDATED: This method now builds a loading skeleton with the Matrix effect.
-  Widget _buildLoadingSkeleton() {
-    return ListView.builder(
-      itemCount: 5,
-      itemBuilder: (_, __) => Card(
-        margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 16.0),
-        color: Colors.white.withOpacity(0.05),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10.0),
-          side: const BorderSide(color: Colors.transparent),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top row placeholder
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  MatrixText(
-                    targetText: "Action Type Placeholder", // CORRECTED
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontFamily: 'monospace'),
-                    speed: const Duration(milliseconds: 80),
-                  ),
-                  MatrixText(
-                    targetText: "XX Loves", // CORRECTED
-                    style: TextStyle(
-                        color: Colors.amber[600],
-                        fontSize: 16,
-                        fontFamily: 'monospace'),
-                    speed: const Duration(milliseconds: 80),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Bottom row placeholder
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                   MatrixText(
-                    targetText: "0x000...0000", // CORRECTED
-                    style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontFamily: 'monospace'),
-                    speed: const Duration(milliseconds: 80),
-                  ),
-                  MatrixText(
-                    targetText: "Date Plchldr", // CORRECTED
-                    style: const TextStyle(color: Colors.white54, fontSize: 12, fontFamily: 'monospace'),
-                    speed: const Duration(milliseconds: 80),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // The _buildLoadingSkeleton() method has been removed to simplify the loading UI.
+  // The loading state is now represented by a simple CircularProgressIndicator.
 
   @override
   Widget build(BuildContext context) {
@@ -99,7 +37,9 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> {
       body: Consumer<LedgerProvider>(
         builder: (context, ledgerProvider, child) {
           if (ledgerProvider.isLoading) {
-            return _buildLoadingSkeleton();
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.white), // Simple loading indicator
+            );
           }
 
           if (ledgerProvider.error != null) {
