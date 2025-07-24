@@ -1,7 +1,7 @@
 // lib/main.dart - Final Version with all card navigation connected
 
 import 'dart:async';
-import 'dart:math'; // Keep Random for now, but it's not needed here after MatrixText move
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +12,7 @@ import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
 // Your other imports...
 import 'models/user_account.dart';
-import 'service/api_client.dart';
+import 'service/api_client.dart'; // CORRECTED PATH to api_client.dart
 import 'state/user_provider.dart';
 import 'state/proposal_provider.dart';
 import 'state/goodwill_processing_provider.dart';
@@ -29,7 +29,7 @@ import 'firebase_options.dart';
 import 'widgets/dynamic_nebula_background.dart';
 import 'utils/app_constants.dart';
 import 'widgets/navigation_card.dart';
-import 'widgets/matrix_text.dart'; // NEW: Import MatrixText from its dedicated file
+import 'widgets/matrix_text.dart'; // Import MatrixText from its dedicated file
 
 // Your constants...
 class AppDurations {
@@ -45,6 +45,7 @@ class AppColors {
   static const wallet = Color(0xFF6A5ACD);
   static final buttonPrimary = Colors.amber[800];
 }
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,7 +69,6 @@ void main() async {
           ),
         ),
         ChangeNotifierProvider<ProposalProvider>(
-          // CORRECTED: Pass the PeoplesCoinApiClient instance
           create: (context) => ProposalProvider(
             Provider.of<PeoplesCoinApiClient>(context, listen: false),
           ),
@@ -375,6 +375,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         duration: AppDurations.fast,
         child: AppBar(
           title: const SizedBox.shrink(),
+          // --- CRITICAL CHANGES HERE ---
+          elevation: 0.0, // Explicitly ensure no shadow elevation
+          shadowColor: Colors.transparent, // Ensure shadow color is fully transparent
+          surfaceTintColor: Colors.transparent, // Ensure surface tint color is fully transparent
+          // Add a transparent bottom property to override any default line
+          bottom: const PreferredSize( // Using const for efficiency
+            preferredSize: Size.fromHeight(0.0), // Zero height
+            child: SizedBox.shrink(), // A completely empty, transparent box
+          ),
+          // --- END CRITICAL CHANGES ---
           actions: [
             IconButton(
               icon: const Icon(Icons.settings),
@@ -416,6 +426,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           );
         }
 
+        // --- REVERTED TO ORIGINAL: NO DIAGNOSTIC CONTAINER ---
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -462,6 +473,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             ),
           ],
         );
+        // --- END REVERTED ---
       },
     );
   }
@@ -595,93 +607,3 @@ class SettingsDialog extends StatelessWidget {
     );
   }
 }
-
-/*
-// Original MatrixText from main.dart, moved to lib/widgets/matrix_text.dart
-class MatrixText extends StatefulWidget {
-  final String targetText;
-  final bool isLoading;
-  final TextStyle? style;
-  final Duration speed;
-
-  const MatrixText({
-    super.key,
-    required this.targetText,
-    required this.isLoading,
-    this.style,
-    this.speed = const Duration(milliseconds: 50),
-  });
-
-  @override
-  State<MatrixText> createState() => _MatrixTextState();
-}
-
-class _MatrixTextState extends State<MatrixText> {
-  static const _chars =
-      'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890*#@!?';
-  final _random = Random();
-  Timer? _timer;
-  late String _displayedText;
-
-  @override
-  void initState() {
-    super.initState();
-    _updateTextForLoadingState(widget.isLoading);
-  }
-
-  @override
-  void didUpdateWidget(covariant MatrixText oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isLoading != oldWidget.isLoading || widget.targetText != oldWidget.targetText) {
-      _updateTextForLoadingState(widget.isLoading);
-    }
-  }
-
-  void _updateTextForLoadingState(bool isLoading) {
-    _timer?.cancel();
-    if (isLoading) {
-      _startScrambleAnimation();
-    } else {
-      setState(() {
-        _displayedText = widget.targetText;
-      });
-    }
-  }
-
-  void _startScrambleAnimation() {
-    _displayedText = _generateRandomString(widget.targetText.length);
-    _timer = Timer.periodic(widget.speed, (timer) {
-      if (mounted) {
-        setState(() {
-          _displayedText = _generateRandomString(widget.targetText.length);
-        });
-      }
-    });
-  }
-
-  String _generateRandomString(int length) {
-    return String.fromCharCodes(Iterable.generate(
-        length, (_) => _chars.codeUnitAt(_random.nextInt(_chars.length))));
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textToDisplay = _displayedText.split('').asMap().entries.map((e) {
-      final targetChar =
-          e.key < widget.targetText.length ? widget.targetText[e.key] : '';
-      return targetChar == ' ' ? ' ' : e.value;
-    }).join();
-
-    return Text(
-      widget.isLoading ? textToDisplay : widget.targetText,
-      style: widget.style,
-    );
-  }
-}
-*/

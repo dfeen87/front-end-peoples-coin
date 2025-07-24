@@ -24,18 +24,16 @@ class _MatrixTextState extends State<MatrixText> {
   static const _chars =
       'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890*#@!?';
   final _random = Random();
-  Timer? _scrambleTimer; // Timer specifically for scrambling effect
-  late String _displayedText; // The text currently visible
+  Timer? _scrambleTimer;
+  late String _displayedText;
 
-  // For typing animation (when not loading)
   int _typingIndex = 0;
   List<String> _typingCharacters = [];
-  bool _isTypingAnimating = false; // Flag for the typing animation
+  bool _isTypingAnimating = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with correct state based on isLoading
     if (widget.isLoading) {
       _startScrambleAnimation();
     } else {
@@ -46,14 +44,11 @@ class _MatrixTextState extends State<MatrixText> {
   @override
   void didUpdateWidget(covariant MatrixText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If loading state or target text changes, stop current animations and restart
     if (widget.isLoading != oldWidget.isLoading || widget.targetText != oldWidget.targetText) {
-      _scrambleTimer?.cancel(); // Cancel any existing scramble timer
-      _isTypingAnimating = false; // Signal to stop any ongoing typing animation
-
-      // A small delay to allow previous animation frames to clean up before starting new one
+      _scrambleTimer?.cancel();
+      _isTypingAnimating = false;
       Future.delayed(const Duration(milliseconds: 10), () {
-        if (mounted) { // Ensure widget is still mounted before starting
+        if (mounted) {
           if (widget.isLoading) {
             _startScrambleAnimation();
           } else {
@@ -65,29 +60,28 @@ class _MatrixTextState extends State<MatrixText> {
   }
 
   void _startScrambleAnimation() {
-    _typingIndex = 0; // Reset typing animation state
-    _typingCharacters = []; // Clear typing characters
-    _displayedText = _generateRandomString(widget.targetText.length); // Initial scramble
+    _typingIndex = 0;
+    _typingCharacters = [];
+    _displayedText = _generateRandomString(widget.targetText.length);
 
     _scrambleTimer = Timer.periodic(widget.speed, (timer) {
-      if (mounted && widget.isLoading) { // Only scramble if still loading and mounted
+      if (mounted && widget.isLoading) {
         setState(() {
           _displayedText = _generateRandomString(widget.targetText.length);
         });
       } else {
-        timer.cancel(); // Stop scrambling if no longer loading or widget unmounted
+        timer.cancel();
       }
     });
   }
 
   void _startTypingAnimation() {
-    _scrambleTimer?.cancel(); // Stop any scramble timer
-    _isTypingAnimating = true; // Set flag for typing animation
+    _scrambleTimer?.cancel();
+    _isTypingAnimating = true;
     _typingCharacters = widget.targetText.split('');
-    _displayedText = ''; // Start with empty string for typing effect
+    _displayedText = '';
     _typingIndex = 0;
 
-    // Immediately set full text if speed is 0 or very fast, or target is empty
     if (widget.speed.inMilliseconds == 0 || widget.targetText.isEmpty) {
       setState(() {
         _displayedText = widget.targetText;
@@ -99,9 +93,7 @@ class _MatrixTextState extends State<MatrixText> {
   }
 
   void _animateTyping() {
-    // Stop conditions for typing animation
     if (!mounted || !_isTypingAnimating || _typingIndex >= _typingCharacters.length) {
-      // Ensure full text is displayed if animation completes or stops prematurely
       if (mounted && _displayedText != widget.targetText) {
         setState(() {
           _displayedText = widget.targetText;
@@ -127,19 +119,26 @@ class _MatrixTextState extends State<MatrixText> {
 
   @override
   void dispose() {
-    _scrambleTimer?.cancel(); // Cancel scramble timer on dispose
-    _isTypingAnimating = false; // Stop typing animation on dispose
+    _scrambleTimer?.cancel();
+    _isTypingAnimating = false;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // When not loading, ensure the full targetText is always shown when animation is done
     final textToRender = widget.isLoading ? _displayedText : widget.targetText;
 
-    return Text(
-      textToRender,
-      style: widget.style,
+    // --- SOLUTION ATTEMPT: RepaintBoundary + Very Subtle Opaque Layer ---
+    return RepaintBoundary(
+      child: Container(
+        // Add a virtually invisible color. This often forces better compositing.
+        color: Colors.black.withOpacity(0.001), // Or Colors.white.withOpacity(0.001)
+        child: Text(
+          textToRender,
+          style: widget.style,
+        ),
+      ),
     );
+    // --- END SOLUTION ATTEMPT ---
   }
 }
