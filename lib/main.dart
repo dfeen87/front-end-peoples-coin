@@ -9,7 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:animated_digit/animated_digit.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
-import 'package:brightacts_frontend_app/pages/sign_in_page.dart'; 
+import 'package:brightacts_frontend_app/pages/dev_gate_page.dart';
 
 // Your other imports...
 import 'models/user_account.dart';
@@ -23,7 +23,6 @@ import 'pages/my_portfolio_page.dart';
 import 'pages/governance_page.dart';
 import 'pages/my_wallet_page.dart';
 import 'pages/public_ledger_page.dart';
-import 'pages/sign_in_page.dart';
 import 'state/auth_provider.dart' as MyAppAuthProvider;
 
 import 'firebase_options.dart';

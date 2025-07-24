@@ -1,14 +1,8 @@
-// lib/pages/sign_in_page.dart
+// lib/pages/dev_gate_page.dart
 
 import 'package:flutter/material.dart';
+import '../screens/sign_in_screen.dart'; // This links to the real sign-in screen
 
-// --- THIS IS THE FIX ---
-// This import tells this page where to find the real SignInScreen.
-import '../screens/sign_in_screen.dart';
-// --- END FIX ---
-
-
-// This is your DevGatePage class
 class DevGatePage extends StatefulWidget {
   const DevGatePage({super.key});
 
@@ -17,21 +11,23 @@ class DevGatePage extends StatefulWidget {
 }
 
 class _DevGatePageState extends State<DevGatePage> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   final String _correctUsername = "dev";
   final String _correctPassword = "password123";
 
-  void _devLogin() {
-    final enteredUsername = _emailController.text;
-    final enteredPassword = _passwordController.text;
+  void _login() {
+    final username = _usernameController.text;
+    final password = _passwordController.text;
 
-    if (enteredUsername == _correctUsername && enteredPassword == _correctPassword) {
+    if (username == _correctUsername && password == _correctPassword) {
+      // On success, navigate to the REAL sign-in screen
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const SignInScreen()),
       );
     } else {
+      // On failure, show an error
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Invalid developer credentials."),
@@ -44,9 +40,7 @@ class _DevGatePageState extends State<DevGatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Developer Access"),
-      ),
+      appBar: AppBar(title: const Text("Developer Access")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -54,18 +48,18 @@ class _DevGatePageState extends State<DevGatePage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: "Dev Username", border: OutlineInputBorder()),
+              controller: _usernameController,
+              decoration: const InputDecoration(labelText: "Dev Username"),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
               obscureText: true,
-              decoration: const InputDecoration(labelText: "Dev Password", border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: "Dev Password"),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _devLogin,
+              onPressed: _login,
               child: const Text("Enter Testing"),
             ),
           ],
