@@ -1,19 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -31,8 +18,28 @@
 
   <title>brightacts_frontend_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- reCAPTCHA Enterprise script -->
+  <script src="https://www.google.com/recaptcha/enterprise.js?render=6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs"></script>
+
+  <script>
+    // Function to get reCAPTCHA token
+    function getRecaptchaToken(action) {
+      return new Promise(function(resolve, reject) {
+        grecaptcha.enterprise.ready(function() {
+          grecaptcha.enterprise.execute('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs', {action: action}).then(function(token) {
+            resolve(token);
+          }).catch(function(error) {
+            reject(error);
+          });
+        });
+      });
+    }
+  </script>
+
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
+

@@ -5,8 +5,8 @@ import 'package:firebase_auth_platform_interface/src/auth_provider.dart' as fb_a
 import '../models/user_account.dart';
 import '../service/api_client.dart';
 
-/// Manages user authentication state using Firebase Auth and integrates with reCAPTCHA Enterprise.
-/// Also handles fetching the associated UserAccount data immediately upon successful authentication.
+/// Manages user authentication state using Firebase Auth and integrates with backend user data.
+/// Supports dev user mock login and real Firebase login.
 class AuthProvider with ChangeNotifier {
   final fb_auth.FirebaseAuth _auth = fb_auth.FirebaseAuth.instance;
   fb_auth.User? _user;
@@ -25,6 +25,7 @@ class AuthProvider with ChangeNotifier {
   bool get isUserAccountLoading => _isUserAccountLoading;
 
   AuthProvider(this._apiClient) {
+    // Listen to Firebase auth state changes to update current user and fetch user data
     _auth.authStateChanges().listen((fb_auth.User? firebaseUser) async {
       _user = firebaseUser;
       _isLoading = false;
@@ -35,7 +36,6 @@ class AuthProvider with ChangeNotifier {
         notifyListeners();
 
         try {
-          // Fetch UserAccount from API using firebaseUser.uid
           _userAccount = await _apiClient.getUserById(firebaseUser.uid);
         } catch (e) {
           print('Error fetching user account: $e');
@@ -52,18 +52,21 @@ class AuthProvider with ChangeNotifier {
     });
   }
 
+  /// Sign in with email and password.
+  /// If credentials match dev user, mock login is used.
+  /// Otherwise, real Firebase authentication is performed.
   Future<Map<String, dynamic>> signInWithEmailAndPassword(String email, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // Mock reCAPTCHA token (replace with actual implementation if needed)
-      final String recaptchaToken = 'mock_recaptcha_token_${DateTime.now().millisecondsSinceEpoch}';
-      print('reCAPTCHA token obtained (mocked for web): $recaptchaToken');
+      // Dev user credentials — hardcoded for quick dev login
+      const devEmail = "dfeen87@brightacts.com";
+      const devPassword = "bleigh1!";
 
-      // Mock sign-in for your specific test account
-      if (email == "dfeen87@brightacts.com" && password == "bleigh1!") {
+      if (email == devEmail && password == devPassword) {
+        // Mock user login for dev/testing
         _user = UserMock(email: email);
 
         _isUserAccountLoading = true;
@@ -76,16 +79,30 @@ class AuthProvider with ChangeNotifier {
           _userAccount = null;
         } finally {
           _isUserAccountLoading = false;
+          notifyListeners();
         }
 
         _isLoading = false;
         notifyListeners();
-        return {'success': true, 'message': 'Signed in successfully!'};
-      } else {
-        throw fb_auth.FirebaseAuthException(code: 'user-not-found', message: 'Invalid credentials.');
+        return {'success': true, 'message': 'Dev user signed in successfully!'};
       }
+
+      // Normal Firebase sign-in flow
+      final credential = await _auth.signInWithEmailAndPassword(email: email, password: password);
+      _user = credential.user;
+
+      _isUserAccountLoading = true;
+      notifyListeners();
+
+      _userAccount = await _apiClient.getUserById(_user!.uid);
+
+      _isUserAccountLoading = false;
+      _isLoading = false;
+      notifyListeners();
+
+      return {'success': true, 'message': 'Signed in successfully!'};
     } on fb_auth.FirebaseAuthException catch (e) {
-      _error = e.message;
+      _error = _firebaseErrorMessage(e);
       print('Firebase Auth Error: ${e.code} - ${e.message}');
       return {'success': false, 'error': _error};
     } catch (e) {
@@ -98,6 +115,43 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Register new user with email and password using Firebase Auth
+  Future<Map<String, dynamic>> signUpWithEmailAndPassword(String email, String password) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final credential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      _user = credential.user;
+
+      // TODO: Optionally send email verification or create user in your backend API
+
+      _isUserAccountLoading = true;
+      notifyListeners();
+
+      _userAccount = await _apiClient.getUserById(_user!.uid);
+
+      _isUserAccountLoading = false;
+      _isLoading = false;
+      notifyListeners();
+
+      return {'success': true, 'message': 'Account created successfully!'};
+    } on fb_auth.FirebaseAuthException catch (e) {
+      _error = _firebaseErrorMessage(e);
+      print('Firebase Sign-Up Error: ${e.code} - ${e.message}');
+      return {'success': false, 'error': _error};
+    } catch (e) {
+      _error = 'An unexpected error occurred: $e';
+      print('Sign-Up Error: $e');
+      return {'success': false, 'error': _error};
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Sign out current user
   Future<void> signOut() async {
     _isLoading = true;
     _error = null;
@@ -116,9 +170,31 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // Helper to convert Firebase error codes to user-friendly messages
+  String _firebaseErrorMessage(fb_auth.FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return 'The email address is badly formatted.';
+      case 'user-disabled':
+        return 'This user has been disabled.';
+      case 'user-not-found':
+        return 'No user found with this email.';
+      case 'wrong-password':
+        return 'Incorrect password.';
+      case 'email-already-in-use':
+        return 'This email is already in use.';
+      case 'operation-not-allowed':
+        return 'Operation not allowed. Please contact support.';
+      case 'weak-password':
+        return 'The password is too weak.';
+      default:
+        return e.message ?? 'Authentication error occurred.';
+    }
+  }
 }
 
-/// Mock User class for testing login without Firebase backend
+/// Mock User class for dev/testing login without Firebase backend
 class UserMock implements fb_auth.User {
   @override
   final String email;
@@ -245,7 +321,6 @@ class UserMock implements fb_auth.User {
 
   @override
   dynamic noSuchMethod(Invocation invocation) {
-    print('UserMock: noSuchMethod called for ${invocation.memberName}');
     if (invocation.isGetter) return null;
     throw UnimplementedError('UserMock: ${invocation.memberName} not implemented');
   }

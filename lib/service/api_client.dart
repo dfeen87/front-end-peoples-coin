@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-import '../models/user_account.dart'; // Use UserAccount here
+import '../models/user_account.dart';
 import '../models/goodwill_action.dart';
 import '../models/goodwill_action_to_send.dart';
 import '../models/proposal.dart';
@@ -27,8 +27,42 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // === GoodwillActions ===
+  Future<bool> checkUsernameAvailability(String username) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/users/username-check/$username');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['available'] == true;
+    }
+    throw Exception('Failed to check username availability');
+  }
 
+  Future<void> createUserWallet({
+    required String username,
+    required String publicKey,
+    required String encryptedPrivateKey,
+    required String recaptchaToken,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/users/register-wallet');
+    final body = json.encode({
+      'username': username,
+      'public_key': publicKey,
+      'encrypted_private_key': encryptedPrivateKey,
+      'recaptcha_token': recaptchaToken,
+    });
+
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: body,
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to create user wallet: ${response.body}');
+    }
+  }
+
+  // === GoodwillActions ===
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
     final uri = Uri.parse('$_baseUrl/api/v1/users/$userId/goodwill-actions');
     final response = await http.get(uri);
@@ -55,7 +89,6 @@ class PeoplesCoinApiClient {
   }
 
   // === Proposals ===
-
   Future<List<Proposal>> listProposals({String? status}) async {
     var url = '$_baseUrl/api/v1/governance/proposals';
     if (status != null) {
@@ -96,7 +129,6 @@ class PeoplesCoinApiClient {
   }
 
   // === Votes ===
-
   Future<Map<String, dynamic>> submitVote(VoteToSend voteToSend) async {
     final uri = Uri.parse('$_baseUrl/api/v1/governance/proposals/${voteToSend.proposalId}/vote');
     final response = await http.post(
@@ -112,7 +144,6 @@ class PeoplesCoinApiClient {
   }
 
   // === Ledger ===
-
   Future<List<PublicLedgerEntry>> getPublicLedger() async {
     final uri = Uri.parse('$_baseUrl/api/v1/ledger/public');
     final response = await http.get(uri);
@@ -125,7 +156,6 @@ class PeoplesCoinApiClient {
   }
 
   // === Metabolic status check example ===
-
   Future<String> checkMetabolicStatus() async {
     final uri = Uri.parse('$_baseUrl/metabolic/status');
     final response = await http.get(uri);
