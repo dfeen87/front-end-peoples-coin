@@ -1,8 +1,6 @@
 # GitHub Action for building and deploying a Flutter Web App to Firebase Hosting
 name: Build and Deploy to Firebase
 
-# Controls when the action will run.
-# This workflow runs on pushes to the 'main' branch.
 on:
   push:
     branches:
@@ -10,15 +8,14 @@ on:
 
 jobs:
   build_and_deploy:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      # 1. Checks-out your repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Creates the .env file from the GitHub Secret
+      # 2. Creates the .env file from the GitHub Secret (THIS IS THE CRITICAL STEP)
       - name: Create .env file
         run: echo "${{ secrets.DOT_ENV }}" > .env
 
@@ -43,4 +40,4 @@ jobs:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           channelId: live
-          projectId: 'brightacts-frontend' # <-- IMPORTANT: Replace with your Firebase Project ID
+          projectId: 'your-firebase-project-id' # Make sure this is your correct Firebase Project ID
