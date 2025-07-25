@@ -21,7 +21,10 @@ jobs:
           channel: 'stable'
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get 
+
+      - name: Verify that the .env file was created
+        run: ls -la
 
       - name: Build web release
         run: flutter build web --release
