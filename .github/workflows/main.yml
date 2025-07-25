@@ -1,4 +1,3 @@
-# GitHub Action for building and deploying a Flutter Web App to Firebase Hosting
 name: Build and Deploy to Firebase
 
 on:
@@ -9,35 +8,28 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Checks-out your repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Creates the .env file from the GitHub Secret (THIS IS THE CRITICAL STEP)
       - name: Create .env file
         run: echo "${{ secrets.DOT_ENV }}" > .env
 
-      # 3. Sets up the Flutter environment
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      # 4. Installs your app's dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # 5. Builds your Flutter web app for release
       - name: Build web release
         run: flutter build web --release
 
-      # 6. Deploys the built app to Firebase Hosting
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           channelId: live
-          projectId: 'your-firebase-project-id' # Make sure this is your correct Firebase Project ID
+          projectId: 'brightacts-frontend'
