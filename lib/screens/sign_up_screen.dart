@@ -1,13 +1,17 @@
+import 'package:flutter/gestures.dart';
+import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui'; // Needed for BackdropFilter
 import 'dart:js_util' as js_util;
 import 'package:flutter/material.dart';
 import 'package:crypto/crypto.dart';
-import 'package:pointycastle/export.dart';
+import 'package:pointycastle/export.dart' as pointy;
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:web3dart/crypto.dart';
 import '../service/api_client.dart';
+import '../widgets/dynamic_nebula_background.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -28,9 +32,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
   String? _error;
 
+  // --- All your existing logic remains the same ---
+  // (generateRandomPrivateKey, deriveWalletAddress, _submit, etc.)
   Future<bool> checkUsernameAvailability(String username) async {
-    // Update this URL to your actual endpoint for username availability
-    final uri = Uri.parse('${_apiClient._baseUrl}/api/v1/users/username-check/$username');
+    final uri = Uri.parse('${_apiClient.baseUrl}/api/v1/users/username-check/$username');
     final res = await http.get(uri);
     return res.statusCode == 200 && jsonDecode(res.body)['available'] == true;
   }
@@ -41,7 +46,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         js_util.callMethod(
           js_util.globalThis,
           'getRecaptchaToken',
-          ['signup'], // action name matches your JS reCAPTCHA call
+          ['signup'],
         ),
       );
       return token;
@@ -61,36 +66,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
       bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
   String deriveWalletAddress(String privateKeyHex) {
-    final domainParams = ECDomainParameters('secp256k1');
-    final privKey = ECPrivateKey(BigInt.parse(privateKeyHex, radix: 16), domainParams);
+    final domainParams = pointy.ECDomainParameters('secp256k1');
+    final privKey = pointy.ECPrivateKey(BigInt.parse(privateKeyHex, radix: 16), domainParams);
     final pubKey = domainParams.G * privKey.d!;
-    final pubBytes = pubKey!.getEncoded(false).sublist(1); // drop prefix byte 0x04
+    final pubBytes = pubKey!.getEncoded(false).sublist(1);
     final hashed = _keccak256(pubBytes);
     return '0x${_hexEncode(hashed.sublist(12))}';
   }
 
-  List<int> _keccak256(List<int> input) {
-    final digest = Digest('keccak/256');
-    return digest.process(Uint8List.fromList(input));
+  Uint8List _keccak256(List<int> input) {
+    return keccak256(Uint8List.fromList(input));
   }
 
   String encryptPrivateKey(String privateKey, String password) {
     final key = sha256.convert(utf8.encode(password)).bytes;
-    final iv = Uint8List(16); // zeros initialization vector
-    final cipher = CBCBlockCipher(AESEngine())
+    final iv = Uint8List(16);
+    final cipher = pointy.CBCBlockCipher(pointy.AESEngine())
       ..init(
         true,
-        ParametersWithIV(KeyParameter(Uint8List.fromList(key)), iv),
+        pointy.ParametersWithIV(pointy.KeyParameter(Uint8List.fromList(key)), iv),
       );
-
     final input = Uint8List.fromList(utf8.encode(privateKey));
-    // PKCS7 padding
     final padLength = 16 - (input.length % 16);
     final padded = Uint8List(input.length + padLength)..setRange(0, input.length, input);
     for (var i = input.length; i < padded.length; i++) {
       padded[i] = padLength;
     }
-
     final output = Uint8List(padded.length);
     for (int offset = 0; offset < padded.length; offset += 16) {
       cipher.processBlock(padded, offset, output, offset);
@@ -100,18 +101,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() {
       _isLoading = true;
       _error = null;
     });
-
     try {
       final username = _usernameController.text.trim();
       final email = _emailController.text.trim();
       final phone = _phoneController.text.trim();
       final password = _passwordController.text.trim();
-
       final usernameAvailable = await checkUsernameAvailability(username);
       if (!usernameAvailable) {
         setState(() {
@@ -120,8 +118,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         });
         return;
       }
-
-      // Get reCAPTCHA token
       final recaptchaToken = await getRecaptchaToken();
       if (recaptchaToken == null) {
         setState(() {
@@ -130,32 +126,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
         });
         return;
       }
-
-      // Register user via Firebase Email & Password
       final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-
-      // Generate wallet keys
       final privateKey = generateRandomPrivateKey();
       final walletAddress = deriveWalletAddress(privateKey);
       final encryptedPrivateKey = encryptPrivateKey(privateKey, password);
-
-      // Call backend API to create user wallet including reCAPTCHA token
       await _apiClient.createUserWallet(
         username: username,
         publicKey: walletAddress,
         encryptedPrivateKey: encryptedPrivateKey,
         recaptchaToken: recaptchaToken,
       );
-
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
     } catch (e) {
-      setState(() => _error = e.toString());
+      if(mounted) setState(() => _error = e.toString());
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -167,56 +158,140 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _passwordController.dispose();
     super.dispose();
   }
+  
+  // --- STYLING HELPER for form fields ---
+  InputDecoration _buildInputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white70),
+      prefixIcon: Icon(icon, color: Colors.white70, size: 20),
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.1),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.amber),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign Up')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              if (_error != null)
-                Text(
-                  _error!,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(labelText: 'Username'),
-                validator: (val) => val == null || val.isEmpty ? 'Enter a username' : null,
-              ),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
-                validator: (val) => val != null && val.contains('@') ? null : 'Invalid email',
-              ),
-              TextFormField(
-                controller: _phoneController,
-                decoration: const InputDecoration(labelText: 'Phone Number (optional)'),
-                keyboardType: TextInputType.phone,
-              ),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Password'),
-                validator: (val) => val != null && val.length >= 6 ? null : 'Password too short',
-              ),
-              const SizedBox(height: 20),
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _submit,
-                      child: const Text('Create Account'),
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          const DynamicNebulaBackground(),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(28),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Create Your BrightActs Account',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            if (_error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Text(
+                                  _error!,
+                                  style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            TextFormField(
+                              controller: _usernameController,
+                              decoration: _buildInputDecoration('Username', Icons.person_outline),
+                              validator: (val) => val == null || val.isEmpty ? 'Enter a username' : null,
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _emailController,
+                              decoration: _buildInputDecoration('Email', Icons.email_outlined),
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (val) => val != null && val.contains('@') ? null : 'Invalid email',
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: true,
+                              decoration: _buildInputDecoration('Password', Icons.lock_outline),
+                              validator: (val) => val != null && val.length >= 6 ? null : 'Password too short',
+                            ),
+                            const SizedBox(height: 24),
+                            _isLoading
+                                ? const Center(child: CircularProgressIndicator())
+                                : ElevatedButton(
+                                    onPressed: _submit,
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      backgroundColor: Colors.amber[800],
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('Create Account', style: TextStyle(fontSize: 16)),
+                                  ),
+                            const SizedBox(height: 20),
+                            // --- NEW: Sign In Link ---
+                            Center(
+                              child: RichText(
+                                text: TextSpan(
+                                  text: 'Already a member? ',
+                                  style: const TextStyle(color: Colors.white70),
+                                  children: [
+                                    TextSpan(
+                                      text: 'Sign in here.',
+                                      style: TextStyle(
+                                        color: Colors.amber[600],
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () {
+                                          Navigator.of(context).pushNamed('/sign_in');
+                                        },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-            ],
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
-

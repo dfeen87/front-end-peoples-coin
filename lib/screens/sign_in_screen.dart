@@ -1,22 +1,10 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import 'package:js/js.dart';
-import 'package:js/js_util.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:ui';
+import 'dart:js_util' as js_util;
 
-import '../state/auth_provider.dart';
-import 'sign_up_screen.dart';
+import '../service/api_client.dart';
 import '../widgets/dynamic_nebula_background.dart';
-
-// JS interop to call grecaptcha.execute with siteKey and action
-@JS('grecaptcha.enterprise.execute')
-external Promise grecaptchaExecute(String siteKey, String action);
-
-class Promise {
-  external void then(void Function(dynamic result) onFulfilled);
-  external void catchError(void Function(dynamic error) onError);
-}
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -29,75 +17,73 @@ class _SignInScreenState extends State<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
+  final _apiClient = PeoplesCoinApiClient();
 
-  String? _recaptchaToken;
+  bool _isLoading = false;
+  String? _error;
 
-  Future<String?> _getRecaptchaToken() {
-    final completer = Completer<String?>();
-
-    // Replace with your actual site key
-    const siteKey = '6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs';
-
-    // Execute reCAPTCHA Enterprise with action 'login'
-    grecaptchaExecute(siteKey, 'login').then(allowInterop((token) {
-      completer.complete(token as String?);
-    })).catchError(allowInterop((error) {
-      completer.completeError(error);
-    }));
-
-    return completer.future;
-  }
-
-  Future<void> _submit() async {
+  Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
-    HapticFeedback.lightImpact();
-
     setState(() {
-      _recaptchaToken = null;
+      _isLoading = true;
+      _error = null;
     });
 
     try {
-      final token = await _getRecaptchaToken();
-      if (token == null) throw Exception('Failed to get reCAPTCHA token');
-
-      setState(() {
-        _recaptchaToken = token;
-      });
-
-      final authProvider = context.read<AuthProvider>();
-
-      // Pass recaptchaToken to your backend (adjust your AuthProvider accordingly)
-      final result = await authProvider.signInWithEmailAndPassword(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-        recaptchaToken: token,
+      final recaptchaToken = await js_util.promiseToFuture<String>(
+        js_util.callMethod(js_util.globalThis, 'grecaptcha.enterprise.execute', [
+          'YOUR_RECAPTCHA_SITE_KEY_HERE', // IMPORTANT: Replace with your actual site key
+          'login',
+        ]),
       );
 
-      if (result['success'] == true) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'])),
-        );
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
-        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['error'] ?? 'Sign in failed'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    } catch (e) {
       if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/home');
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+        _error = 'Incorrect email or password.';
+      } else {
+        _error = 'An error occurred. Please try again.';
+      }
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'An unexpected error occurred: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error during reCAPTCHA verification: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
+        const SnackBar(
+            content: Text('Please enter a valid email address first.'),
+            backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Password reset link sent to your email.'),
+            backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send reset link: ${e.toString()}')),
       );
     }
   }
@@ -108,147 +94,126 @@ class _SignInScreenState extends State<SignInScreen> {
     _passwordController.dispose();
     super.dispose();
   }
-
-  void _togglePasswordVisibility() {
-    setState(() => _obscurePassword = !_obscurePassword);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final authProvider = context.watch<AuthProvider>();
-
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: const Text('Sign In'),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: Stack(
-          children: [
-            const DynamicNebulaBackground(),
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'Welcome Back',
-                          style: TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        TextFormField(
-                          controller: _emailController,
-                          autofillHints: const [AutofillHints.email],
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _inputDecoration('Email'),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Enter your email';
-                            }
-                            final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-                            if (!emailRegex.hasMatch(value)) {
-                              return 'Enter a valid email';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          autofillHints: const [AutofillHints.password],
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _inputDecoration('Password').copyWith(
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: Colors.white70,
-                              ),
-                              onPressed: _togglePasswordVisibility,
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 24),
-                        authProvider.isLoading
-                            ? const CircularProgressIndicator(color: Colors.amber)
-                            : ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.amber[800],
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size.fromHeight(50),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: _submit,
-                                child: const Text('Sign In'),
-                              ),
-                        const SizedBox(height: 16),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SignUpScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "Don't have an account? Sign Up",
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label) {
+  
+  InputDecoration _buildInputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
+      prefixIcon: Icon(icon, color: Colors.white70, size: 20),
       filled: true,
-      fillColor: Colors.white10,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      fillColor: Colors.white.withOpacity(0.1),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.white30),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Colors.amber),
       ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      // FIX: This one line tells the body to draw behind the app bar
+      extendBodyBehindAppBar: true, 
+      appBar: AppBar(
+        title: const Text(''), // Title can be empty for a cleaner look
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Stack(
+        children: [
+          const DynamicNebulaBackground(),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(28),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Welcome Back',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            if (_error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Text(
+                                  _error!,
+                                  style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            TextFormField(
+                              controller: _emailController,
+                              decoration: _buildInputDecoration('Email', Icons.email_outlined),
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (val) => val != null && val.contains('@') ? null : 'Please enter a valid email',
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _passwordController,
+                              decoration: _buildInputDecoration('Password', Icons.lock_outline),
+                              obscureText: true,
+                              validator: (val) => val != null && val.isNotEmpty ? null : 'Please enter your password',
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _forgotPassword,
+                                child: Text(
+                                  'Forgot Password?',
+                                  style: TextStyle(color: Colors.amber[600]),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _isLoading
+                                ? const Center(child: CircularProgressIndicator())
+                                : ElevatedButton(
+                                    onPressed: _signIn,
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      backgroundColor: Colors.amber[800],
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('Sign In', style: TextStyle(fontSize: 16)),
+                                  ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
-

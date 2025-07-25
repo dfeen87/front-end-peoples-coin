@@ -51,3 +51,6 @@ venv/          # Keep this, useful if Python venv was ever in this repo
 # You can remove this, or keep it. It's usually covered by the /build/ above
 # /.react-router/
 # .firebase/ # You probably don't need this if .firebase/ is inside your .gitignore
+
+
+.env

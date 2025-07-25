@@ -6,9 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
-// Import your files - adjust these paths as needed
+// Import your files
 import 'models/user_account.dart';
 import 'service/api_client.dart';
 import 'state/user_provider.dart';
@@ -31,29 +32,24 @@ import 'widgets/navigation_card.dart';
 import 'widgets/matrix_text.dart';
 import 'widgets/animated_digit_widget.dart';
 
-class AppDurations {
-  static const fast = Duration(milliseconds: 300);
-  static const medium = Duration(milliseconds: 400);
-}
 
-class AppColors {
-  static const governance = Color(0xFF8A2BE2);
-  static const portfolio = Color(0xFFCC6699);
-  static const recordAct = Color(0xFFDA70D6);
-  static const ledger = Color(0xFF00BFFF);
-  static const wallet = Color(0xFF6A5ACD);
-  static final buttonPrimary = Colors.amber[800];
-}
+// --- MAIN ENTRY POINT ---
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // ENHANCEMENT: Load environment variables at startup
+  await dotenv.load(fileName: ".env");
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // ENHANCEMENT: Get reCAPTCHA key from .env instead of hardcoding
+  final reCaptchaKey = dotenv.env['RECAPTCHA_SITE_KEY'] ?? 'YOUR_FALLBACK_KEY_HERE';
+
   await FirebaseAppCheck.instance.activate(
-    webProvider: ReCaptchaV3Provider('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs'),
+    webProvider: ReCaptchaV3Provider(reCaptchaKey),
     androidProvider: AndroidProvider.playIntegrity,
     appleProvider: AppleProvider.appAttest,
   );
@@ -61,33 +57,31 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
+        // 1. Provide the main API client
         Provider<PeoplesCoinApiClient>(
           create: (_) => PeoplesCoinApiClient(),
         ),
-        ChangeNotifierProvider<MyAppAuthProvider.AuthProvider>(
-          create: (context) => MyAppAuthProvider.AuthProvider(
-            Provider.of<PeoplesCoinApiClient>(context, listen: false),
-          ),
+        // ENHANCEMENT: Use ProxyProvider to simplify dependency injection.
+        // These providers now automatically receive the PeoplesCoinApiClient.
+        ChangeNotifierProxyProvider<PeoplesCoinApiClient, MyAppAuthProvider.AuthProvider>(
+          create: (context) => MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>()),
+          update: (context, apiClient, previous) => MyAppAuthProvider.AuthProvider(apiClient),
         ),
-        ChangeNotifierProvider<UserProvider>(
-          create: (context) => UserProvider(
-            Provider.of<PeoplesCoinApiClient>(context, listen: false),
-          ),
+        ChangeNotifierProxyProvider<PeoplesCoinApiClient, UserProvider>(
+          create: (context) => UserProvider(context.read<PeoplesCoinApiClient>()),
+          update: (context, apiClient, previous) => UserProvider(apiClient),
         ),
-        ChangeNotifierProvider<ProposalProvider>(
-          create: (context) => ProposalProvider(
-            Provider.of<PeoplesCoinApiClient>(context, listen: false),
-          ),
+        ChangeNotifierProxyProvider<PeoplesCoinApiClient, ProposalProvider>(
+          create: (context) => ProposalProvider(context.read<PeoplesCoinApiClient>()),
+          update: (context, apiClient, previous) => ProposalProvider(apiClient),
         ),
-        ChangeNotifierProvider<GoodwillProcessingProvider>(
-          create: (context) => GoodwillProcessingProvider(
-            Provider.of<PeoplesCoinApiClient>(context, listen: false),
-          ),
+        ChangeNotifierProxyProvider<PeoplesCoinApiClient, GoodwillProcessingProvider>(
+          create: (context) => GoodwillProcessingProvider(context.read<PeoplesCoinApiClient>()),
+          update: (context, apiClient, previous) => GoodwillProcessingProvider(apiClient),
         ),
-        ChangeNotifierProvider<LedgerProvider>(
-          create: (context) => LedgerProvider(
-            Provider.of<PeoplesCoinApiClient>(context, listen: false),
-          ),
+        ChangeNotifierProxyProvider<PeoplesCoinApiClient, LedgerProvider>(
+          create: (context) => LedgerProvider(context.read<PeoplesCoinApiClient>()),
+          update: (context, apiClient, previous) => LedgerProvider(apiClient),
         ),
       ],
       child: const BrightActsApp(),
@@ -95,40 +89,27 @@ Future<void> main() async {
   );
 }
 
+
+// --- ROOT APP WIDGET ---
+
 class BrightActsApp extends StatelessWidget {
   const BrightActsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Setting system UI overlay for a more immersive feel
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light.copyWith(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.black.withOpacity(0.5),
+      systemNavigationBarIconBrightness: Brightness.light,
+    ));
+
     return MaterialApp(
       title: 'BrightActs',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.transparent,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          foregroundColor: Colors.white,
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white70),
-          bodyMedium: TextStyle(color: Colors.white70),
-          headlineMedium: TextStyle(color: Colors.white),
-          headlineSmall: TextStyle(color: Colors.white),
-          titleLarge: TextStyle(color: Colors.white70),
-        ),
-        popupMenuTheme: PopupMenuThemeData(
-          color: Colors.black.withOpacity(0.5),
-          textStyle: const TextStyle(color: Colors.white),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-        ),
-      ),
-
-      // Entry point widget that decides routing based on auth state
-      home: const DevAccessScreen(),
-
-      // Named routes for navigation
+      theme: buildAppTheme(), // ENHANCEMENT: Extracted theme to a separate function
+      // ENHANCEMENT: Start with LandingGate to handle auth state automatically
+      home: const LandingGate(),
       routes: {
         '/sign_up': (context) => const SignUpScreen(),
         '/sign_in': (context) => const SignInScreen(),
@@ -138,7 +119,9 @@ class BrightActsApp extends StatelessWidget {
   }
 }
 
-/// LandingGate widget listens to auth state and routes accordingly
+
+// --- AUTHENTICATION GATE ---
+
 class LandingGate extends StatelessWidget {
   const LandingGate({super.key});
 
@@ -154,18 +137,19 @@ class LandingGate extends StatelessWidget {
         }
 
         if (authProvider.user == null) {
-          // No user signed in - show SignUp screen first
-          return const SignUpScreen();
+          return const DevAccessScreen(); // Or SignUpScreen() for production
         }
 
-        // User signed in - go to main HomePage
+        // ENHANCEMENT: Fetch user data immediately after login, before showing HomePage
+        context.read<UserProvider>().fetchUser(authProvider.user!.uid);
         return const HomePage();
       },
     );
   }
 }
 
-// --- Your HomePage with cards and bottom nav ---
+
+// --- HOME PAGE WIDGET ---
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -174,83 +158,64 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
-  int _selectedIndex = 2;
-  late PageController _pageController;
+class _HomePageState extends State<HomePage> {
+  int _selectedIndex = 2; // Start on 'Record Act'
+  late final PageController _pageController;
   late final List<Widget> _pages;
 
-  bool _showMenuBars = true;
-  bool _showCards = true;
+  bool _showUiElements = true;
 
   @override
   void initState() {
     super.initState();
-
     _pageController = PageController(initialPage: _selectedIndex);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-      final String? userId = authProvider.user?.uid;
-      if (userId != null) {
-        context.read<UserProvider>().fetchUser(userId);
-      }
-    });
-
-    _pages = [
-      NavigationCard(
+    // ENHANCEMENT: Build pages list directly. No need for addPostFrameCallback here.
+    _pages = _buildPages();
+  }
+  
+  // ENHANCEMENT: Extracted page creation to a separate method for cleanliness.
+  List<Widget> _buildPages() {
+    return [
+      _buildNavigationPage(
         title: 'Governance',
         description: 'View active proposals, create new ones, and cast your votes.',
         icon: Icons.gavel,
         cardColor: AppColors.governance,
-        expandedContent: _cardContent(
-          context,
-          "View Proposals",
-          pageToOpen: const GovernancePage(),
-        ),
+        buttonText: "View Proposals",
+        pageToOpen: const GovernancePage(),
       ),
-      NavigationCard(
+      _buildNavigationPage(
         title: 'My Portfolio',
         description: 'Track your personal acts of goodwill and contributions.',
         icon: Icons.account_balance_wallet,
         cardColor: AppColors.portfolio,
-        expandedContent: _cardContent(
-          context,
-          "View My Acts",
-          pageToOpen: const MyPortfolioPage(),
-        ),
+        buttonText: "View My Acts",
+        pageToOpen: const MyPortfolioPage(),
       ),
-      NavigationCard(
+      _buildNavigationPage(
         title: 'Record Act',
         description: 'Share a new act of kindness or contribution and earn Loves.',
         icon: Icons.favorite,
         cardColor: AppColors.recordAct,
-        expandedContent: _cardContent(
-          context,
-          "Submit a Bright Act",
-          pageToOpen: const SubmitGoodwillPage(),
-        ),
+        buttonText: "Submit a Bright Act",
+        pageToOpen: const SubmitGoodwillPage(),
       ),
-      NavigationCard(
+      _buildNavigationPage(
         title: 'Public Ledger',
         description: 'View all recorded acts of goodwill on the blockchain.',
         icon: Icons.public,
         cardColor: AppColors.ledger,
-        expandedContent: _cardContent(
-          context,
-          "View Ledger",
-          pageToOpen: const PublicLedgerPage(),
-        ),
+        buttonText: "View Ledger",
+        pageToOpen: const PublicLedgerPage(),
       ),
-      NavigationCard(
+      _buildNavigationPage(
         title: 'My Wallet',
         description: 'Manage your Loves balance, send, and receive.',
         icon: Icons.wallet,
         cardColor: AppColors.wallet,
-        expandedContent: _cardContent(
-          context,
-          "Open Wallet",
-          pageToOpen: const MyWalletPage(),
-        ),
+        buttonText: "Open Wallet",
+        pageToOpen: const MyWalletPage(),
       ),
     ];
   }
@@ -261,12 +226,28 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
+  // Helper method to reduce repetition in page building
+  Widget _buildNavigationPage({
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color cardColor,
+    required String buttonText,
+    required Widget pageToOpen,
+  }) {
+    return NavigationCard(
+      title: title,
+      description: description,
+      icon: icon,
+      cardColor: cardColor,
+      expandedContent: _cardContent(context, buttonText, pageToOpen: pageToOpen),
+    );
+  }
+
   Future<void> _showSlidingFormOverlay(BuildContext context, Widget content) async {
-    setState(() {
-      _showMenuBars = false;
-      _showCards = false;
-    });
+    setState(() => _showUiElements = false);
     await Future.delayed(AppDurations.fast);
+    
     await showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -281,19 +262,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         );
       },
       pageBuilder: (context, animation, secondaryAnimation) {
+        final mediaQuery = MediaQuery.of(context);
+        final isDesktop = mediaQuery.size.width >= AppBreakpoints.desktop;
         return Align(
           alignment: Alignment.center,
           child: Container(
-            width: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.width > AppBreakpoints.tablet ? 0.4 : 0.9),
-            height: MediaQuery.of(context).size.height * 0.85,
+            width: mediaQuery.size.width * (isDesktop ? 0.4 : 0.9),
+            height: mediaQuery.size.height * 0.85,
             margin: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + AppBar().preferredSize.height,
-              bottom: MediaQuery.of(context).padding.bottom,
+              top: mediaQuery.padding.top + (AppBar().preferredSize.height / 2),
+              bottom: mediaQuery.padding.bottom,
             ),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(25.0),
-              border: Border.all(color: Colors.white.withOpacity(0.3)),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(25.0),
@@ -303,55 +286,47 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         );
       },
     );
-    setState(() {
-      _showMenuBars = true;
-      _showCards = true;
-    });
+
+    setState(() => _showUiElements = true);
   }
-
-  Widget _cardContent(BuildContext context, String buttonText, {Widget? pageToOpen}) {
-    final Widget contentToShow = pageToOpen ??
-        Center(
-            child: Text(buttonText,
-                style: const TextStyle(color: Colors.white, fontSize: 20)));
-
+  
+  Widget _cardContent(BuildContext context, String buttonText, {required Widget pageToOpen}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Detailed information about this section.',
+          'Detailed information about this section.', // Placeholder text
           style: TextStyle(color: Colors.white70, fontSize: 14),
         ),
-        const SizedBox(height: 15),
+        const Spacer(),
         Center(
           child: ElevatedButton(
             onPressed: () {
               HapticFeedback.lightImpact();
-              _showSlidingFormOverlay(context, contentToShow);
+              _showSlidingFormOverlay(context, pageToOpen);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.buttonPrimary,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
             child: Text(buttonText, style: const TextStyle(fontSize: 16)),
           ),
         ),
+        const SizedBox(height: 10),
       ],
     );
   }
 
   void _onItemTapped(int index) {
     HapticFeedback.lightImpact();
-    setState(() {
-      _selectedIndex = index;
-      _pageController.animateToPage(index, duration: AppDurations.fast, curve: Curves.ease);
-    });
+    _pageController.animateToPage(index, duration: AppDurations.fast, curve: Curves.ease);
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final double verticalMargin = screenWidth >= AppBreakpoints.desktop ? 40.0 : 20.0;
+    final verticalMargin = screenWidth >= AppBreakpoints.desktop ? 40.0 : 20.0;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -365,7 +340,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AnimatedSlide(
-                  offset: _showMenuBars ? Offset.zero : const Offset(0, -1),
+                  offset: _showUiElements ? Offset.zero : const Offset(0, -1.5),
                   duration: AppDurations.fast,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -386,19 +361,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return PreferredSize(
-      preferredSize: AppBar().preferredSize,
+      preferredSize: const Size.fromHeight(kToolbarHeight),
       child: AnimatedSlide(
-        offset: _showMenuBars ? Offset.zero : const Offset(0, -1),
+        offset: _showUiElements ? Offset.zero : const Offset(0, -1.5),
         duration: AppDurations.fast,
         child: AppBar(
           title: const SizedBox.shrink(),
+          backgroundColor: Colors.transparent,
           elevation: 0,
-          shadowColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          bottom: const PreferredSize(
-            preferredSize: Size.fromHeight(0),
-            child: SizedBox.shrink(),
-          ),
           actions: [
             IconButton(
               icon: const Icon(Icons.settings),
@@ -444,7 +414,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               targetText: 'Welcome, ${data.userAccount?.username ?? 'User'}!',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 24, fontFamily: 'monospace'),
               isLoading: data.isLoading,
-              speed: const Duration(milliseconds: 182),
             ),
             const SizedBox(height: 8),
             Row(
@@ -457,9 +426,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   AnimatedDigitWidget(
                     value: data.userAccount!.balance,
                     textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18, color: Colors.white),
-                    duration: const Duration(seconds: 1),
-                    curve: Curves.easeOut,
-                    fractionDigits: 2,
                   ),
                 Text(' Loves',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
@@ -473,22 +439,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _buildPageView() {
     return AnimatedOpacity(
-      opacity: _showCards ? 1 : 0,
+      opacity: _showUiElements ? 1 : 0,
       duration: AppDurations.fast,
-      child: AnimatedSlide(
-        offset: _showCards ? Offset.zero : const Offset(0, -1),
-        duration: AppDurations.fast,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: _pages.length,
-            itemBuilder: (context, index) => _pages[index],
-            onPageChanged: (index) {
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: PageView.builder(
+          controller: _pageController,
+          itemCount: _pages.length,
+          itemBuilder: (context, index) => _pages[index],
+          onPageChanged: (index) {
+            if (_selectedIndex != index) {
               HapticFeedback.selectionClick();
               setState(() => _selectedIndex = index);
-            },
-          ),
+            }
+          },
         ),
       ),
     );
@@ -496,13 +460,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _buildBottomNavBar() {
     return AnimatedSlide(
-      offset: _showMenuBars ? Offset.zero : const Offset(0, 1),
+      offset: _showUiElements ? Offset.zero : const Offset(0, 2),
       duration: AppDurations.fast,
       child: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'Governance'),
           BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Portfolio'),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Share'),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Record'),
           BottomNavigationBarItem(icon: Icon(Icons.public), label: 'Ledger'),
           BottomNavigationBarItem(icon: Icon(Icons.wallet), label: 'Wallet'),
         ],
@@ -512,10 +476,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         onTap: _onItemTapped,
         backgroundColor: Colors.black.withOpacity(0.5),
         type: BottomNavigationBarType.fixed,
+        showUnselectedLabels: false,
+        showSelectedLabels: true,
       ),
     );
   }
 }
+
+
+// --- SETTINGS DIALOG WIDGET ---
 
 class SettingsDialog extends StatelessWidget {
   const SettingsDialog({super.key});
@@ -527,7 +496,7 @@ class SettingsDialog extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.7),
+          color: Colors.black.withOpacity(0.75),
           borderRadius: BorderRadius.circular(15),
           border: Border.all(color: Colors.white24),
         ),
@@ -552,7 +521,7 @@ class SettingsDialog extends StatelessWidget {
                 text: 'Get Support',
                 icon: Icons.support_agent,
                 onPressed: () {
-                  // Implement support action
+                  // Implement support action, e.g., launching mailto link
                 },
               ),
               const SizedBox(height: 20),
@@ -563,9 +532,9 @@ class SettingsDialog extends StatelessWidget {
                 label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
                 onPressed: () async {
                   HapticFeedback.heavyImpact();
-                  final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-                  await authProvider.signOut();
+                  // Pop dialog first, then sign out to avoid context issues
                   Navigator.of(context).pop();
+                  await context.read<MyAppAuthProvider.AuthProvider>().signOut();
                 },
               ),
             ],
@@ -585,16 +554,72 @@ class SettingsDialog extends StatelessWidget {
     return TextButton.icon(
       icon: Icon(icon, color: Colors.amber[700]),
       label: Text(text, style: const TextStyle(color: Colors.white, fontSize: 16)),
-      onPressed: onPressed ??
-          () async {
-            if (url != null) {
-              final uri = Uri.parse(url);
-              if (await url_launcher.canLaunchUrl(uri)) {
-                await url_launcher.launchUrl(uri);
-              }
-            }
-          },
+      onPressed: onPressed ?? () async {
+        if (url != null) {
+          final uri = Uri.parse(url);
+          // ENHANCEMENT: Removed deprecated `canLaunchUrl`
+          try {
+            await url_launcher.launchUrl(uri, mode: url_launcher.LaunchMode.externalApplication);
+          } catch (e) {
+            // Optional: Show a snackbar or dialog if launching fails
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not launch $url')),
+            );
+          }
+        }
+      },
     );
   }
 }
 
+// --- HELPER: App Theme ---
+ThemeData buildAppTheme() {
+  return ThemeData(
+    brightness: Brightness.dark,
+    primarySwatch: Colors.blue,
+    scaffoldBackgroundColor: Colors.transparent,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: Colors.white,
+    ),
+    textTheme: const TextTheme(
+      bodyLarge: TextStyle(color: Colors.white70),
+      bodyMedium: TextStyle(color: Colors.white70),
+      headlineMedium: TextStyle(color: Colors.white),
+      headlineSmall: TextStyle(color: Colors.white),
+      titleLarge: TextStyle(color: Colors.white70),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: Colors.black.withOpacity(0.5),
+      textStyle: const TextStyle(color: Colors.white),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      ),
+    ),
+  );
+}
+
+// NOTE: Consider moving these constants to `utils/app_constants.dart`
+class AppDurations {
+  static const fast = Duration(milliseconds: 300);
+  static const medium = Duration(milliseconds: 400);
+}
+
+class AppColors {
+  static const governance = Color(0xFF8A2BE2);
+  static const portfolio = Color(0xFFCC6699);
+  static const recordAct = Color(0xFFDA70D6);
+  static const ledger = Color(0xFF00BFFF);
+  static const wallet = Color(0xFF6A5ACD);
+  static final buttonPrimary = Colors.amber[800];
+}
+
+class AppBreakpoints {
+  static const double tablet = 768;
+  static const double desktop = 1200;
+}
