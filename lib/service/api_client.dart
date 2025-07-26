@@ -15,7 +15,7 @@ class PeoplesCoinApiClient {
   final String baseUrl;
 
   PeoplesCoinApiClient()
-      : baseUrl = dotenv.env['API_URL'] ?? 'https://peoples-coin-service-105378934751.us-east4.run.app';
+      : baseUrl = dotenv.env['API_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
 
   // === User ===
   Future<UserAccount> getUserById(String userId) async {
