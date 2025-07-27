@@ -87,57 +87,75 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   // --- Submit Logic (Corrected) ---
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+// In screens/sign_up_screen.dart
 
-    try {
-      final username = _usernameController.text.trim();
-      final email = _emailController.text.trim();
-      final password = _passwordController.text.trim();
-      // Note: The phone number is collected but not sent to the API in this version.
-      // You would need to modify your API to accept it.
+Future<void> _submit() async {
+  if (!_formKey.currentState!.validate()) {
+    print("Validation failed. Form is not valid.");
+    return;
+  }
+  
+  setState(() {
+    _isLoading = true;
+    _error = null;
+  });
 
-      final usernameAvailable = await checkUsernameAvailability(username);
-      if (!usernameAvailable) {
-        throw Exception('Username already taken');
-      }
+  try {
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-      // Create user in Firebase Auth
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+    print("Step 1: Checking username availability for '$username'...");
+    final usernameAvailable = await checkUsernameAvailability(username);
+    if (!usernameAvailable) {
+      throw Exception('Username already taken');
+    }
+    print("Step 1 SUCCESS: Username is available.");
 
-      // Generate keys and encrypt on the client-side (as per original logic)
-      final privateKey = generateRandomPrivateKey();
-      final walletAddress = deriveWalletAddress(privateKey);
-      final encryptedPrivateKey = encryptPrivateKey(privateKey, password);
-      
-      // Call the API with the parameters it expects
-      await _apiClient.createUserWallet(
-        username: username,
-        publicKey: walletAddress,
-        encryptedPrivateKey: encryptedPrivateKey,
-        // The recaptchaToken is no longer needed here, App Check handles it.
-      );
+    print("Step 2: Creating user in Firebase Auth for email '$email'...");
+    await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    print("Step 2 SUCCESS: Firebase user created.");
 
-      if (!mounted) return;
-      context.go('/home');
+    print("Step 3: Generating client-side crypto keys...");
+    final privateKey = generateRandomPrivateKey();
+    final walletAddress = deriveWalletAddress(privateKey);
+    final encryptedPrivateKey = encryptPrivateKey(privateKey, password);
+    print("Step 3 SUCCESS: Crypto keys generated.");
 
-    } catch (e) {
-      if(mounted) setState(() => _error = e.toString().replaceFirst("Exception: ", ""));
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    print("Step 4: Calling API to create user wallet...");
+    await _apiClient.createUserWallet(
+      username: username,
+      publicKey: walletAddress,
+      encryptedPrivateKey: encryptedPrivateKey,
+    );
+    print("Step 4 SUCCESS: API call to create wallet completed.");
+
+    if (!mounted) return;
+    print("Step 5: Navigating to /home...");
+    context.go('/home');
+
+  } on FirebaseAuthException catch (e) {
+    print("--- ERROR CAUGHT (FirebaseAuthException) ---");
+    print("Code: ${e.code}");
+    print("Message: ${e.message}");
+    if (e.code == 'email-already-in-use') {
+      setState(() => _error = 'This email is already registered. Please sign in.');
+    } else {
+      setState(() => _error = 'An error occurred during sign up. (Code: ${e.code})');
+    }
+  } catch (e) {
+    print("--- ERROR CAUGHT (General Exception) ---");
+    print("Error: ${e.toString()}");
+    if(mounted) setState(() => _error = e.toString().replaceFirst("Exception: ", ""));
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
-
+}
   @override
   void dispose() {
     _usernameController.dispose();
