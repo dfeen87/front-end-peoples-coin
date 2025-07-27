@@ -31,12 +31,22 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
+      // Check if grecaptcha is loaded
+      final hasRecaptcha = js_util.hasProperty(js_util.globalThis, 'grecaptcha');
+      if (!hasRecaptcha) {
+        throw Exception('reCAPTCHA not loaded on the page.');
+      }
+
+      // Call grecaptcha.execute (not enterprise.execute)
       final recaptchaToken = await js_util.promiseToFuture<String>(
-        js_util.callMethod(js_util.globalThis, 'grecaptcha.enterprise.execute', [
-          'YOUR_RECAPTCHA_SITE_KEY_HERE', // IMPORTANT: Replace with your actual site key
-          'login',
+        js_util.callMethod(js_util.getProperty(js_util.globalThis, 'grecaptcha'), 'execute', [
+          'YOUR_RECAPTCHA_SITE_KEY_HERE', // Replace with your actual site key
+          {'action': 'login'},
         ]),
       );
+
+      // Optionally: send recaptchaToken to your backend for verification
+      // await _apiClient.verifyRecaptchaToken(recaptchaToken);
 
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
@@ -117,10 +127,9 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      // FIX: This one line tells the body to draw behind the app bar
       extendBodyBehindAppBar: true, 
       appBar: AppBar(
-        title: const Text(''), // Title can be empty for a cleaner look
+        title: const Text(''), 
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -217,3 +226,4 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 }
+
