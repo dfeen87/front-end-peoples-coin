@@ -1,29 +1,33 @@
-// lib/widgets/proposal_card.dart
-
 import 'package:flutter/material.dart';
 import '../models/proposal.dart';
-import '../pages/proposal_detail_page.dart'; // Import the detail page
+import '../pages/proposal_detail_page.dart';
 
 class ProposalCard extends StatelessWidget {
   final Proposal proposal;
 
   const ProposalCard({super.key, required this.proposal});
 
-  // Helper to build a small chip for status or type
+  // Builds a small info chip with label and background color
   Widget _buildInfoChip(String label, Color color) {
     return Chip(
-      label: Text(label),
-      labelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+      label: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
       backgroundColor: color,
       visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
     );
   }
 
-  // Helper to get a user-friendly string for the time remaining
+  // Returns a human-readable voting time status
   String _getTimeStatus() {
     if (proposal.voteEndTime == null) return "No end date set";
-    
+
     final now = DateTime.now();
     final difference = proposal.voteEndTime!.difference(now);
 
@@ -50,15 +54,16 @@ class ProposalCard extends StatelessWidget {
         side: BorderSide(color: Colors.white.withOpacity(0.2)),
       ),
       child: InkWell(
+        borderRadius: BorderRadius.circular(12.0),
         onTap: () {
-          // This will navigate to the detail page when a card is tapped
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => ProposalDetailPage(proposalId: proposal.id),
+              builder: (_) => ProposalDetailPage(proposalId: proposal.id),
             ),
           );
         },
-        borderRadius: BorderRadius.circular(12.0),
+        splashColor: Colors.purple.withOpacity(0.2),
+        highlightColor: Colors.purple.withOpacity(0.1),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -69,7 +74,6 @@ class ProposalCard extends StatelessWidget {
                 runSpacing: 4.0,
                 children: [
                   _buildInfoChip(proposal.status.name.toUpperCase(), Colors.purple.shade400),
-                  // Assuming proposal.proposalType is a string from your model
                   _buildInfoChip(proposal.proposalType, Colors.blueGrey.shade400),
                 ],
               ),
@@ -83,11 +87,12 @@ class ProposalCard extends StatelessWidget {
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+                semanticsLabel: 'Proposal title: ${proposal.title}',
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.timer_outlined, color: Colors.white70, size: 16),
+                  const Icon(Icons.timer_outlined, color: Colors.white70, size: 16),
                   const SizedBox(width: 8),
                   Text(
                     _getTimeStatus(),
@@ -102,3 +107,4 @@ class ProposalCard extends StatelessWidget {
     );
   }
 }
+

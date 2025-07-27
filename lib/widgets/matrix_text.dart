@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'dart:async'; // For Timer
-import 'dart:math'; // For Random
+import 'dart:async';
+import 'dart:math';
 
 class MatrixText extends StatefulWidget {
   final String targetText;
   final TextStyle? style;
-  final bool isLoading;
+  final bool isLoading; // scramble effect toggle
   final Duration speed;
+  final VoidCallback? onTypingComplete; // Callback when typing finishes
 
   const MatrixText({
     super.key,
@@ -14,13 +15,14 @@ class MatrixText extends StatefulWidget {
     this.style,
     this.isLoading = false,
     this.speed = const Duration(milliseconds: 50),
+    this.onTypingComplete,
   });
 
   @override
   State<MatrixText> createState() => _MatrixTextState();
 }
 
-class _MatrixTextState extends State<MatrixText> {
+class _MatrixTextState extends State<MatrixText> with SingleTickerProviderStateMixin {
   static const _chars =
       'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890*#@!?';
   final _random = Random();
@@ -34,6 +36,10 @@ class _MatrixTextState extends State<MatrixText> {
   @override
   void initState() {
     super.initState();
+    _displayedText = widget.isLoading
+        ? _generateRandomString(widget.targetText.length)
+        : widget.targetText;
+
     if (widget.isLoading) {
       _startScrambleAnimation();
     } else {
@@ -48,12 +54,11 @@ class _MatrixTextState extends State<MatrixText> {
       _scrambleTimer?.cancel();
       _isTypingAnimating = false;
       Future.delayed(const Duration(milliseconds: 10), () {
-        if (mounted) {
-          if (widget.isLoading) {
-            _startScrambleAnimation();
-          } else {
-            _startTypingAnimation();
-          }
+        if (!mounted) return;
+        if (widget.isLoading) {
+          _startScrambleAnimation();
+        } else {
+          _startTypingAnimation();
         }
       });
     }
@@ -86,6 +91,7 @@ class _MatrixTextState extends State<MatrixText> {
       setState(() {
         _displayedText = widget.targetText;
         _isTypingAnimating = false;
+        widget.onTypingComplete?.call();
       });
     } else {
       _animateTyping();
@@ -100,6 +106,7 @@ class _MatrixTextState extends State<MatrixText> {
         });
       }
       _isTypingAnimating = false;
+      widget.onTypingComplete?.call();
       return;
     }
 
@@ -128,17 +135,15 @@ class _MatrixTextState extends State<MatrixText> {
   Widget build(BuildContext context) {
     final textToRender = widget.isLoading ? _displayedText : widget.targetText;
 
-    // --- SOLUTION ATTEMPT: RepaintBoundary + Very Subtle Opaque Layer ---
     return RepaintBoundary(
       child: Container(
-        // Add a virtually invisible color. This often forces better compositing.
-        color: Colors.black.withOpacity(0.001), // Or Colors.white.withOpacity(0.001)
+        color: Colors.black.withOpacity(0.001),
         child: Text(
           textToRender,
           style: widget.style,
         ),
       ),
     );
-    // --- END SOLUTION ATTEMPT ---
   }
 }
+

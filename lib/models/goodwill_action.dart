@@ -11,10 +11,15 @@ class GoodwillAction {
   final String actionType;
   final String description;
   final Map<String, dynamic> contextualData;
-  final int lovesValue;
+  final int lovesValue; // You can keep or deprecate this if switching fully to calculatedScore
   final GoodwillStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  // New fields for enhanced scoring
+  final int timeSpentMinutes;
+  final int userImpactScore;
+  final int? calculatedScore; // nullable, filled by backend
 
   const GoodwillAction({
     required this.id,
@@ -26,6 +31,9 @@ class GoodwillAction {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.timeSpentMinutes = 0,
+    this.userImpactScore = 50, // default mid value
+    this.calculatedScore,
   });
 
   /// Factory constructor to create a GoodwillAction from a JSON map.
@@ -40,6 +48,9 @@ class GoodwillAction {
       status: _statusFromString(json['status'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      timeSpentMinutes: json['time_spent_minutes'] as int? ?? 0,
+      userImpactScore: json['user_impact_score'] as int? ?? 50,
+      calculatedScore: json['calculated_score'] as int?,
     );
   }
 
@@ -69,6 +80,9 @@ class GoodwillAction {
       'status': status.toString().split('.').last.toUpperCase(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'time_spent_minutes': timeSpentMinutes,
+      'user_impact_score': userImpactScore,
+      'calculated_score': calculatedScore,
     };
   }
 }

@@ -26,16 +26,16 @@ class NavigationCard extends StatefulWidget {
 
 class _NavigationCardState extends State<NavigationCard>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+  late final AnimationController _controller;
 
-  late Animation<double> _iconSizeAnimation;
-  late Animation<AlignmentGeometry> _iconAlignmentAnimation;
-  late Animation<Offset> _titleSlideAnimation;
-  late Animation<double> _titleOpacityAnimation;
-  late Animation<Offset> _descriptionSlideAnimation;
-  late Animation<double> _descriptionOpacityAnimation;
-  late Animation<double> _expandedContentOpacityAnimation;
-  late Animation<double> _cardHeightFactorAnimation;
+  late final Animation<double> _iconSizeAnimation;
+  late final Animation<AlignmentGeometry> _iconAlignmentAnimation;
+  late final Animation<Offset> _titleSlideAnimation;
+  late final Animation<double> _titleOpacityAnimation;
+  late final Animation<Offset> _descriptionSlideAnimation;
+  late final Animation<double> _descriptionOpacityAnimation;
+  late final Animation<double> _expandedContentOpacityAnimation;
+  late final Animation<double> _cardHeightFactorAnimation;
 
   bool _isExpanded = false;
 
@@ -102,47 +102,45 @@ class _NavigationCardState extends State<NavigationCard>
   }
 
   void _toggleExpanded() {
-    setState(() {
-      _isExpanded = !_isExpanded;
-      if (_isExpanded) {
-        _controller.forward();
-      } else {
-        _controller.reverse();
+    if (_isExpanded) {
+      _controller.reverse();
+      if (widget.onTap != null) {
+        widget.onTap!();
       }
-    });
-    if (!_isExpanded && widget.onTap != null) {
-      widget.onTap!();
+    } else {
+      _controller.forward();
     }
+    setState(() => _isExpanded = !_isExpanded);
   }
 
   @override
   Widget build(BuildContext context) {
-    final resolvedCardColor =
+    final cardColor =
         (widget.cardColor ?? Colors.white.withOpacity(0.15)).withOpacity(widget.opacity);
 
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+    final mediaQuery = MediaQuery.of(context);
+    final screenWidth = mediaQuery.size.width;
+    final screenHeight = mediaQuery.size.height;
 
-    // Set card size — slightly larger than last time
-    double collapsedWidth = (screenWidth * 0.55).clamp(240.0, 400.0);
-    double collapsedHeight = (screenHeight * 0.3).clamp(180.0, 280.0);
-    double expandedExtraHeight = widget.expandedContent != null ? 120.0 : 0;
+    // Card dimensions
+    final collapsedWidth = (screenWidth * 0.55).clamp(240.0, 400.0);
+    final collapsedHeight = (screenHeight * 0.3).clamp(180.0, 280.0);
+    final expandedExtraHeight = widget.expandedContent != null ? 120.0 : 0.0;
 
-    double cardHeight = _isExpanded
-        ? collapsedHeight + expandedExtraHeight
-        : collapsedHeight;
+    final cardHeight = _isExpanded ? collapsedHeight + expandedExtraHeight : collapsedHeight;
 
     return Center(
       child: GestureDetector(
         onTap: _toggleExpanded,
+        behavior: HitTestBehavior.opaque,
         child: Card(
-          color: resolvedCardColor,
+          color: cardColor,
           elevation: 6,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20.0),
           ),
           child: AnimatedContainer(
-            duration: _controller.duration!,
+            duration: _controller.duration ?? const Duration(milliseconds: 700),
             curve: _commonCurve,
             width: collapsedWidth,
             height: cardHeight,
@@ -156,8 +154,7 @@ class _NavigationCardState extends State<NavigationCard>
                 children: [
                   Align(
                     alignment: _iconAlignmentAnimation.value,
-                    child: Icon(widget.icon,
-                        size: _iconSizeAnimation.value, color: Colors.white),
+                    child: Icon(widget.icon, size: _iconSizeAnimation.value, color: Colors.white),
                   ),
                   const SizedBox(height: 5),
                   FractionalTranslation(
@@ -167,10 +164,7 @@ class _NavigationCardState extends State<NavigationCard>
                       child: Text(
                         widget.title,
                         textAlign: TextAlign.center,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),

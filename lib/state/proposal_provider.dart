@@ -1,9 +1,8 @@
-// lib/state/proposal_provider.dart
 import 'package:flutter/material.dart';
 import '../models/proposal.dart';
 import '../models/vote_to_send.dart';
 import '../models/proposal_to_send.dart';
-import '../service/api_client.dart'; // MODIFIED: Assuming your file is api_client.dart (singular)
+import '../service/api_client.dart';
 
 class ProposalProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
@@ -77,65 +76,64 @@ class ProposalProvider with ChangeNotifier {
     }
   }
 
-  // MODIFIED: createProposal now returns Future<Map<String, dynamic>>
   Future<Map<String, dynamic>> createProposal(ProposalToSend proposal) async {
     _isSubmittingProposal = true;
     _detailsError = null;
     notifyListeners();
 
     try {
-      final result = await _apiClient.createProposal(proposal); // This already returns Map
-      if (result['success'] == true) { // Check for boolean true from map
+      final result = await _apiClient.createProposal(proposal);
+      if (result['success'] == true) {
         print('Proposal created successfully!');
         await fetchProposals(status: 'ACTIVE');
-        return {'success': true}; // Return a map as expected by UI
+        return {'success': true};
       } else {
         final errorMessage = result['error'] ?? 'Unknown error creating proposal.';
         _detailsError = errorMessage;
         print('API Error creating proposal: $_detailsError');
-        return {'success': false, 'error': errorMessage}; // Return a map as expected by UI
+        return {'success': false, 'error': errorMessage};
       }
     } catch (e) {
       final errorMessage = 'An unexpected error occurred: ${e.toString()}';
       _detailsError = errorMessage;
       print('Caught Error creating proposal: $_detailsError');
-      return {'success': false, 'error': errorMessage}; // Return a map as expected by UI
+      return {'success': false, 'error': errorMessage};
     } finally {
       _isSubmittingProposal = false;
       notifyListeners();
     }
   }
 
-  // MODIFIED: submitVote now returns Future<Map<String, dynamic>>
   Future<Map<String, dynamic>> submitVote(VoteToSend vote) async {
     _isSubmittingVote = true;
     _detailsError = null;
     notifyListeners();
 
     try {
-      final result = await _apiClient.submitVote(vote); // This already returns Map
-      if (result['success'] == true) { // Check for boolean true from map
+      final result = await _apiClient.submitVote(vote);
+      if (result['success'] == true) {
         print('Vote submitted successfully!');
         if (_selectedProposal != null) {
           await fetchProposalDetails(_selectedProposal!.id);
         } else {
           await fetchProposals(status: 'ACTIVE');
         }
-        return {'success': true}; // Return a map as expected by UI
+        return {'success': true};
       } else {
         final errorMessage = result['error'] ?? 'Unknown error submitting vote.';
         _detailsError = errorMessage;
         print('API Error submitting vote: $_detailsError');
-        return {'success': false, 'error': errorMessage}; // Return a map as expected by UI
+        return {'success': false, 'error': errorMessage};
       }
     } catch (e) {
       final errorMessage = 'An unexpected error occurred: ${e.toString()}';
       _detailsError = errorMessage;
       print('Caught Error submitting vote: $_detailsError');
-      return {'success': false, 'error': errorMessage}; // Return a map as expected by UI
+      return {'success': false, 'error': errorMessage};
     } finally {
       _isSubmittingVote = false;
       notifyListeners();
     }
   }
 }
+

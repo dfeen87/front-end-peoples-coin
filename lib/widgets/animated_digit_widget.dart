@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+typedef AnimationCompleteCallback = void Function();
+
 class AnimatedDigitWidget extends StatefulWidget {
   final double value;
   final TextStyle? textStyle;
   final Duration duration;
   final Curve curve;
   final int fractionDigits;
+  final AnimationCompleteCallback? onAnimationComplete;
+  final double? initialValue; // optional initial start value for first animation
 
   const AnimatedDigitWidget({
     Key? key,
@@ -14,6 +18,8 @@ class AnimatedDigitWidget extends StatefulWidget {
     this.duration = const Duration(milliseconds: 500),
     this.curve = Curves.easeOut,
     this.fractionDigits = 0,
+    this.onAnimationComplete,
+    this.initialValue,
   }) : super(key: key);
 
   @override
@@ -23,27 +29,44 @@ class AnimatedDigitWidget extends StatefulWidget {
 class _AnimatedDigitWidgetState extends State<AnimatedDigitWidget> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  double _oldValue = 0;
+  late double _oldValue;
 
   @override
   void initState() {
     super.initState();
-    _oldValue = widget.value;
+
+    // Start from initialValue or zero on first build for nice entry animation
+    _oldValue = widget.initialValue ?? 0;
+
     _controller = AnimationController(vsync: this, duration: widget.duration);
     _animation = Tween<double>(begin: _oldValue, end: widget.value).animate(
       CurvedAnimation(parent: _controller, curve: widget.curve),
-    );
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          if (widget.onAnimationComplete != null) {
+            widget.onAnimationComplete!();
+          }
+        }
+      });
+
     _controller.forward();
   }
 
   @override
   void didUpdateWidget(covariant AnimatedDigitWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value) {
+    if ((oldWidget.value - widget.value).abs() > 0.0001) {
       _oldValue = oldWidget.value;
       _animation = Tween<double>(begin: _oldValue, end: widget.value).animate(
         CurvedAnimation(parent: _controller, curve: widget.curve),
-      );
+      )..addStatusListener((status) {
+          if (status == AnimationStatus.completed) {
+            if (widget.onAnimationComplete != null) {
+              widget.onAnimationComplete!();
+            }
+          }
+        });
+
       _controller.forward(from: 0);
     }
   }
@@ -67,4 +90,3 @@ class _AnimatedDigitWidgetState extends State<AnimatedDigitWidget> with SingleTi
     super.dispose();
   }
 }
-

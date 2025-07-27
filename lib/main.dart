@@ -32,12 +32,61 @@ import 'widgets/navigation_card.dart';
 import 'widgets/matrix_text.dart';
 import 'widgets/animated_digit_widget.dart';
 
+// --- NEW: Theme Definition (as per best practice 4) ---
+// Consider moving this to `lib/theme/app_theme.dart`
+class AppTheme {
+  static ThemeData lightTheme = ThemeData(
+    primarySwatch: Colors.deepPurple,
+    brightness: Brightness.light,
+    fontFamily: 'Roboto',
+    // Add other light theme specific properties if needed
+  );
+
+  static ThemeData darkTheme = ThemeData(
+    brightness: Brightness.dark,
+    fontFamily: 'Roboto',
+    primarySwatch: Colors.blue, // Keeping your existing primary color for dark theme
+    scaffoldBackgroundColor: Colors.transparent,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: Colors.white,
+    ),
+    textTheme: const TextTheme(
+      bodyLarge: TextStyle(color: Colors.white70),
+      bodyMedium: TextStyle(color: Colors.white70),
+      headlineMedium: TextStyle(color: Colors.white),
+      headlineSmall: TextStyle(color: Colors.white),
+      titleLarge: TextStyle(color: Colors.white70),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: Colors.black.withOpacity(0.5),
+      textStyle: const TextStyle(color: Colors.white),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      ),
+    ),
+    // Add other dark theme specific properties
+  );
+}
 
 // --- MAIN ENTRY POINT ---
 
 Future<void> main() async {
+  // ✅ 1. Wrap your runApp() in WidgetsFlutterBinding.ensureInitialized()
+  // Already there, good job!
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Optional: lock to portrait orientation (as per best practice 1)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   // ENHANCEMENT: Load environment variables at startup
   await dotenv.load(fileName: ".env");
 
@@ -54,15 +103,15 @@ Future<void> main() async {
     appleProvider: AppleProvider.appAttest,
   );
 
+  // ✅ 2. Add MultiProvider for better scalability
+  // You're already using MultiProvider with ProxyProvider, which is excellent!
   runApp(
     MultiProvider(
       providers: [
-        // 1. Provide the main API client
+        // ✅ 5. Use a centralized API client
         Provider<PeoplesCoinApiClient>(
           create: (_) => PeoplesCoinApiClient(),
         ),
-        // ENHANCEMENT: Use ProxyProvider to simplify dependency injection.
-        // These providers now automatically receive the PeoplesCoinApiClient.
         ChangeNotifierProxyProvider<PeoplesCoinApiClient, MyAppAuthProvider.AuthProvider>(
           create: (context) => MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>()),
           update: (context, apiClient, previous) => MyAppAuthProvider.AuthProvider(apiClient),
@@ -84,11 +133,11 @@ Future<void> main() async {
           update: (context, apiClient, previous) => LedgerProvider(apiClient),
         ),
       ],
+      // Use AppStartupController as the home, as per best practice 3
       child: const BrightActsApp(),
     ),
   );
 }
-
 
 // --- ROOT APP WIDGET ---
 
@@ -107,9 +156,12 @@ class BrightActsApp extends StatelessWidget {
     return MaterialApp(
       title: 'BrightActs',
       debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(), // ENHANCEMENT: Extracted theme to a separate function
-      // ENHANCEMENT: Start with LandingGate to handle auth state automatically
-      home: const LandingGate(),
+      // ✅ 4. Create a theme/app_theme.dart (optional)
+      theme: AppTheme.lightTheme, // Default light theme
+      darkTheme: AppTheme.darkTheme, // Dark theme
+      themeMode: ThemeMode.system, // Use system preference for theme
+      // ✅ 3. Create a RootController to handle deferred startup
+      home: const AppStartupController(), // Changed from LandingGate to AppStartupController
       routes: {
         '/sign_up': (context) => const SignUpScreen(),
         '/sign_in': (context) => const SignInScreen(),
@@ -119,8 +171,59 @@ class BrightActsApp extends StatelessWidget {
   }
 }
 
+// --- NEW: App Startup Controller (renamed from RootController, as per best practice 3) ---
 
-// --- AUTHENTICATION GATE ---
+class AppStartupController extends StatefulWidget {
+  const AppStartupController({super.key});
+
+  @override
+  State<AppStartupController> createState() => _AppStartupControllerState();
+}
+
+class _AppStartupControllerState extends State<AppStartupController> {
+  bool _isReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeApp();
+    });
+  }
+
+  Future<void> _initializeApp() async {
+    // Simulate some initial loading/auth check logic
+    // This is where you might check auth state, load user preferences, etc.
+    // For now, we'll use a delay.
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // After initial checks, determine if the user is authenticated
+    // You'd typically use your AuthProvider here to check the user's login status.
+    final authProvider = Provider.of<MyAppAuthProvider.AuthProvider>(context, listen: false);
+    await authProvider.checkCurrentUser(); // Ensure auth state is checked/updated
+
+    setState(() {
+      _isReady = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isReady) {
+      // You can replace this with a dedicated SplashScreen widget
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.deepPurple), // Or a custom splash screen UI
+        ),
+      );
+    }
+    // Now that the app is ready, delegate to the LandingGate (which handles user authentication status)
+    return const LandingGate();
+  }
+}
+
+// --- AUTHENTICATION GATE (Now handles navigation based on auth state after initial startup) ---
 
 class LandingGate extends StatelessWidget {
   const LandingGate({super.key});
@@ -130,6 +233,8 @@ class LandingGate extends StatelessWidget {
     return Consumer<MyAppAuthProvider.AuthProvider>(
       builder: (context, authProvider, _) {
         if (authProvider.isLoading) {
+          // This isLoading is for *auth state checking* after the initial app startup.
+          // The AppStartupController handles the initial overall app readiness.
           return const Scaffold(
             backgroundColor: Colors.black,
             body: Center(child: CircularProgressIndicator()),
@@ -141,13 +246,13 @@ class LandingGate extends StatelessWidget {
         }
 
         // ENHANCEMENT: Fetch user data immediately after login, before showing HomePage
+        // This is correctly placed here, ensuring user data is fetched once the user is known.
         context.read<UserProvider>().fetchUser(authProvider.user!.uid);
         return const HomePage();
       },
     );
   }
 }
-
 
 // --- HOME PAGE WIDGET ---
 
@@ -173,7 +278,7 @@ class _HomePageState extends State<HomePage> {
     // ENHANCEMENT: Build pages list directly. No need for addPostFrameCallback here.
     _pages = _buildPages();
   }
-  
+
   // ENHANCEMENT: Extracted page creation to a separate method for cleanliness.
   List<Widget> _buildPages() {
     return [
@@ -247,7 +352,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _showSlidingFormOverlay(BuildContext context, Widget content) async {
     setState(() => _showUiElements = false);
     await Future.delayed(AppDurations.fast);
-    
+
     await showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -289,7 +394,7 @@ class _HomePageState extends State<HomePage> {
 
     setState(() => _showUiElements = true);
   }
-  
+
   Widget _cardContent(BuildContext context, String buttonText, {required Widget pageToOpen}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +588,6 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-
 // --- SETTINGS DIALOG WIDGET ---
 
 class SettingsDialog extends StatelessWidget {
@@ -572,7 +676,9 @@ class SettingsDialog extends StatelessWidget {
   }
 }
 
-// --- HELPER: App Theme ---
+// --- HELPER: App Theme (Moved into AppTheme class) ---
+// Kept for reference, but the AppTheme class is now the source of truth.
+/*
 ThemeData buildAppTheme() {
   return ThemeData(
     brightness: Brightness.dark,
@@ -603,6 +709,7 @@ ThemeData buildAppTheme() {
     ),
   );
 }
+*/
 
 // NOTE: Consider moving these constants to `utils/app_constants.dart`
 class AppDurations {

@@ -1,5 +1,3 @@
-// lib/state/user_provider.dart
-
 import 'package:flutter/foundation.dart';
 import '../models/user_account.dart';
 import '../service/api_client.dart';
@@ -8,22 +6,23 @@ import '../models/goodwill_action.dart';
 class UserProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
 
-  // Existing state for user account
+  // --- User Account State ---
   UserAccount? _userAccount;
   bool _isLoading = false;
   String? _error;
 
-  // State for the user's portfolio of goodwill actions
+  // --- User's Goodwill Actions (Portfolio) State ---
   List<GoodwillAction> _userActions = [];
   bool _isFetchingActions = false;
   String? _actionsError;
 
-  // Public getters for user account
+  // --- Getters for User Account ---
   UserAccount? get userAccount => _userAccount;
   bool get isLoading => _isLoading;
   bool get hasError => _error != null;
+  String? get error => _error;
 
-  // Public getters for the portfolio
+  // --- Getters for User Portfolio ---
   List<GoodwillAction> get userActions => _userActions;
   bool get isFetchingActions => _isFetchingActions;
   bool get hasActionsError => _actionsError != null;
@@ -31,14 +30,14 @@ class UserProvider with ChangeNotifier {
 
   UserProvider(this._apiClient);
 
+  /// Fetch user account info (currently mock, replace with API call when ready)
   Future<void> fetchUser(String userId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // NOTE: This is still using mock data for the user account.
-      // You can update this to use a real API call later.
+      // Simulated delay and mock user data
       await Future.delayed(const Duration(seconds: 1));
       _userAccount = UserAccount(
         id: userId,
@@ -53,26 +52,28 @@ class UserProvider with ChangeNotifier {
       );
     } catch (e) {
       _error = "Failed to fetch user data: $e";
+      print(_error);
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // UPDATED: This method now calls the API client to fetch live data.
+  /// Fetch user's goodwill actions portfolio from backend
   Future<void> fetchUserActions(String userId) async {
     _isFetchingActions = true;
     _actionsError = null;
     notifyListeners();
 
     try {
-      // This is the new, live API call, replacing the mock data.
       _userActions = await _apiClient.getUserGoodwillActions(userId);
     } catch (e) {
       _actionsError = "Failed to fetch your Bright Acts: $e";
+      print(_actionsError);
     } finally {
       _isFetchingActions = false;
       notifyListeners();
     }
   }
 }
+
