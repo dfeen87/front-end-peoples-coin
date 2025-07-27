@@ -208,7 +208,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const Text(
-                              'Create Your BrightActs Account',
+                              'Create Your Bright Acts Account',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white,
