@@ -32,7 +32,7 @@ class _MyWalletPageState extends State<MyWalletPage>
   @override
   Widget build(BuildContext context) {
     // We get the balance from UserProvider.
-    final userBalance = context.watch<UserProvider>().userAccount?.balance ?? 0.0;
+    final userBalance = context.watch<UserProvider>().currentUser?.balance ?? 0.0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,

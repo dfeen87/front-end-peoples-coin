@@ -1,6 +1,10 @@
+// lib/state/auth_provider.dart
+
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-import 'package:firebase_auth_platform_interface/src/auth_provider.dart' as fb_auth_platform_provider;
+// You might not need this specific import if not directly using AuthProvider from platform_interface
+// import 'package:firebase_auth_platform_interface/src/auth_provider.dart' as fb_auth_platform_provider;
 
 import '../models/user_account.dart';
 import '../service/api_client.dart';
@@ -10,7 +14,7 @@ import '../service/api_client.dart';
 class AuthProvider with ChangeNotifier {
   final fb_auth.FirebaseAuth _auth = fb_auth.FirebaseAuth.instance;
   fb_auth.User? _user;
-  bool _isLoading = false;
+  bool _isLoading = true; // Set to true initially for app startup check
   String? _error;
 
   UserAccount? _userAccount;
@@ -19,21 +23,30 @@ class AuthProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
 
   fb_auth.User? get user => _user;
-  bool get isLoading => _isLoading;
+  bool get isLoading => _isLoading; // This now also reflects the initial startup check
   String? get error => _error;
   UserAccount? get userAccount => _userAccount;
   bool get isUserAccountLoading => _isUserAccountLoading;
+
+  // Add a Completer to signal when the initial auth state check is complete
+  final Completer<void> _initialAuthCheckCompleter = Completer<void>();
 
   AuthProvider(this._apiClient) {
     // Listen to Firebase auth state changes to update current user and fetch user data
     _auth.authStateChanges().listen((fb_auth.User? firebaseUser) async {
       _user = firebaseUser;
-      _isLoading = false;
+      _isLoading = false; // Auth state determined
       _error = null;
 
       if (firebaseUser != null) {
         _isUserAccountLoading = true;
-        notifyListeners();
+        // Only notify if we are not already in the middle of a login/signup
+        // to avoid redundant rebuilds during the initial sequence.
+        // For the initial setup, we notify within the checkCurrentUser.
+        if (!_initialAuthCheckCompleter.isCompleted) {
+            notifyListeners(); // Notify for _isUserAccountLoading change
+        }
+
 
         try {
           _userAccount = await _apiClient.getUserById(firebaseUser.uid);
@@ -42,15 +55,33 @@ class AuthProvider with ChangeNotifier {
           _userAccount = null;
         } finally {
           _isUserAccountLoading = false;
+          // Notify after user account data is fetched
           notifyListeners();
+          // Complete the completer once the initial auth state and user data are loaded
+          if (!_initialAuthCheckCompleter.isCompleted) {
+            _initialAuthCheckCompleter.complete();
+          }
         }
       } else {
         _userAccount = null;
         _isUserAccountLoading = false;
         notifyListeners();
+        // Complete if no user is found, means initial check is done
+        if (!_initialAuthCheckCompleter.isCompleted) {
+          _initialAuthCheckCompleter.complete();
+        }
       }
     });
   }
+
+  /// NEW METHOD: Ensures the initial Firebase authentication state check is complete.
+  /// Used by AppStartupController to await readiness.
+  Future<void> checkCurrentUser() async {
+    // Wait for the _initialAuthCheckCompleter to complete, which is done
+    // by the authStateChanges listener once it processes the initial state.
+    await _initialAuthCheckCompleter.future;
+  }
+
 
   /// Sign in with email and password.
   /// If credentials match dev user, mock login is used.
@@ -245,22 +276,22 @@ class UserMock implements fb_auth.User {
   }
 
   @override
-  Future<fb_auth.UserCredential> linkWithProvider(fb_auth_platform_provider.AuthProvider provider) async {
+  Future<fb_auth.UserCredential> linkWithProvider(fb_auth.AuthProvider provider) async { // Changed fb_auth_platform_provider.AuthProvider to fb_auth.AuthProvider
     throw UnimplementedError('linkWithProvider not implemented for UserMock.');
   }
 
   @override
-  Future<fb_auth.UserCredential> reauthenticateWithProvider(fb_auth_platform_provider.AuthProvider provider) async {
+  Future<fb_auth.UserCredential> reauthenticateWithProvider(fb_auth.AuthProvider provider) async { // Changed fb_auth_platform_provider.AuthProvider to fb_auth.AuthProvider
     throw UnimplementedError('reauthenticateWithProvider not implemented for UserMock.');
   }
 
   @override
-  Future<fb_auth.UserCredential> linkWithPopup(fb_auth_platform_provider.AuthProvider provider) async {
+  Future<fb_auth.UserCredential> linkWithPopup(fb_auth.AuthProvider provider) async { // Changed fb_auth_platform_provider.AuthProvider to fb_auth.AuthProvider
     throw UnimplementedError('linkWithPopup not implemented for UserMock.');
   }
 
   @override
-  Future<void> linkWithRedirect(fb_auth_platform_provider.AuthProvider provider) async {
+  Future<void> linkWithRedirect(fb_auth.AuthProvider provider) async { // Changed fb_auth_platform_provider.AuthProvider to fb_auth.AuthProvider
     throw UnimplementedError('linkWithRedirect not implemented for UserMock.');
   }
 
@@ -335,4 +366,3 @@ class UserMetadata implements fb_auth.UserMetadata {
 
   UserMetadata({required this.creationTime, required this.lastSignInTime});
 }
-

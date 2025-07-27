@@ -70,7 +70,7 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
-      final currentUser = context.read<UserProvider>().userAccount;
+      final currentUser = context.read<UserProvider>().currentUser;
       if (currentUser == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error: User not logged in.')),

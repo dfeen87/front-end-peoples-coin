@@ -20,20 +20,20 @@ import 'pages/submit_goodwill_page.dart';
 import 'pages/my_portfolio_page.dart';
 import 'pages/governance_page.dart';
 import 'pages/my_wallet_page.dart';
-import 'pages/public_ledger_page.dart';
+import 'pages/public_ledger_page.dart'; // Ensure this path is correct
 import 'screens/dev_access_screen.dart';
 import 'screens/sign_up_screen.dart';
 import 'screens/sign_in_screen.dart';
-import 'state/auth_provider.dart' as MyAppAuthProvider;
+import 'state/auth_provider.dart' as MyAppAuthProvider; // Alias to avoid naming conflicts
 import 'firebase_options.dart';
 import 'widgets/dynamic_nebula_background.dart';
-import 'utils/app_constants.dart';
+import 'utils/app_constants.dart'; // Assuming these are defined here or correctly imported
 import 'widgets/navigation_card.dart';
 import 'widgets/matrix_text.dart';
 import 'widgets/animated_digit_widget.dart';
 
-// --- NEW: Theme Definition (as per best practice 4) ---
-// Consider moving this to `lib/theme/app_theme.dart`
+// --- Theme Definition (as per best practice 4) ---
+// Consider moving this to `lib/theme/app_theme.dart` for better organization.
 class AppTheme {
   static ThemeData lightTheme = ThemeData(
     primarySwatch: Colors.deepPurple,
@@ -77,24 +77,22 @@ class AppTheme {
 // --- MAIN ENTRY POINT ---
 
 Future<void> main() async {
-  // ✅ 1. Wrap your runApp() in WidgetsFlutterBinding.ensureInitialized()
-  // Already there, good job!
+  // Ensure Flutter widgets are initialized before any Flutter-specific calls
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Optional: lock to portrait orientation (as per best practice 1)
+  // Optional: lock to portrait orientation
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // ENHANCEMENT: Load environment variables at startup
+  // Load environment variables at startup
   await dotenv.load(fileName: ".env");
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // ENHANCEMENT: Get reCAPTCHA key from .env instead of hardcoding
   final reCaptchaKey = dotenv.env['RECAPTCHA_SITE_KEY'] ?? 'YOUR_FALLBACK_KEY_HERE';
 
   await FirebaseAppCheck.instance.activate(
@@ -103,12 +101,9 @@ Future<void> main() async {
     appleProvider: AppleProvider.appAttest,
   );
 
-  // ✅ 2. Add MultiProvider for better scalability
-  // You're already using MultiProvider with ProxyProvider, which is excellent!
   runApp(
     MultiProvider(
       providers: [
-        // ✅ 5. Use a centralized API client
         Provider<PeoplesCoinApiClient>(
           create: (_) => PeoplesCoinApiClient(),
         ),
@@ -133,7 +128,6 @@ Future<void> main() async {
           update: (context, apiClient, previous) => LedgerProvider(apiClient),
         ),
       ],
-      // Use AppStartupController as the home, as per best practice 3
       child: const BrightActsApp(),
     ),
   );
@@ -146,7 +140,6 @@ class BrightActsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Setting system UI overlay for a more immersive feel
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light.copyWith(
       statusBarColor: Colors.transparent,
       systemNavigationBarColor: Colors.black.withOpacity(0.5),
@@ -156,12 +149,10 @@ class BrightActsApp extends StatelessWidget {
     return MaterialApp(
       title: 'BrightActs',
       debugShowCheckedModeBanner: false,
-      // ✅ 4. Create a theme/app_theme.dart (optional)
-      theme: AppTheme.lightTheme, // Default light theme
-      darkTheme: AppTheme.darkTheme, // Dark theme
-      themeMode: ThemeMode.system, // Use system preference for theme
-      // ✅ 3. Create a RootController to handle deferred startup
-      home: const AppStartupController(), // Changed from LandingGate to AppStartupController
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      home: const AppStartupController(),
       routes: {
         '/sign_up': (context) => const SignUpScreen(),
         '/sign_in': (context) => const SignInScreen(),
@@ -171,7 +162,7 @@ class BrightActsApp extends StatelessWidget {
   }
 }
 
-// --- NEW: App Startup Controller (renamed from RootController, as per best practice 3) ---
+// --- App Startup Controller ---
 
 class AppStartupController extends StatefulWidget {
   const AppStartupController({super.key});
@@ -192,15 +183,10 @@ class _AppStartupControllerState extends State<AppStartupController> {
   }
 
   Future<void> _initializeApp() async {
-    // Simulate some initial loading/auth check logic
-    // This is where you might check auth state, load user preferences, etc.
-    // For now, we'll use a delay.
     await Future.delayed(const Duration(milliseconds: 800));
 
-    // After initial checks, determine if the user is authenticated
-    // You'd typically use your AuthProvider here to check the user's login status.
     final authProvider = Provider.of<MyAppAuthProvider.AuthProvider>(context, listen: false);
-    await authProvider.checkCurrentUser(); // Ensure auth state is checked/updated
+    await authProvider.checkCurrentUser();
 
     setState(() {
       _isReady = true;
@@ -210,20 +196,18 @@ class _AppStartupControllerState extends State<AppStartupController> {
   @override
   Widget build(BuildContext context) {
     if (!_isReady) {
-      // You can replace this with a dedicated SplashScreen widget
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(
-          child: CircularProgressIndicator(color: Colors.deepPurple), // Or a custom splash screen UI
+          child: CircularProgressIndicator(color: Colors.deepPurple),
         ),
       );
     }
-    // Now that the app is ready, delegate to the LandingGate (which handles user authentication status)
     return const LandingGate();
   }
 }
 
-// --- AUTHENTICATION GATE (Now handles navigation based on auth state after initial startup) ---
+// --- AUTHENTICATION GATE ---
 
 class LandingGate extends StatelessWidget {
   const LandingGate({super.key});
@@ -233,8 +217,6 @@ class LandingGate extends StatelessWidget {
     return Consumer<MyAppAuthProvider.AuthProvider>(
       builder: (context, authProvider, _) {
         if (authProvider.isLoading) {
-          // This isLoading is for *auth state checking* after the initial app startup.
-          // The AppStartupController handles the initial overall app readiness.
           return const Scaffold(
             backgroundColor: Colors.black,
             body: Center(child: CircularProgressIndicator()),
@@ -242,11 +224,9 @@ class LandingGate extends StatelessWidget {
         }
 
         if (authProvider.user == null) {
-          return const DevAccessScreen(); // Or SignUpScreen() for production
+          return const DevAccessScreen();
         }
 
-        // ENHANCEMENT: Fetch user data immediately after login, before showing HomePage
-        // This is correctly placed here, ensuring user data is fetched once the user is known.
         context.read<UserProvider>().fetchUser(authProvider.user!.uid);
         return const HomePage();
       },
@@ -274,12 +254,9 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _selectedIndex);
-
-    // ENHANCEMENT: Build pages list directly. No need for addPostFrameCallback here.
     _pages = _buildPages();
   }
 
-  // ENHANCEMENT: Extracted page creation to a separate method for cleanliness.
   List<Widget> _buildPages() {
     return [
       _buildNavigationPage(
@@ -331,7 +308,6 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // Helper method to reduce repetition in page building
   Widget _buildNavigationPage({
     required String title,
     required String description,
@@ -400,7 +376,7 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Detailed information about this section.', // Placeholder text
+          'Detailed information about this section.',
           style: TextStyle(color: Colors.white70, fontSize: 14),
         ),
         const Spacer(),
@@ -494,7 +470,7 @@ class _HomePageState extends State<HomePage> {
       selector: (_, provider) => (
         isLoading: provider.isLoading,
         hasError: provider.hasError,
-        userAccount: provider.userAccount
+        userAccount: provider.currentUser
       ),
       builder: (context, data, _) {
         if (data.hasError) {
@@ -626,6 +602,7 @@ class SettingsDialog extends StatelessWidget {
                 icon: Icons.support_agent,
                 onPressed: () {
                   // Implement support action, e.g., launching mailto link
+                  // For example: url_launcher.launchUrl(Uri.parse('mailto:support@example.com'));
                 },
               ),
               const SizedBox(height: 20),
@@ -661,7 +638,6 @@ class SettingsDialog extends StatelessWidget {
       onPressed: onPressed ?? () async {
         if (url != null) {
           final uri = Uri.parse(url);
-          // ENHANCEMENT: Removed deprecated `canLaunchUrl`
           try {
             await url_launcher.launchUrl(uri, mode: url_launcher.LaunchMode.externalApplication);
           } catch (e) {
@@ -676,42 +652,8 @@ class SettingsDialog extends StatelessWidget {
   }
 }
 
-// --- HELPER: App Theme (Moved into AppTheme class) ---
-// Kept for reference, but the AppTheme class is now the source of truth.
-/*
-ThemeData buildAppTheme() {
-  return ThemeData(
-    brightness: Brightness.dark,
-    primarySwatch: Colors.blue,
-    scaffoldBackgroundColor: Colors.transparent,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      foregroundColor: Colors.white,
-    ),
-    textTheme: const TextTheme(
-      bodyLarge: TextStyle(color: Colors.white70),
-      bodyMedium: TextStyle(color: Colors.white70),
-      headlineMedium: TextStyle(color: Colors.white),
-      headlineSmall: TextStyle(color: Colors.white),
-      titleLarge: TextStyle(color: Colors.white70),
-    ),
-    popupMenuTheme: PopupMenuThemeData(
-      color: Colors.black.withOpacity(0.5),
-      textStyle: const TextStyle(color: Colors.white),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
-    ),
-  );
-}
-*/
-
-// NOTE: Consider moving these constants to `utils/app_constants.dart`
+// --- HELPER CONSTANTS (Consider moving these to `utils/app_constants.dart` if not already there) ---
+// If these are defined in utils/app_constants.dart, remove them from here.
 class AppDurations {
   static const fast = Duration(milliseconds: 300);
   static const medium = Duration(milliseconds: 400);

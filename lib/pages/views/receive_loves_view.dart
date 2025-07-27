@@ -13,7 +13,7 @@ class ReceiveLovesView extends StatelessWidget {
   Widget build(BuildContext context) {
     // For this view, we'll assume the wallet address is part of the UserAccount model.
     // In a real app, you might fetch a dedicated UserWallet object.
-    final walletAddress = context.watch<UserProvider>().userAccount?.profileImageUrl ?? "no-address-found";
+    final walletAddress = context.watch<UserProvider>().currentUser?.profileImageUrl ?? "no-address-found";
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),

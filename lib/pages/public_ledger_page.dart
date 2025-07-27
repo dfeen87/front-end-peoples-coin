@@ -1,10 +1,151 @@
+// lib/pages/public_ledger_page.dart
+
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:flutter/services.dart'; // Clipboard
+import 'package:flutter/services.dart'; // For Clipboard
+import 'package:intl/intl.dart'; // For DateFormat
+import 'package:provider/provider.dart';
+
+// Import your state providers
+import '../state/ledger_provider.dart'; // Adjust path as per your project structure
+import '../state/user_provider.dart'; // Adjust path as per your project structure
+
+// Import your models
+import '../models/public_ledger_entry.dart'; // Important: Ensure this model is correctly defined
+import '../models/user_account.dart'; // Important: Ensure UserAccount has 'walletId'
+
+
+// --- PublicLedgerPage Definition ---
+class PublicLedgerPage extends StatefulWidget {
+  const PublicLedgerPage({super.key});
+
+  @override
+  State<PublicLedgerPage> createState() => _PublicLedgerPageState();
+}
+
+class _PublicLedgerPageState extends State<PublicLedgerPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch initial data when the page loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<LedgerProvider>(context, listen: false).fetchPublicLedgerEntries();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Access LedgerProvider to get public entries
+    final ledgerProvider = Provider.of<LedgerProvider>(context);
+    // Access UserProvider to get the current user's wallet ID for sending loves
+    final userProvider = Provider.of<UserProvider>(context);
+
+    // FIX: Access 'currentUser' getter from UserProvider, then its 'walletId' property from UserAccount.
+    // This assumes UserProvider has a 'currentUser' getter (UserAccount?) and UserAccount has a 'walletId'.
+    final currentUserWalletId = userProvider.currentUser?.walletId;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Public Ledger',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white), // For back button
+      ),
+      extendBodyBehindAppBar: true, // Allows content to go behind the app bar
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0D1B2A), // Dark Blue
+              Color(0xFF1B263B), // Slightly Lighter Blue
+            ],
+          ),
+        ),
+        child: RefreshIndicator(
+          onRefresh: () => ledgerProvider.fetchPublicLedgerEntries(),
+          color: Colors.amber, // Color of the refresh indicator
+          backgroundColor: Colors.grey[800],
+          child: Builder(
+            builder: (context) {
+              if (ledgerProvider.isLoading) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.amber),
+                );
+              } else if (ledgerProvider.errorMessage != null) {
+                return Center(
+                  child: Text(
+                    'Error: ${ledgerProvider.errorMessage}',
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
+                );
+              } else if (ledgerProvider.publicLedgerEntries.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No public ledger entries found.',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.only(top: kToolbarHeight + 20), // Adjust padding for app bar
+                itemCount: ledgerProvider.publicLedgerEntries.length,
+                itemBuilder: (context, index) {
+                  final entry = ledgerProvider.publicLedgerEntries[index];
+                  return PublicActionCard(
+                    // FIX: Pass PublicLedgerEntry object directly
+                    entry: entry,
+                    // Pass the sendLoves function from LedgerProvider
+                    onSendLoves: ({
+                      required String senderWalletId, // This parameter is ignored here; PublicLedgerPage provides the actual sender.
+                      required String recipientWalletId,
+                      required int amount,
+                      String? memo,
+                    }) async {
+                      if (currentUserWalletId == null || currentUserWalletId.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please sign in to send Loves.')),
+                        );
+                        return; // Exit if no sender wallet ID
+                      }
+                      await ledgerProvider.sendLoves(
+                        senderWalletId: currentUserWalletId, // Use the current user's wallet ID from UserProvider
+                        recipientWalletId: recipientWalletId,
+                        amount: amount,
+                        memo: memo,
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- PublicActionCard Definition (Now updated to accept PublicLedgerEntry) ---
+// We need to define a more specific type for onSendLoves
+// to include senderId and memo, which the LedgerProvider's
+// sendLoves likely needs.
+typedef OnSendLovesCallback = Future<void> Function({
+  required String senderWalletId, // Add senderWalletId
+  required String recipientWalletId,
+  required int amount,
+  String? memo, // Add optional memo
+});
+
 
 class PublicActionCard extends StatefulWidget {
-  final Map<String, dynamic> entry;
-  final Future<void> Function(String walletId, int amount)? onSendLoves;
+  // FIX: Changed type from Map<String, dynamic> to PublicLedgerEntry
+  final PublicLedgerEntry entry;
+  // --- Updated the type of onSendLoves to our new typedef ---
+  final OnSendLovesCallback? onSendLoves;
 
   const PublicActionCard({
     super.key,
@@ -20,12 +161,14 @@ class _PublicActionCardState extends State<PublicActionCard> with SingleTickerPr
   bool _isExpanded = false;
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
+  final _memoController = TextEditingController(); // NEW: Controller for memo
 
   bool _isSending = false;
 
   @override
   void dispose() {
     _amountController.dispose();
+    _memoController.dispose(); // Dispose the new memo controller
     super.dispose();
   }
 
@@ -47,12 +190,21 @@ class _PublicActionCardState extends State<PublicActionCard> with SingleTickerPr
     final amount = int.tryParse(_amountController.text);
     if (amount == null) return;
 
+    final memo = _memoController.text.trim(); // Get memo text
+
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirm Send'),
-        content: Text('Send $amount ❤️ Loves to this wallet?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Send $amount ❤️ Loves to this wallet?'),
+            if (memo.isNotEmpty) Text('Memo: "$memo"'),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -74,11 +226,19 @@ class _PublicActionCardState extends State<PublicActionCard> with SingleTickerPr
 
     try {
       if (widget.onSendLoves != null) {
-        await widget.onSendLoves!(widget.entry['wallet_id'], amount);
+        // --- Call the updated onSendLoves with all required parameters ---
+        await widget.onSendLoves!(
+          senderWalletId: '', // This will be set by the PublicLedgerPage where PublicActionCard is used
+          // FIX: Access walletId directly from the PublicLedgerEntry object
+          recipientWalletId: widget.entry.walletId,
+          amount: amount,
+          memo: memo,
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Successfully sent $amount Loves!')),
         );
         _amountController.clear();
+        _memoController.clear(); // Clear memo controller
         setState(() {
           _isExpanded = false;
         });
@@ -102,17 +262,12 @@ class _PublicActionCardState extends State<PublicActionCard> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.entry['title'] ?? 'No Title';
-    final wallet = widget.entry['wallet_id'] ?? 'Unknown Wallet';
-    final lovesValue = widget.entry['loves_value'] ?? 0;
-    final createdAtStr = widget.entry['created_at'] ?? '';
-    DateTime? createdAt;
-
-    try {
-      createdAt = DateTime.parse(createdAtStr);
-    } catch (_) {
-      createdAt = null;
-    }
+    // FIX: Access properties directly from the PublicLedgerEntry object
+    final title = widget.entry.title;
+    final wallet = widget.entry.walletId;
+    final lovesValue = widget.entry.lovesValue;
+    // createdAt is already a DateTime in PublicLedgerEntry, no need to parse here.
+    final createdAt = widget.entry.createdAt;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
@@ -160,13 +315,13 @@ class _PublicActionCardState extends State<PublicActionCard> with SingleTickerPr
             // Loves count + Send Loves button
             Row(
               children: [
-                Text(
+                const Text(
                   'Loves: ',
                   style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
                 ),
                 Text(
                   '$lovesValue ❤️',
-                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 TextButton.icon(
@@ -181,7 +336,7 @@ class _PublicActionCardState extends State<PublicActionCard> with SingleTickerPr
                   ),
                   label: Text(
                     _isExpanded ? 'Cancel' : 'Send Loves',
-                    style: TextStyle(color: Colors.redAccent),
+                    style: const TextStyle(color: Colors.redAccent),
                   ),
                 ),
               ],
@@ -192,41 +347,59 @@ class _PublicActionCardState extends State<PublicActionCard> with SingleTickerPr
                 padding: const EdgeInsets.only(top: 12),
                 child: Form(
                   key: _formKey,
-                  child: Row(
+                  child: Column( // Changed to Column to stack input and memo
                     children: [
-                      // Input for amount of loves
-                      Expanded(
-                        child: TextFormField(
-                          controller: _amountController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'Amount (min 1)',
-                            labelStyle: const TextStyle(color: Colors.white70),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.amber.withOpacity(0.7)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.amber),
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Amount (min 1)',
+                          labelStyle: const TextStyle(color: Colors.white70),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.amber.withOpacity(0.7)),
                           ),
-                          style: const TextStyle(color: Colors.white),
-                          validator: (val) {
-                            if (val == null || val.isEmpty) {
-                              return 'Required';
-                            }
-                            final n = int.tryParse(val);
-                            if (n == null || n < 1) {
-                              return 'Enter a positive number';
-                            }
-                            return null;
-                          },
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Colors.amber),
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
+                        style: const TextStyle(color: Colors.white),
+                        validator: (val) {
+                          if (val == null || val.isEmpty) {
+                            return 'Required';
+                          }
+                          final n = int.tryParse(val);
+                          if (n == null || n < 1) {
+                            return 'Enter a positive number';
+                          }
+                          return null;
+                        },
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(height: 12), // Spacing between amount and memo
+                      TextFormField(
+                        controller: _memoController,
+                        keyboardType: TextInputType.text,
+                        decoration: InputDecoration(
+                          labelText: 'Memo (optional)',
+                          labelStyle: const TextStyle(color: Colors.white70),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.amber.withOpacity(0.7)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Colors.amber),
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                        maxLength: 100, // Optional: Limit memo length
+                      ),
+                      const SizedBox(height: 12), // Spacing before button
                       // Confirm button
                       _isSending
                           ? const SizedBox(
@@ -246,18 +419,17 @@ class _PublicActionCardState extends State<PublicActionCard> with SingleTickerPr
                   ),
                 ),
               ),
-            if (createdAt != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  'Date: ${DateFormat.yMMMd().add_jm().format(createdAt)}',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
-                ),
+            // FIX: No need for null check on createdAt, it's now a non-nullable DateTime in the model
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                'Date: ${DateFormat.yMMMd().add_jm().format(createdAt)}',
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
               ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-

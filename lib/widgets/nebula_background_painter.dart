@@ -1,8 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 class NebulaBackgroundPainter extends CustomPainter {
-  final Offset center;  // 0..1 normalized position
+  final Offset center;  // Normalized 0.0 – 1.0
   final List<Color> colors;
   final double noiseIntensity;
 
@@ -14,34 +15,40 @@ class NebulaBackgroundPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final rect = Offset.zero & size;
 
-    // Create radial gradient centered according to normalized Offset
+    // Scale normalized center (0–1) to canvas alignment (-1 to 1)
+    final alignmentCenter = Alignment(center.dx * 2 - 1, center.dy * 2 - 1);
+
+    // Radial gradient centered at scaled alignment
     final gradient = RadialGradient(
-      center: Alignment(center.dx * 2 - 1, center.dy * 2 - 1), // normalize to -1..1
-      radius: 1.5,
+      center: alignmentCenter,
+      radius: 1.0,
       colors: colors,
+      stops: List.generate(colors.length, (i) => i / (colors.length - 1)),
     );
 
-    final paint = Paint()..shader = gradient.createShader(rect);
+    final Paint paint = Paint()
+      ..shader = gradient.createShader(rect);
+
+    // Paint gradient background
     canvas.drawRect(rect, paint);
 
-    // Draw noise texture
-    final random = Random(123); // fixed seed for consistent pattern
-    final noiseCount = (5000 * noiseIntensity).round();
+    // Star-like noise overlay
+    final random = Random(123); // fixed seed = consistent noise
     final noisePaint = Paint();
+    final int noiseCount = (5000 * noiseIntensity).round();
 
     for (int i = 0; i < noiseCount; i++) {
       final x = random.nextDouble() * size.width;
       final y = random.nextDouble() * size.height;
-      noisePaint.color = Colors.white.withOpacity(random.nextDouble() * 0.2);
-      canvas.drawCircle(Offset(x, y), 0.5, noisePaint);
+      noisePaint.color = Colors.white.withOpacity(random.nextDouble() * 0.12);
+      canvas.drawCircle(Offset(x, y), 0.4, noisePaint);
     }
   }
 
   @override
   bool shouldRepaint(covariant NebulaBackgroundPainter oldDelegate) {
-    // Repaint if any parameter changed
     return oldDelegate.center != center ||
         !listEquals(oldDelegate.colors, colors) ||
         oldDelegate.noiseIntensity != noiseIntensity;

@@ -85,5 +85,14 @@ class GoodwillAction {
       'calculated_score': calculatedScore,
     };
   }
-}
 
+  // --- NEW: Getters to resolve errors in my_portfolio_page.dart ---
+
+  /// Provides the score for the goodwill action.
+  /// Prioritizes calculatedScore if available, otherwise uses lovesValue.
+  int get score => calculatedScore ?? lovesValue;
+
+  /// Provides a title for the goodwill action.
+  /// Uses the description as the title.
+  String get title => description;
+}

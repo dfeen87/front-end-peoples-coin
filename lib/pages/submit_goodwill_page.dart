@@ -35,7 +35,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> {
       ),
       body: Consumer<GoodwillProcessingProvider>(
         builder: (context, provider, child) {
-          final currentUser = context.watch<UserProvider>().userAccount;
+          final currentUser = context.watch<UserProvider>().currentUser;
           if (currentUser == null) {
             return const Center(child: Text("User not logged in or data not loaded."));
           }

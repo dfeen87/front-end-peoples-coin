@@ -1,26 +1,53 @@
 // lib/models/public_ledger_entry.dart
 
 class PublicLedgerEntry {
-  final String actionType;
+  final String id;
+  final String title;
   final int lovesValue;
-  final String performerWalletAddress;
+  final String walletId; // Changed from performerWalletAddress
   final DateTime createdAt;
 
   PublicLedgerEntry({
-    required this.actionType,
+    required this.id,
+    required this.title,
     required this.lovesValue,
-    required this.performerWalletAddress,
+    required this.walletId,
     required this.createdAt,
   });
 
-  // A factory constructor for creating a new PublicLedgerEntry instance from a map.
   factory PublicLedgerEntry.fromJson(Map<String, dynamic> json) {
     return PublicLedgerEntry(
-      actionType: json['action_type'] ?? 'Unknown Act',
-      lovesValue: json['loves_value'] ?? 0,
-      // Assumes the API provides the address in a nested 'performer' object
-      performerWalletAddress: json['performer']?['wallet_address'] ?? '0x000...000',
-      createdAt: DateTime.parse(json['created_at']),
+      id: json['id'] as String,
+      title: json['title'] as String? ?? 'Unknown Act', // Ensure backend has 'title'
+      lovesValue: json['loves_value'] as int? ?? 0,
+      walletId: json['wallet_id'] as String? ?? '0x000...000', // Ensure backend has 'wallet_id'
+      createdAt: DateTime.parse(json['created_at'] as String),
     );
+  }
+
+  PublicLedgerEntry copyWith({
+    String? id,
+    String? title,
+    int? lovesValue,
+    String? walletId,
+    DateTime? createdAt,
+  }) {
+    return PublicLedgerEntry(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      lovesValue: lovesValue ?? this.lovesValue,
+      walletId: walletId ?? this.walletId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'loves_value': lovesValue,
+      'wallet_id': walletId,
+      'created_at': createdAt.toIso8601String(),
+    };
   }
 }
