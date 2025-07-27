@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:intl/intl.dart';
+
 import '../state/user_provider.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
-import '../widgets/goodwill_action_card.dart';
-import 'package:shimmer/shimmer.dart';
+import '../models/goodwill_action.dart';
+import '../widgets/dynamic_nebula_background.dart';
+import '../widgets/animated_digit_widget.dart';
 
 class MyPortfolioPage extends StatefulWidget {
   const MyPortfolioPage({super.key});
@@ -13,166 +17,296 @@ class MyPortfolioPage extends StatefulWidget {
 }
 
 class _MyPortfolioPageState extends State<MyPortfolioPage> with TickerProviderStateMixin {
-  late AnimationController _heartController;
+  late AnimationController _listAnimationController;
 
   @override
   void initState() {
     super.initState();
-
-    _heartController = AnimationController(
-      duration: const Duration(milliseconds: 700),
+    _listAnimationController = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 1000),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userId = context.read<MyAppAuthProvider.AuthProvider>().user?.uid;
       if (userId != null) {
-        context.read<UserProvider>().fetchUserActions(userId);
+        context.read<UserProvider>().fetchUserActions(userId).then((_) {
+          if (mounted) {
+            _listAnimationController.forward();
+          }
+        });
       }
     });
   }
 
   @override
   void dispose() {
-    _heartController.dispose();
+    _listAnimationController.dispose();
     super.dispose();
-  }
-
-  Widget _buildLoadingSkeleton() {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey[850]!,
-      highlightColor: Colors.grey[700]!,
-      child: ListView.builder(
-        itemCount: 3,
-        itemBuilder: (_, __) => Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Container(
-            height: 120.0,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12.0),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAnimatedHearts(int loves) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(
-        loves.clamp(1, 5),
-        (index) => ScaleTransition(
-          scale: CurvedAnimation(
-            parent: _heartController,
-            curve: Interval(
-              index * 0.1,
-              1.0,
-              curve: Curves.elasticOut,
-            ),
-          ),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 2.0),
-            child: Text('❤️', style: TextStyle(fontSize: 24)),
-          ),
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: const Text('My Portfolio'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+      body: Stack(
+        children: [
+          const DynamicNebulaBackground(),
+          Consumer<UserProvider>(
+            builder: (context, userProvider, child) {
+              if (userProvider.isFetchingActions && userProvider.userActions.isEmpty) {
+                return _buildLoadingSkeleton();
+              }
+
+              if (userProvider.hasActionsError) {
+                return Center(child: Text(userProvider.actionsError ?? 'An error occurred.', style: const TextStyle(color: Colors.redAccent)));
+              }
+
+              if (userProvider.userActions.isEmpty) {
+                return const _EmptyPortfolioState();
+              }
+
+              return _buildPortfolioContent(userProvider);
+            },
+          ),
+        ],
       ),
-      body: Consumer<UserProvider>(
-        builder: (context, userProvider, child) {
-          if (userProvider.isFetchingActions) {
-            return _buildLoadingSkeleton();
-          }
+    );
+  }
 
-          if (userProvider.hasActionsError) {
-            return Center(
-              child: Text(
-                userProvider.actionsError ?? 'An unknown error occurred.',
-                style: const TextStyle(color: Colors.redAccent),
-              ),
-            );
-          }
+  Widget _buildLoadingSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[850]!,
+      highlightColor: Colors.grey[800]!,
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        children: [
+          SizedBox(height: MediaQuery.of(context).padding.top + 20),
+          Container(height: 120, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
+          const SizedBox(height: 24),
+          Container(height: 100, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+          const SizedBox(height: 16),
+          Container(height: 100, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+          const SizedBox(height: 16),
+          Container(height: 100, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+        ],
+      ),
+    );
+  }
 
-          if (userProvider.userActions.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Text(
-                  "You haven't submitted any Bright Acts yet.\nTap 'Record Act' to get started!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 18),
-                ),
-              ),
-            );
-          }
+  Widget _buildPortfolioContent(UserProvider userProvider) {
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          expandedHeight: 220.0,
+          pinned: true,
+          flexibleSpace: FlexibleSpaceBar(
+            background: _buildHeader(userProvider),
+            title: const Text('My Portfolio', style: TextStyle(fontSize: 16)),
+            centerTitle: true,
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final action = userProvider.userActions[index];
+                final animation = Tween(begin: 0.0, end: 1.0).animate(
+                  CurvedAnimation(
+                    parent: _listAnimationController,
+                    curve: Interval(
+                      (1 / userProvider.userActions.length) * index,
+                      1.0,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                );
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(animation),
+                    child: GoodwillTimelineCard(action: action, isFirst: index == 0, isLast: index == userProvider.userActions.length - 1),
+                  ),
+                );
+              },
+              childCount: userProvider.userActions.length,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(8.0),
-            itemCount: userProvider.userActions.length,
-            itemBuilder: (context, index) {
-              final action = userProvider.userActions[index];
-              final loves = (action.score ?? 0).clamp(1, 100); // or use action.loves
+  Widget _buildHeader(UserProvider userProvider) {
+    final totalLoves = userProvider.userActions.fold<int>(0, (sum, item) => sum + (item.score ?? 0));
+    final totalActs = userProvider.userActions.length;
+    final username = userProvider.currentUser?.username ?? 'User';
 
-              _heartController.forward(from: 0.0);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0).copyWith(top: kToolbarHeight),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Impact Summary for $username', style: const TextStyle(color: Colors.white70, fontSize: 16)),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatColumn('Total Acts', totalActs),
+                _buildStatColumn('Loves Earned', totalLoves, isLoves: true),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              return Card(
-                color: Colors.grey[900],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                margin: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        action.title ?? 'Bright Act',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        action.description ?? '',
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '💗 $loves Loves Earned',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.pinkAccent,
-                            ),
-                          ),
-                          _buildAnimatedHearts((loves / 20).ceil()) // Up to 5 hearts
-                        ],
-                      ),
-                    ],
+  Widget _buildStatColumn(String label, int value, {bool isLoves = false}) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoves) const Text('❤️ ', style: TextStyle(fontSize: 28)),
+            AnimatedDigitWidget(
+              // --- THIS IS THE FIX ---
+              // The AnimatedDigitWidget expects a double, so we convert the int.
+              value: value.toDouble(),
+              textStyle: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+      ],
+    );
+  }
+}
+
+class GoodwillTimelineCard extends StatelessWidget {
+  final GoodwillAction action;
+  final bool isFirst;
+  final bool isLast;
+
+  const GoodwillTimelineCard({
+    super.key,
+    required this.action,
+    this.isFirst = false,
+    this.isLast = false,
+  });
+
+  IconData _getIconForAction(String? title) {
+    switch (title?.toLowerCase()) {
+      case 'mentorship': return Icons.school_outlined;
+      case 'volunteering': return Icons.volunteer_activism_outlined;
+      case 'donation': return Icons.monetization_on_outlined;
+      default: return Icons.favorite_border;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildTimelineIndicator(),
+          const SizedBox(width: 16),
+          Expanded(child: _buildCardContent()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineIndicator() {
+    return Column(
+      children: [
+        if (!isFirst) Expanded(child: Container(width: 2, color: Colors.white24)),
+        CircleAvatar(
+          backgroundColor: Colors.amber.withOpacity(0.3),
+          child: Icon(_getIconForAction(action.title), color: Colors.amber, size: 20),
+        ),
+        if (!isLast) Expanded(child: Container(width: 2, color: Colors.white24)),
+      ],
+    );
+  }
+
+  Widget _buildCardContent() {
+    return Card(
+      color: Colors.white.withOpacity(0.05),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.0),
+        side: BorderSide(color: Colors.white.withOpacity(0.1)),
+      ),
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    action.title ?? 'Bright Act',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
-              );
-            },
-          );
-        },
+                Text(
+                  '${action.score ?? 0} ❤️',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.pinkAccent),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              action.description ?? '',
+              style: const TextStyle(color: Colors.white70, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              DateFormat.yMMMd().format(action.createdAt ?? DateTime.now()),
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyPortfolioState extends StatelessWidget {
+  const _EmptyPortfolioState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.edit_note_rounded, size: 80, color: Colors.white.withOpacity(0.3)),
+            const SizedBox(height: 24),
+            const Text(
+              "Your Portfolio is Your Story",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              "You haven't submitted any Bright Acts yet. Tap 'Record Act' on the home screen to begin your journey!",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.5),
+            ),
+          ],
+        ),
       ),
     );
   }

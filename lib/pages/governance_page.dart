@@ -1,11 +1,14 @@
-// lib/pages/governance_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../state/proposal_provider.dart';
-import '../widgets/proposal_card.dart'; // Assuming you have a ProposalCard widget
-import 'create_proposal_page.dart'; // This will be the file containing CreateProposalPageContent
+import 'package:shimmer/shimmer.dart';
+import 'dart:ui';
 
+import '../state/proposal_provider.dart';
+import '../widgets/proposal_card.dart';
+import 'create_proposal_page.dart';
+import '../widgets/dynamic_nebula_background.dart';
+
+// --- GovernancePage ---
 class GovernancePage extends StatefulWidget {
   const GovernancePage({super.key});
 
@@ -13,118 +16,226 @@ class GovernancePage extends StatefulWidget {
   State<GovernancePage> createState() => _GovernancePageState();
 }
 
-class _GovernancePageState extends State<GovernancePage> {
-  // State to toggle between list and form view
-  bool _showCreateForm = false;
+class _GovernancePageState extends State<GovernancePage> with TickerProviderStateMixin {
+  String _selectedStatus = 'ACTIVE';
+  late AnimationController _listAnimationController;
 
   @override
   void initState() {
     super.initState();
-    // Fetch proposals only when the list view is first active
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchProposalsIfListActive();
-    });
+    _listAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fetchProposals();
   }
 
-  void _fetchProposalsIfListActive() {
-    if (!_showCreateForm) {
-      // Assuming 'ACTIVE' is the desired initial status to fetch for the list
-      context.read<ProposalProvider>().fetchProposals(status: 'ACTIVE');
+  @override
+  void dispose() {
+    _listAnimationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchProposals() async {
+    _listAnimationController.reset();
+    // Use `mounted` check for safety in async operations
+    if (mounted) {
+      await context.read<ProposalProvider>().fetchProposals(status: _selectedStatus);
+      if (mounted) {
+        _listAnimationController.forward();
+      }
     }
   }
 
-  // Callback to hide the form and refresh the list
-  void _onProposalFormCompleted() {
-    setState(() {
-      _showCreateForm = false; // Switch back to list view
-    });
-    // Refresh proposals after form submission/cancellation
-    _fetchProposalsIfListActive();
-  }
-
-  // Builds the list view of proposals
-  Widget _buildProposalList() {
-    return Consumer<ProposalProvider>(
-      builder: (context, proposalProvider, child) {
-        if (proposalProvider.isFetchingProposals) {
-          return const Center(child: CircularProgressIndicator(color: Colors.white));
-        }
-        if (proposalProvider.hasListError) {
-          return Center(
-            child: Text(
-              proposalProvider.listError ?? 'Failed to load proposals.',
-              style: const TextStyle(color: Colors.redAccent),
-            ),
-          );
-        }
-        if (proposalProvider.proposals.isEmpty) {
-          return const Center(
-            child: Text(
-              "No active proposals found.",
-              style: TextStyle(color: Colors.white70, fontSize: 18),
-            ),
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(8.0),
-          itemCount: proposalProvider.proposals.length,
-          itemBuilder: (context, index) {
-            final proposal = proposalProvider.proposals[index];
-            // Assuming ProposalCard takes a Proposal object
-            return ProposalCard(proposal: proposal);
+  void _showCreateProposalForm() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Close',
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (context, anim1, anim2) {
+        return CreateProposalPageContent(
+          onFormCompleted: () {
+            Navigator.of(context).pop();
+            _fetchProposals();
           },
         );
       },
-    );
-  }
-
-  // Builds the create proposal form view (content from CreateProposalPage)
-  Widget _buildCreateProposalForm() {
-    return CreateProposalPageContent( // Ensure this class name matches your create_proposal_page.dart
-      onFormCompleted: _onProposalFormCompleted, // Pass the callback
+      transitionBuilder: (context, anim1, anim2, child) {
+        return SlideTransition(
+          position: Tween(begin: const Offset(0, 1), end: Offset.zero).animate(
+            CurvedAnimation(parent: anim1, curve: Curves.easeInOutCubic),
+          ),
+          child: child,
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // Ensure page background is transparent
-      appBar: AppBar(
-        title: Text(_showCreateForm ? 'Create New Proposal' : 'Governance'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false, // Prevents implicit back button
-        actions: [
-          _showCreateForm // If currently showing the form
-              ? IconButton(
-                  icon: const Icon(Icons.close), // Close button for the form
-                  onPressed: () {
-                    setState(() {
-                      _showCreateForm = false; // Switch back to list view
-                    });
-                  },
-                )
-              : IconButton(
-                  icon: const Icon(Icons.add), // Add button for the list
-                  onPressed: () {
-                    setState(() {
-                      _showCreateForm = true; // Switch to form view
-                    });
-                  },
-                ),
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showCreateProposalForm,
+        icon: const Icon(Icons.add, color: Colors.black),
+        label: const Text('New Proposal', style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.amber[700],
+      ),
+      body: Stack(
+        children: [
+          const DynamicNebulaBackground(),
+          RefreshIndicator(
+            onRefresh: _fetchProposals,
+            color: Colors.amber,
+            backgroundColor: Colors.grey[850],
+            child: CustomScrollView(
+              slivers: [
+                _buildSliverAppBar(),
+                _buildHeader(),
+                _buildFilterBar(),
+                _buildProposalList(),
+              ],
+            ),
+          ),
         ],
       ),
-      resizeToAvoidBottomInset: false, // <<< ADDED THIS LINE: Prevents layout jumps
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 500), // Fade duration
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        // Use a KeyedSubtree to ensure AnimatedSwitcher sees a different widget and animates
-        child: _showCreateForm
-            ? KeyedSubtree(key: const ValueKey('createForm'), child: _buildCreateProposalForm())
-            : KeyedSubtree(key: const ValueKey('proposalList'), child: _buildProposalList()),
+    );
+  }
+
+  SliverAppBar _buildSliverAppBar() {
+    return const SliverAppBar(
+      title: Text('Governance'),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      pinned: true,
+    );
+  }
+
+  SliverToBoxAdapter _buildHeader() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.gavel_rounded, color: Colors.white70, size: 40),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Shape the future of the community by creating and voting on proposals.',
+                      style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  SliverToBoxAdapter _buildFilterBar() {
+    final statuses = ['ACTIVE', 'PASSED', 'FAILED'];
+    return SliverToBoxAdapter(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
+        child: SegmentedButton<String>(
+          segments: statuses.map((status) {
+            return ButtonSegment<String>(
+              value: status,
+              label: Text(status.toUpperCase()),
+            );
+          }).toList(),
+          selected: {_selectedStatus},
+          onSelectionChanged: (newSelection) {
+            setState(() {
+              _selectedStatus = newSelection.first;
+              _fetchProposals();
+            });
+          },
+          style: SegmentedButton.styleFrom(
+            backgroundColor: Colors.white.withOpacity(0.1),
+            foregroundColor: Colors.white70,
+            selectedBackgroundColor: Colors.amber[800]!,
+            selectedForegroundColor: Colors.black,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProposalList() {
+    return Consumer<ProposalProvider>(
+      builder: (context, proposalProvider, child) {
+        if (proposalProvider.isFetchingProposals && proposalProvider.proposals.isEmpty) {
+          return _buildLoadingShimmer();
+        }
+        if (proposalProvider.hasListError) {
+          return SliverFillRemaining(child: Center(child: Text(proposalProvider.listError ?? 'Failed to load proposals.')));
+        }
+        if (proposalProvider.proposals.isEmpty) {
+          return const SliverFillRemaining(child: Center(child: Text("No proposals found for this status.")));
+        }
+
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0).copyWith(bottom: 100),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final proposal = proposalProvider.proposals[index];
+                final animation = Tween(begin: 0.0, end: 1.0).animate(
+                  CurvedAnimation(
+                    parent: _listAnimationController,
+                    curve: Interval((1 / proposalProvider.proposals.length) * index, 1.0, curve: Curves.easeOut),
+                  ),
+                );
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(animation),
+                    child: ProposalCard(proposal: proposal),
+                  ),
+                );
+              },
+              childCount: proposalProvider.proposals.length,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLoadingShimmer() {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => Shimmer.fromColors(
+            baseColor: Colors.grey[850]!,
+            highlightColor: Colors.grey[800]!,
+            child: Card(
+              margin: const EdgeInsets.symmetric(vertical: 8.0),
+              color: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+              child: const SizedBox(height: 150),
+            ),
+          ),
+          childCount: 4,
+        ),
       ),
     );
   }
 }
+
