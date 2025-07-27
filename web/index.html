@@ -7,39 +7,20 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
 
-  <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="brightacts_frontend_app">
+  <meta name="apple-mobile-web-app-title" content="Bright Acts">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>❤️</text></svg>">
 
-  <title>brightacts_frontend_app</title>
+  <title>Bright Acts</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- reCAPTCHA Enterprise script -->
-  <script src="https://www.google.com/recaptcha/enterprise.js?render=6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs"></script>
-
-  <script>
-    // Function to get reCAPTCHA token
-    function getRecaptchaToken(action) {
-      return new Promise(function(resolve, reject) {
-        grecaptcha.enterprise.ready(function() {
-          grecaptcha.enterprise.execute('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs', {action: action}).then(function(token) {
-            resolve(token);
-          }).catch(function(error) {
-            reject(error);
-          });
-        });
-      });
-    }
-  </script>
+  <script src="https://www.google.com/recaptcha/api.js?render=6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs"></script>
 
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
-
