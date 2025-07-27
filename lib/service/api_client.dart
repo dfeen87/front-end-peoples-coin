@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart'; // Import for kDebugMode
 import '../models/user_account.dart';
 import '../models/goodwill_action.dart';
 import '../models/goodwill_action_to_send.dart';
-import '../models/proposal.dart'; // <--- FIXED THIS LINE: Added '.dart';
+import '../models/proposal.dart';
 import '../models/proposal_to_send.dart';
 import '../models/vote.dart';
 import '../models/vote_to_send.dart';
@@ -53,18 +53,19 @@ class PeoplesCoinApiClient {
     }
   }
 
+  // --- THIS FUNCTION IS CORRECTED ---
   Future<void> createUserWallet({
     required String username,
     required String publicKey,
     required String encryptedPrivateKey,
-    required String recaptchaToken,
+    // The 'recaptchaToken' parameter has been removed.
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/register-wallet');
     final body = json.encode({
       'username': username,
       'public_key': publicKey,
       'encrypted_private_key': encryptedPrivateKey,
-      'recaptcha_token': recaptchaToken,
+      // The 'recaptcha_token' field has been removed from the body.
     });
 
     try {
@@ -209,7 +210,6 @@ class PeoplesCoinApiClient {
   }
 
   // === Ledger ===
-  // Renamed from getPublicLedger for consistency with LedgerProvider
   Future<List<PublicLedgerEntry>> getLedgerEntries() async {
     final uri = Uri.parse('$baseUrl/api/v1/ledger/public');
     try {
@@ -228,26 +228,18 @@ class PeoplesCoinApiClient {
     }
   }
 
-  /// NEW METHOD: Sends 'Loves' (tokens) from one wallet to another.
-  /// This method is crucial for enabling token transfers in your application.
-  ///
-  /// IMPORTANT:
-  ///   - Ensure the `uri` matches your actual backend API endpoint for sending tokens.
-  ///     The current URI is an example (`/api/v1/transactions/send`).
-  ///   - The `body` structure (`sender_id`, `recipient_id`, `amount`, `memo`)
-  ///     must perfectly match what your backend expects.
   Future<Map<String, dynamic>> sendLoves({
     required String senderWalletId,
     required String recipientWalletId,
     required int amount,
-    String? memo, // Optional memo/description for the transaction
+    String? memo,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/transactions/send'); // **Adjust this URI if your backend endpoint is different**
+    final uri = Uri.parse('$baseUrl/api/v1/transactions/send');
     final body = json.encode({
       'sender_id': senderWalletId,
       'recipient_id': recipientWalletId,
       'amount': amount,
-      if (memo != null && memo.isNotEmpty) 'memo': memo, // Only include memo if provided and not empty
+      if (memo != null && memo.isNotEmpty) 'memo': memo,
     });
 
     try {
@@ -258,9 +250,6 @@ class PeoplesCoinApiClient {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Assuming a successful response returns some data.
-        // You might want to parse this into a specific model if your API returns
-        // a complex object upon successful transaction.
         return json.decode(response.body);
       } else {
         throw Exception('Failed to send loves. Status: ${response.statusCode}, Body: ${response.body}');
@@ -291,3 +280,4 @@ class PeoplesCoinApiClient {
     }
   }
 }
+

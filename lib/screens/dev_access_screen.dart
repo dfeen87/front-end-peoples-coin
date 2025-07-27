@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'sign_up_screen.dart';
-import '../widgets/dynamic_nebula_background.dart'; // Adjust path as needed
+import 'package:go_router/go_router.dart'; // 1. Import go_router
+import '../widgets/dynamic_nebula_background.dart';
 
 class DevAccessScreen extends StatefulWidget {
   const DevAccessScreen({Key? key}) : super(key: key);
@@ -30,10 +30,9 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
   void _validateAccess() {
     final input = _codeController.text.trim();
     if (input == _devAccessCode) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const SignUpScreen()),
-      );
+      // 2. Use context.go() to navigate to the sign-up screen.
+      // The path '/sign_up' is defined in your main.dart router config.
+      context.go('/sign_up');
     } else {
       setState(() {
         _errorText = 'Invalid access code. Please try again.';

@@ -4,12 +4,13 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui'; // Needed for BackdropFilter
-import 'dart:js_util' as js_util;
 import 'package:flutter/material.dart';
 import 'package:crypto/crypto.dart';
 import 'package:pointycastle/export.dart' as pointy;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:web3dart/crypto.dart';
+
 import '../service/api_client.dart';
 import '../widgets/dynamic_nebula_background.dart';
 
@@ -26,34 +27,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   final _apiClient = PeoplesCoinApiClient();
 
   bool _isLoading = false;
   String? _error;
 
-  // --- All your existing logic remains the same ---
-  // (generateRandomPrivateKey, deriveWalletAddress, _submit, etc.)
+  // --- Crypto and Helper Logic (Restored) ---
+
   Future<bool> checkUsernameAvailability(String username) async {
     final uri = Uri.parse('${_apiClient.baseUrl}/api/v1/users/username-check/$username');
     final res = await http.get(uri);
     return res.statusCode == 200 && jsonDecode(res.body)['available'] == true;
-  }
-
-  Future<String?> getRecaptchaToken() async {
-    try {
-      final token = await js_util.promiseToFuture<String>(
-        js_util.callMethod(
-          js_util.globalThis,
-          'getRecaptchaToken',
-          ['signup'],
-        ),
-      );
-      return token;
-    } catch (e) {
-      debugPrint('Failed to get reCAPTCHA token: $e');
-      return null;
-    }
   }
 
   String generateRandomPrivateKey() {
@@ -80,7 +66,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   String encryptPrivateKey(String privateKey, String password) {
     final key = sha256.convert(utf8.encode(password)).bytes;
-    final iv = Uint8List(16);
+    final iv = Uint8List(16); // Using a zero IV, consider a random one for production
     final cipher = pointy.CBCBlockCipher(pointy.AESEngine())
       ..init(
         true,
@@ -99,50 +85,52 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return base64.encode(output);
   }
 
+  // --- Submit Logic (Corrected) ---
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    
     setState(() {
       _isLoading = true;
       _error = null;
     });
+
     try {
       final username = _usernameController.text.trim();
       final email = _emailController.text.trim();
-      final phone = _phoneController.text.trim();
       final password = _passwordController.text.trim();
+      // Note: The phone number is collected but not sent to the API in this version.
+      // You would need to modify your API to accept it.
+
       final usernameAvailable = await checkUsernameAvailability(username);
       if (!usernameAvailable) {
-        setState(() {
-          _error = 'Username already taken';
-          _isLoading = false;
-        });
-        return;
+        throw Exception('Username already taken');
       }
-      final recaptchaToken = await getRecaptchaToken();
-      if (recaptchaToken == null) {
-        setState(() {
-          _error = 'Failed to verify reCAPTCHA. Please try again.';
-          _isLoading = false;
-        });
-        return;
-      }
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+
+      // Create user in Firebase Auth
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      // Generate keys and encrypt on the client-side (as per original logic)
       final privateKey = generateRandomPrivateKey();
       final walletAddress = deriveWalletAddress(privateKey);
       final encryptedPrivateKey = encryptPrivateKey(privateKey, password);
+      
+      // Call the API with the parameters it expects
       await _apiClient.createUserWallet(
         username: username,
         publicKey: walletAddress,
         encryptedPrivateKey: encryptedPrivateKey,
-        recaptchaToken: recaptchaToken,
+        // The recaptchaToken is no longer needed here, App Check handles it.
       );
+
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed('/home');
+      context.go('/home');
+
     } catch (e) {
-      if(mounted) setState(() => _error = e.toString());
+      if(mounted) setState(() => _error = e.toString().replaceFirst("Exception: ", ""));
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -156,10 +144,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
   
-  // --- STYLING HELPER for form fields ---
   InputDecoration _buildInputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
@@ -240,10 +228,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
+                              controller: _phoneController,
+                              decoration: _buildInputDecoration('Phone Number (Optional)', Icons.phone_outlined),
+                              keyboardType: TextInputType.phone,
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
                               controller: _passwordController,
                               obscureText: true,
                               decoration: _buildInputDecoration('Password', Icons.lock_outline),
-                              validator: (val) => val != null && val.length >= 6 ? null : 'Password too short',
+                              validator: (val) => val != null && val.length >= 6 ? null : 'Password must be at least 6 characters',
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _confirmPasswordController,
+                              obscureText: true,
+                              decoration: _buildInputDecoration('Confirm Password', Icons.lock_reset_outlined),
+                              validator: (val) {
+                                if (val != _passwordController.text) {
+                                  return 'Passwords do not match';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 24),
                             _isLoading
@@ -258,7 +264,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     child: const Text('Create Account', style: TextStyle(fontSize: 16)),
                                   ),
                             const SizedBox(height: 20),
-                            // --- NEW: Sign In Link ---
                             Center(
                               child: RichText(
                                 text: TextSpan(
@@ -274,7 +279,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       ),
                                       recognizer: TapGestureRecognizer()
                                         ..onTap = () {
-                                          Navigator.of(context).pushNamed('/sign_in');
+                                          context.go('/sign_in');
                                         },
                                     ),
                                   ],
@@ -295,3 +300,4 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 }
+

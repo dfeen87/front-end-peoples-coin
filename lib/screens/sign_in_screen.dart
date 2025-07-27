@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart'; // Import Provider
 import 'dart:ui';
-import 'dart:js_util' as js_util;
 
-import '../service/api_client.dart';
 import '../widgets/dynamic_nebula_background.dart';
+import '../state/auth_provider.dart' as MyAppAuthProvider; // Import your providers
+import '../state/user_provider.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -17,11 +19,11 @@ class _SignInScreenState extends State<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _apiClient = PeoplesCoinApiClient();
 
   bool _isLoading = false;
   String? _error;
 
+  // --- THIS IS THE CORRECTED SIGN-IN FUNCTION ---
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -31,40 +33,44 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      // Check if grecaptcha is loaded
-      final hasRecaptcha = js_util.hasProperty(js_util.globalThis, 'grecaptcha');
-      if (!hasRecaptcha) {
-        throw Exception('reCAPTCHA not loaded on the page.');
-      }
-
-      // Call grecaptcha.execute (not enterprise.execute)
-      final recaptchaToken = await js_util.promiseToFuture<String>(
-        js_util.callMethod(js_util.getProperty(js_util.globalThis, 'grecaptcha'), 'execute', [
-          'YOUR_RECAPTCHA_SITE_KEY_HERE', // Replace with your actual site key
-          {'action': 'login'},
-        ]),
-      );
-
-      // Optionally: send recaptchaToken to your backend for verification
-      // await _apiClient.verifyRecaptchaToken(recaptchaToken);
-
+      print("Attempting to sign in with Firebase Auth...");
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      print("Firebase Auth sign-in successful.");
 
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed('/home');
+
+      // Fetch user profile data *after* logging in and *before* navigating.
+      print("Updating AuthProvider state...");
+      final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
+      await authProvider.checkCurrentUser(); // Ensure auth provider state is updated
+      
+      if (authProvider.user != null) {
+        print("Fetching user profile from UserProvider for UID: ${authProvider.user!.uid}");
+        await context.read<UserProvider>().fetchUser(authProvider.user!.uid);
+        print("User profile fetched successfully.");
+
+        // Now it's safe to navigate to the home page.
+        print("Navigating to /home...");
+        context.go('/home');
+      } else {
+        throw Exception("Failed to update auth state after sign-in.");
+      }
+
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+      print('FirebaseAuthException caught: ${e.code} - ${e.message}');
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential' || e.code == 'wrong-password') {
         _error = 'Incorrect email or password.';
       } else {
-        _error = 'An error occurred. Please try again.';
+        _error = 'An error occurred during sign-in. Please try again.';
       }
       if (mounted) setState(() {});
     } catch (e) {
+      print('An unexpected error occurred during sign-in: $e');
       if (mounted) {
-        setState(() => _error = 'An unexpected error occurred: ${e.toString()}');
+        setState(() => _error = 'An unexpected error occurred. Please check your connection.');
       }
     } finally {
       if (mounted) {
@@ -127,11 +133,13 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true, 
+      extendBodyBehindAppBar: true,  
       appBar: AppBar(
-        title: const Text(''), 
+        title: const Text(''),  
         backgroundColor: Colors.transparent,
         elevation: 0,
+        // This ensures the back button is white and visible
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Stack(
         children: [

@@ -1,5 +1,3 @@
-// lib/main.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
+import 'package:go_router/go_router.dart';
 
 // Import your files
 import 'models/user_account.dart';
@@ -20,32 +19,30 @@ import 'pages/submit_goodwill_page.dart';
 import 'pages/my_portfolio_page.dart';
 import 'pages/governance_page.dart';
 import 'pages/my_wallet_page.dart';
-import 'pages/public_ledger_page.dart'; // Ensure this path is correct
+import 'pages/public_ledger_page.dart';
 import 'screens/dev_access_screen.dart';
 import 'screens/sign_up_screen.dart';
 import 'screens/sign_in_screen.dart';
-import 'state/auth_provider.dart' as MyAppAuthProvider; // Alias to avoid naming conflicts
+import 'state/auth_provider.dart' as MyAppAuthProvider;
 import 'firebase_options.dart';
 import 'widgets/dynamic_nebula_background.dart';
-import 'utils/app_constants.dart'; // Assuming these are defined here or correctly imported
+import 'utils/app_constants.dart';
 import 'widgets/navigation_card.dart';
 import 'widgets/matrix_text.dart';
 import 'widgets/animated_digit_widget.dart';
 
-// --- Theme Definition (as per best practice 4) ---
-// Consider moving this to `lib/theme/app_theme.dart` for better organization.
+// --- Theme Definition ---
 class AppTheme {
   static ThemeData lightTheme = ThemeData(
     primarySwatch: Colors.deepPurple,
     brightness: Brightness.light,
     fontFamily: 'Roboto',
-    // Add other light theme specific properties if needed
   );
 
   static ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
     fontFamily: 'Roboto',
-    primarySwatch: Colors.blue, // Keeping your existing primary color for dark theme
+    primarySwatch: Colors.blue,
     scaffoldBackgroundColor: Colors.transparent,
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
@@ -70,23 +67,19 @@ class AppTheme {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       ),
     ),
-    // Add other dark theme specific properties
   );
 }
 
 // --- MAIN ENTRY POINT ---
 
 Future<void> main() async {
-  // Ensure Flutter widgets are initialized before any Flutter-specific calls
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Optional: lock to portrait orientation
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Load environment variables at startup
   await dotenv.load(fileName: ".env");
 
   await Firebase.initializeApp(
@@ -133,6 +126,60 @@ Future<void> main() async {
   );
 }
 
+// --- ROUTER CONFIGURATION ---
+
+final _router = GoRouter(
+  routes: [
+    GoRoute(
+      path: '/',
+      builder: (context, state) => const AppStartupController(),
+    ),
+    GoRoute(
+      path: '/dev_access',
+      builder: (context, state) => const DevAccessScreen(),
+    ),
+    GoRoute(
+      path: '/sign_in',
+      builder: (context, state) => const SignInScreen(),
+    ),
+    GoRoute(
+      path: '/sign_up',
+      builder: (context, state) => const SignUpScreen(),
+    ),
+    ShellRoute(
+      builder: (context, state, child) {
+        return AppShell(child: child);
+      },
+      routes: [
+        GoRoute(
+          path: '/home',
+          builder: (context, state) => const HomePage(),
+        ),
+      ],
+    ),
+  ],
+);
+
+// --- APP SHELL WIDGET ---
+class AppShell extends StatelessWidget {
+  final Widget child;
+
+  const AppShell({required this.child, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        const Positioned.fill(
+          child: DynamicNebulaBackground(),
+        ),
+        child,
+      ],
+    );
+  }
+}
+
+
 // --- ROOT APP WIDGET ---
 
 class BrightActsApp extends StatelessWidget {
@@ -146,18 +193,13 @@ class BrightActsApp extends StatelessWidget {
       systemNavigationBarIconBrightness: Brightness.light,
     ));
 
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'BrightActs',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: const AppStartupController(),
-      routes: {
-        '/sign_up': (context) => const SignUpScreen(),
-        '/sign_in': (context) => const SignInScreen(),
-        '/home': (context) => const HomePage(),
-      },
+      themeMode: ThemeMode.dark,
+      routerConfig: _router,
     );
   }
 }
@@ -172,64 +214,35 @@ class AppStartupController extends StatefulWidget {
 }
 
 class _AppStartupControllerState extends State<AppStartupController> {
-  bool _isReady = false;
-
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeApp();
-    });
+    _initializeApp();
   }
 
   Future<void> _initializeApp() async {
-    await Future.delayed(const Duration(milliseconds: 800));
+    await WidgetsBinding.instance.endOfFrame;
 
     final authProvider = Provider.of<MyAppAuthProvider.AuthProvider>(context, listen: false);
     await authProvider.checkCurrentUser();
 
-    setState(() {
-      _isReady = true;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_isReady) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: CircularProgressIndicator(color: Colors.deepPurple),
-        ),
-      );
-    }
-    return const LandingGate();
-  }
-}
-
-// --- AUTHENTICATION GATE ---
-
-class LandingGate extends StatelessWidget {
-  const LandingGate({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<MyAppAuthProvider.AuthProvider>(
-      builder: (context, authProvider, _) {
-        if (authProvider.isLoading) {
-          return const Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (authProvider.user == null) {
-          return const DevAccessScreen();
-        }
-
+    if (mounted) {
+      if (authProvider.user == null) {
+        context.go('/dev_access');
+      } else {
         context.read<UserProvider>().fetchUser(authProvider.user!.uid);
-        return const HomePage();
-      },
+        context.go('/home');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: CircularProgressIndicator(color: Colors.deepPurple),
+      ),
     );
   }
 }
@@ -244,7 +257,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 2; // Start on 'Record Act'
+  int _selectedIndex = 2;
   late final PageController _pageController;
   late final List<Widget> _pages;
 
@@ -404,37 +417,38 @@ class _HomePageState extends State<HomePage> {
     _pageController.animateToPage(index, duration: AppDurations.fast, curve: Curves.ease);
   }
 
+  // --- THIS IS THE CORRECTED BUILD METHOD FOR HOMEPAGE ---
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final verticalMargin = screenWidth >= AppBreakpoints.desktop ? 40.0 : 20.0;
 
+    // The Scaffold is now the root widget of this page.
+    // It's transparent to let the AppShell's background show through.
     return Scaffold(
+      backgroundColor: Colors.transparent, // Make sure it's transparent
       extendBodyBehindAppBar: true,
       extendBody: true,
       appBar: _buildAppBar(context),
-      body: Stack(
-        children: [
-          const DynamicNebulaBackground(),
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AnimatedSlide(
-                  offset: _showUiElements ? Offset.zero : const Offset(0, -1.5),
-                  duration: AppDurations.fast,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildWelcomeHeader(),
-                  ),
-                ),
-                SizedBox(height: verticalMargin),
-                Expanded(child: _buildPageView()),
-                SizedBox(height: verticalMargin),
-              ],
+      // The main body is now just the SafeArea with the Column.
+      // The old Stack and DynamicNebulaBackground are GONE from here.
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedSlide(
+              offset: _showUiElements ? Offset.zero : const Offset(0, -1.5),
+              duration: AppDurations.fast,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: _buildWelcomeHeader(),
+              ),
             ),
-          ),
-        ],
+            SizedBox(height: verticalMargin),
+            Expanded(child: _buildPageView()),
+            SizedBox(height: verticalMargin),
+          ],
+        ),
       ),
       bottomNavigationBar: _buildBottomNavBar(),
     );
@@ -601,8 +615,7 @@ class SettingsDialog extends StatelessWidget {
                 text: 'Get Support',
                 icon: Icons.support_agent,
                 onPressed: () {
-                  // Implement support action, e.g., launching mailto link
-                  // For example: url_launcher.launchUrl(Uri.parse('mailto:support@example.com'));
+                  // Implement support action
                 },
               ),
               const SizedBox(height: 20),
@@ -613,9 +626,9 @@ class SettingsDialog extends StatelessWidget {
                 label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
                 onPressed: () async {
                   HapticFeedback.heavyImpact();
-                  // Pop dialog first, then sign out to avoid context issues
                   Navigator.of(context).pop();
                   await context.read<MyAppAuthProvider.AuthProvider>().signOut();
+                  context.go('/dev_access');
                 },
               ),
             ],
@@ -641,7 +654,6 @@ class SettingsDialog extends StatelessWidget {
           try {
             await url_launcher.launchUrl(uri, mode: url_launcher.LaunchMode.externalApplication);
           } catch (e) {
-            // Optional: Show a snackbar or dialog if launching fails
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Could not launch $url')),
             );
@@ -652,8 +664,7 @@ class SettingsDialog extends StatelessWidget {
   }
 }
 
-// --- HELPER CONSTANTS (Consider moving these to `utils/app_constants.dart` if not already there) ---
-// If these are defined in utils/app_constants.dart, remove them from here.
+// --- HELPER CONSTANTS ---
 class AppDurations {
   static const fast = Duration(milliseconds: 300);
   static const medium = Duration(milliseconds: 400);
@@ -672,3 +683,4 @@ class AppBreakpoints {
   static const double tablet = 768;
   static const double desktop = 1200;
 }
+
