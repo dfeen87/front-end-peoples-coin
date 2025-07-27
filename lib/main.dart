@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -74,32 +75,24 @@ class AppTheme {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-
   await dotenv.load(fileName: ".env");
-
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
   final reCaptchaKey = dotenv.env['RECAPTCHA_SITE_KEY'] ?? 'YOUR_FALLBACK_KEY_HERE';
-
   await FirebaseAppCheck.instance.activate(
     webProvider: ReCaptchaV3Provider(reCaptchaKey),
     androidProvider: AndroidProvider.playIntegrity,
     appleProvider: AppleProvider.appAttest,
   );
-
   runApp(
     MultiProvider(
       providers: [
-        Provider<PeoplesCoinApiClient>(
-          create: (_) => PeoplesCoinApiClient(),
-        ),
+        Provider<PeoplesCoinApiClient>(create: (_) => PeoplesCoinApiClient()),
         ChangeNotifierProxyProvider<PeoplesCoinApiClient, MyAppAuthProvider.AuthProvider>(
           create: (context) => MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>()),
           update: (context, apiClient, previous) => MyAppAuthProvider.AuthProvider(apiClient),
@@ -130,31 +123,14 @@ Future<void> main() async {
 
 final _router = GoRouter(
   routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const AppStartupController(),
-    ),
-    GoRoute(
-      path: '/dev_access',
-      builder: (context, state) => const DevAccessScreen(),
-    ),
-    GoRoute(
-      path: '/sign_in',
-      builder: (context, state) => const SignInScreen(),
-    ),
-    GoRoute(
-      path: '/sign_up',
-      builder: (context, state) => const SignUpScreen(),
-    ),
+    GoRoute(path: '/', builder: (context, state) => const AppStartupController()),
+    GoRoute(path: '/dev_access', builder: (context, state) => const DevAccessScreen()),
+    GoRoute(path: '/sign_in', builder: (context, state) => const SignInScreen()),
+    GoRoute(path: '/sign_up', builder: (context, state) => const SignUpScreen()),
     ShellRoute(
-      builder: (context, state, child) {
-        return AppShell(child: child);
-      },
+      builder: (context, state, child) => AppShell(child: child),
       routes: [
-        GoRoute(
-          path: '/home',
-          builder: (context, state) => const HomePage(),
-        ),
+        GoRoute(path: '/home', builder: (context, state) => const HomePage()),
       ],
     ),
   ],
@@ -163,22 +139,18 @@ final _router = GoRouter(
 // --- APP SHELL WIDGET ---
 class AppShell extends StatelessWidget {
   final Widget child;
-
   const AppShell({required this.child, super.key});
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        const Positioned.fill(
-          child: DynamicNebulaBackground(),
-        ),
+        const Positioned.fill(child: DynamicNebulaBackground()),
         child,
       ],
     );
   }
 }
-
 
 // --- ROOT APP WIDGET ---
 
@@ -192,7 +164,6 @@ class BrightActsApp extends StatelessWidget {
       systemNavigationBarColor: Colors.black.withOpacity(0.5),
       systemNavigationBarIconBrightness: Brightness.light,
     ));
-
     return MaterialApp.router(
       title: 'BrightActs',
       debugShowCheckedModeBanner: false,
@@ -208,7 +179,6 @@ class BrightActsApp extends StatelessWidget {
 
 class AppStartupController extends StatefulWidget {
   const AppStartupController({super.key});
-
   @override
   State<AppStartupController> createState() => _AppStartupControllerState();
 }
@@ -222,10 +192,8 @@ class _AppStartupControllerState extends State<AppStartupController> {
 
   Future<void> _initializeApp() async {
     await WidgetsBinding.instance.endOfFrame;
-
     final authProvider = Provider.of<MyAppAuthProvider.AuthProvider>(context, listen: false);
     await authProvider.checkCurrentUser();
-
     if (mounted) {
       if (authProvider.user == null) {
         context.go('/dev_access');
@@ -240,9 +208,7 @@ class _AppStartupControllerState extends State<AppStartupController> {
   Widget build(BuildContext context) {
     return const Scaffold(
       backgroundColor: Colors.black,
-      body: Center(
-        child: CircularProgressIndicator(color: Colors.deepPurple),
-      ),
+      body: Center(child: CircularProgressIndicator(color: Colors.deepPurple)),
     );
   }
 }
@@ -251,7 +217,6 @@ class _AppStartupControllerState extends State<AppStartupController> {
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -260,7 +225,6 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 2;
   late final PageController _pageController;
   late final List<Widget> _pages;
-
   bool _showUiElements = true;
 
   @override
@@ -272,46 +236,11 @@ class _HomePageState extends State<HomePage> {
 
   List<Widget> _buildPages() {
     return [
-      _buildNavigationPage(
-        title: 'Governance',
-        description: 'View active proposals, create new ones, and cast your votes.',
-        icon: Icons.gavel,
-        cardColor: AppColors.governance,
-        buttonText: "View Proposals",
-        pageToOpen: const GovernancePage(),
-      ),
-      _buildNavigationPage(
-        title: 'My Portfolio',
-        description: 'Track your personal acts of goodwill and contributions.',
-        icon: Icons.account_balance_wallet,
-        cardColor: AppColors.portfolio,
-        buttonText: "View My Acts",
-        pageToOpen: const MyPortfolioPage(),
-      ),
-      _buildNavigationPage(
-        title: 'Record Act',
-        description: 'Share a new act of kindness or contribution and earn Loves.',
-        icon: Icons.favorite,
-        cardColor: AppColors.recordAct,
-        buttonText: "Submit a Bright Act",
-        pageToOpen: const SubmitGoodwillPage(),
-      ),
-      _buildNavigationPage(
-        title: 'Public Ledger',
-        description: 'View all recorded acts of goodwill on the blockchain.',
-        icon: Icons.public,
-        cardColor: AppColors.ledger,
-        buttonText: "View Ledger",
-        pageToOpen: const PublicLedgerPage(),
-      ),
-      _buildNavigationPage(
-        title: 'My Wallet',
-        description: 'Manage your Loves balance, send, and receive.',
-        icon: Icons.wallet,
-        cardColor: AppColors.wallet,
-        buttonText: "Open Wallet",
-        pageToOpen: const MyWalletPage(),
-      ),
+      _buildNavigationPage(title: 'Governance', description: 'View active proposals, create new ones, and cast your votes.', icon: Icons.gavel, cardColor: AppColors.governance, buttonText: "View Proposals", pageToOpen: const GovernancePage()),
+      _buildNavigationPage(title: 'My Portfolio', description: 'Track your personal acts of goodwill and contributions.', icon: Icons.account_balance_wallet, cardColor: AppColors.portfolio, buttonText: "View My Acts", pageToOpen: const MyPortfolioPage()),
+      _buildNavigationPage(title: 'Record Act', description: 'Share a new act of kindness or contribution and earn Loves.', icon: Icons.favorite, cardColor: AppColors.recordAct, buttonText: "Submit a Bright Act", pageToOpen: const SubmitGoodwillPage()),
+      _buildNavigationPage(title: 'Public Ledger', description: 'View all recorded acts of goodwill on the blockchain.', icon: Icons.public, cardColor: AppColors.ledger, buttonText: "View Ledger", pageToOpen: const PublicLedgerPage()),
+      _buildNavigationPage(title: 'My Wallet', description: 'Manage your Loves balance, send, and receive.', icon: Icons.wallet, cardColor: AppColors.wallet, buttonText: "Open Wallet", pageToOpen: const MyWalletPage()),
     ];
   }
 
@@ -321,14 +250,7 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Widget _buildNavigationPage({
-    required String title,
-    required String description,
-    required IconData icon,
-    required Color cardColor,
-    required String buttonText,
-    required Widget pageToOpen,
-  }) {
+  Widget _buildNavigationPage({required String title, required String description, required IconData icon, required Color cardColor, required String buttonText, required Widget pageToOpen}) {
     return NavigationCard(
       title: title,
       description: description,
@@ -341,7 +263,6 @@ class _HomePageState extends State<HomePage> {
   Future<void> _showSlidingFormOverlay(BuildContext context, Widget content) async {
     setState(() => _showUiElements = false);
     await Future.delayed(AppDurations.fast);
-
     await showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -363,24 +284,17 @@ class _HomePageState extends State<HomePage> {
           child: Container(
             width: mediaQuery.size.width * (isDesktop ? 0.4 : 0.9),
             height: mediaQuery.size.height * 0.85,
-            margin: EdgeInsets.only(
-              top: mediaQuery.padding.top + (AppBar().preferredSize.height / 2),
-              bottom: mediaQuery.padding.bottom,
-            ),
+            margin: EdgeInsets.only(top: mediaQuery.padding.top + (AppBar().preferredSize.height / 2), bottom: mediaQuery.padding.bottom),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(25.0),
               border: Border.all(color: Colors.white.withOpacity(0.2)),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(25.0),
-              child: content,
-            ),
+            child: ClipRRect(borderRadius: BorderRadius.circular(25.0), child: content),
           ),
         );
       },
     );
-
     setState(() => _showUiElements = true);
   }
 
@@ -388,10 +302,7 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Detailed information about this section.',
-          style: TextStyle(color: Colors.white70, fontSize: 14),
-        ),
+        const Text('Detailed information about this section.', style: TextStyle(color: Colors.white70, fontSize: 14)),
         const Spacer(),
         Center(
           child: ElevatedButton(
@@ -417,21 +328,15 @@ class _HomePageState extends State<HomePage> {
     _pageController.animateToPage(index, duration: AppDurations.fast, curve: Curves.ease);
   }
 
-  // --- THIS IS THE CORRECTED BUILD METHOD FOR HOMEPAGE ---
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final verticalMargin = screenWidth >= AppBreakpoints.desktop ? 40.0 : 20.0;
-
-    // The Scaffold is now the root widget of this page.
-    // It's transparent to let the AppShell's background show through.
     return Scaffold(
-      backgroundColor: Colors.transparent, // Make sure it's transparent
+      backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
       extendBody: true,
       appBar: _buildAppBar(context),
-      // The main body is now just the SafeArea with the Column.
-      // The old Stack and DynamicNebulaBackground are GONE from here.
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,7 +374,12 @@ class _HomePageState extends State<HomePage> {
               icon: const Icon(Icons.settings),
               onPressed: () {
                 HapticFeedback.mediumImpact();
-                showDialog(context: context, builder: (_) => const SettingsDialog());
+                showModalBottomSheet(
+                  context: context,
+                  backgroundColor: Colors.transparent,
+                  isScrollControlled: true,
+                  builder: (_) => const SettingsBottomSheet(),
+                );
               },
             ),
           ],
@@ -479,29 +389,18 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildWelcomeHeader() {
-    return Selector<UserProvider,
-        ({bool isLoading, bool hasError, UserAccount? userAccount})>(
-      selector: (_, provider) => (
-        isLoading: provider.isLoading,
-        hasError: provider.hasError,
-        userAccount: provider.currentUser
-      ),
+    return Selector<UserProvider, ({bool isLoading, bool hasError, UserAccount? userAccount})>(
+      selector: (_, provider) => (isLoading: provider.isLoading, hasError: provider.hasError, userAccount: provider.currentUser),
       builder: (context, data, _) {
         if (data.hasError) {
           return const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('// CONNECTION INTERRUPTED',
-                  style: TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 24,
-                      fontFamily: 'monospace')),
-              Text('  Could not load user data.',
-                  style: TextStyle(color: Colors.white70)),
+              Text('// CONNECTION INTERRUPTED', style: TextStyle(color: Colors.redAccent, fontSize: 24, fontFamily: 'monospace')),
+              Text('  Could not load user data.', style: TextStyle(color: Colors.white70)),
             ],
           );
         }
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -513,8 +412,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 8),
             Row(
               children: [
-                Text('Your Balance: ',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
+                Text('Your Balance: ', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
                 if (data.isLoading)
                   Text("******", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
                 if (!data.isLoading && data.userAccount != null)
@@ -522,8 +420,7 @@ class _HomePageState extends State<HomePage> {
                     value: data.userAccount!.balance,
                     textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18, color: Colors.white),
                   ),
-                Text(' Loves',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
+                Text(' Loves', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
               ],
             ),
           ],
@@ -578,77 +475,162 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// --- SETTINGS DIALOG WIDGET ---
+// --- ENHANCED SettingsBottomSheet WIDGET ---
+class SettingsBottomSheet extends StatelessWidget {
+  const SettingsBottomSheet({super.key});
 
-class SettingsDialog extends StatelessWidget {
-  const SettingsDialog({super.key});
+  // --- NEW: Helper for the "cool support ticket" email ---
+  void _launchSupportEmail(BuildContext context) async {
+    // Replace with your actual business email
+    const String businessEmail = 'support@brightacts.com';
+    const String subject = 'Bright Acts Support Request';
+    // A helpful template for the user
+    const String body = '''
+      Please describe your issue or question in detail below.
+      
+      --------------------
+      App Version: 1.0.0
+      Platform: Web
+      User ID: [Please leave this for faster support]
+      --------------------
+
+      My issue is:
+    ''';
+
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: businessEmail,
+      query: 'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}',
+    );
+
+    try {
+      await url_launcher.launchUrl(emailLaunchUri);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not launch email app. Please contact support@brightacts.com directly.')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.75),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.white24),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Settings & Info',
-                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              _buildLinkButton(
-                context: context,
-                text: 'Docs & Codebase',
-                icon: Icons.code,
-                url: 'https://github.com/DonMichaelFeeney/Brightacts',
-              ),
-              const SizedBox(height: 10),
-              _buildLinkButton(
-                context: context,
-                text: 'Get Support',
-                icon: Icons.support_agent,
-                onPressed: () {
-                  // Implement support action
-                },
-              ),
-              const SizedBox(height: 20),
-              Divider(color: Colors.white.withOpacity(0.3)),
-              const SizedBox(height: 10),
-              TextButton.icon(
-                icon: const Icon(Icons.logout, color: Colors.redAccent),
-                label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
-                onPressed: () async {
-                  HapticFeedback.heavyImpact();
-                  Navigator.of(context).pop();
-                  await context.read<MyAppAuthProvider.AuthProvider>().signOut();
-                  context.go('/dev_access');
-                },
-              ),
-            ],
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
+          border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2))),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 5,
+              decoration: BoxDecoration(color: Colors.grey[700], borderRadius: BorderRadius.circular(12)),
+            ),
+            const SizedBox(height: 20),
+            const Text('Settings & Info', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+
+            // --- NEW: Donate Button (Placeholder) ---
+            _buildLinkButton(
+              context: context,
+              text: 'Donate to Bright Acts',
+              icon: Icons.volunteer_activism, // A more fitting icon
+              color: Colors.pinkAccent, // A standout color
+              onPressed: () {
+                // Placeholder action until you have the Stripe link
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Donation link coming soon. Thank you for your support!')),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+
+            // --- NEW: Change Background Button (Disabled) ---
+            _buildLinkButton(
+              context: context,
+              text: 'Change Background',
+              icon: Icons.wallpaper,
+              // Set onPressed to null to disable the button
+              onPressed: null, 
+            ),
+            const SizedBox(height: 10),
+
+            _buildLinkButton(
+              context: context,
+              text: 'Docs & Codebase',
+              icon: Icons.code,
+              url: 'https://github.com/DonMichaelFeeney/Brightacts',
+            ),
+            const SizedBox(height: 10),
+
+            // --- ENHANCED: Get Support Button ---
+            _buildLinkButton(
+              context: context,
+              text: 'Get Support',
+              icon: Icons.support_agent,
+              onPressed: () => _launchSupportEmail(context),
+            ),
+            const SizedBox(height: 20),
+            Divider(color: Colors.white.withOpacity(0.3)),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              icon: const Icon(Icons.logout, color: Colors.redAccent),
+              label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
+              onPressed: () async {
+                HapticFeedback.heavyImpact();
+                Navigator.of(context).pop();
+                await context.read<MyAppAuthProvider.AuthProvider>().signOut();
+                context.go('/dev_access');
+              },
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
         ),
       ),
     );
   }
 
+  // --- ENHANCED: _buildLinkButton helper ---
   Widget _buildLinkButton({
     required BuildContext context,
     required String text,
     required IconData icon,
+    Color? color,
     String? url,
     VoidCallback? onPressed,
   }) {
+    final bool isEnabled = onPressed != null || url != null;
+    final Color enabledColor = color ?? Colors.amber[700]!;
+    final Color disabledColor = Colors.grey[600]!;
+
     return TextButton.icon(
-      icon: Icon(icon, color: Colors.amber[700]),
-      label: Text(text, style: const TextStyle(color: Colors.white, fontSize: 16)),
-      onPressed: onPressed ?? () async {
+      icon: Icon(icon, color: isEnabled ? enabledColor : disabledColor),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            text,
+            style: TextStyle(
+              color: isEnabled ? Colors.white : Colors.grey[600],
+              fontSize: 16,
+            ),
+          ),
+          if (!isEnabled)
+            const Text(
+              ' (Coming Soon)',
+              style: TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
+            ),
+        ],
+      ),
+      onPressed: isEnabled ? (onPressed ?? () async {
         if (url != null) {
           final uri = Uri.parse(url);
           try {
@@ -659,7 +641,7 @@ class SettingsDialog extends StatelessWidget {
             );
           }
         }
-      },
+      }) : null, // Pass null to onPressed to automatically disable the button
     );
   }
 }
