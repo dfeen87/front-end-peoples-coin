@@ -34,7 +34,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
   String? _error;
 
-  // --- Crypto and Helper Logic (Restored) ---
+  // --- Crypto and Helper Logic ---
 
   Future<bool> checkUsernameAvailability(String username) async {
     final uri = Uri.parse('${_apiClient.baseUrl}/api/v1/users/username-check/$username');
@@ -85,77 +85,76 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return base64.encode(output);
   }
 
-  // --- Submit Logic (Corrected) ---
+  // --- Submit Logic with Debug Logging ---
 
-// In screens/sign_up_screen.dart
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      print("Validation failed. Form is not valid.");
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
-Future<void> _submit() async {
-  if (!_formKey.currentState!.validate()) {
-    print("Validation failed. Form is not valid.");
-    return;
+    try {
+      final username = _usernameController.text.trim();
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+
+      print("Step 1: Checking username availability for '$username'...");
+      final usernameAvailable = await checkUsernameAvailability(username);
+      if (!usernameAvailable) {
+        throw Exception('Username already taken');
+      }
+      print("Step 1 SUCCESS: Username is available.");
+
+      print("Step 2: Creating user in Firebase Auth for email '$email'...");
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      print("Step 2 SUCCESS: Firebase user created.");
+
+      print("Step 3: Generating client-side crypto keys...");
+      final privateKey = generateRandomPrivateKey();
+      final walletAddress = deriveWalletAddress(privateKey);
+      final encryptedPrivateKey = encryptPrivateKey(privateKey, password);
+      print("Step 3 SUCCESS: Crypto keys generated.");
+
+      print("Step 4: Calling API to create user wallet...");
+      await _apiClient.createUserWallet(
+        username: username,
+        publicKey: walletAddress,
+        encryptedPrivateKey: encryptedPrivateKey,
+      );
+      print("Step 4 SUCCESS: API call to create wallet completed.");
+
+      if (!mounted) return;
+      print("Step 5: Navigating to /home...");
+      context.go('/home');
+
+    } on FirebaseAuthException catch (e) {
+      print("--- ERROR CAUGHT (FirebaseAuthException) ---");
+      print("Code: ${e.code}");
+      print("Message: ${e.message}");
+      if (e.code == 'email-already-in-use') {
+        setState(() => _error = 'This email is already registered. Please sign in.');
+      } else {
+        setState(() => _error = 'An error occurred during sign up. (Code: ${e.code})');
+      }
+    } catch (e) {
+      print("--- ERROR CAUGHT (General Exception) ---");
+      print("Error: ${e.toString()}");
+      if(mounted) setState(() => _error = e.toString().replaceFirst("Exception: ", ""));
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
-  
-  setState(() {
-    _isLoading = true;
-    _error = null;
-  });
 
-  try {
-    final username = _usernameController.text.trim();
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-
-    print("Step 1: Checking username availability for '$username'...");
-    final usernameAvailable = await checkUsernameAvailability(username);
-    if (!usernameAvailable) {
-      throw Exception('Username already taken');
-    }
-    print("Step 1 SUCCESS: Username is available.");
-
-    print("Step 2: Creating user in Firebase Auth for email '$email'...");
-    await FirebaseAuth.instance.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-    print("Step 2 SUCCESS: Firebase user created.");
-
-    print("Step 3: Generating client-side crypto keys...");
-    final privateKey = generateRandomPrivateKey();
-    final walletAddress = deriveWalletAddress(privateKey);
-    final encryptedPrivateKey = encryptPrivateKey(privateKey, password);
-    print("Step 3 SUCCESS: Crypto keys generated.");
-
-    print("Step 4: Calling API to create user wallet...");
-    await _apiClient.createUserWallet(
-      username: username,
-      publicKey: walletAddress,
-      encryptedPrivateKey: encryptedPrivateKey,
-    );
-    print("Step 4 SUCCESS: API call to create wallet completed.");
-
-    if (!mounted) return;
-    print("Step 5: Navigating to /home...");
-    context.go('/home');
-
-  } on FirebaseAuthException catch (e) {
-    print("--- ERROR CAUGHT (FirebaseAuthException) ---");
-    print("Code: ${e.code}");
-    print("Message: ${e.message}");
-    if (e.code == 'email-already-in-use') {
-      setState(() => _error = 'This email is already registered. Please sign in.');
-    } else {
-      setState(() => _error = 'An error occurred during sign up. (Code: ${e.code})');
-    }
-  } catch (e) {
-    print("--- ERROR CAUGHT (General Exception) ---");
-    print("Error: ${e.toString()}");
-    if(mounted) setState(() => _error = e.toString().replaceFirst("Exception: ", ""));
-  } finally {
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
-  }
-}
   @override
   void dispose() {
     _usernameController.dispose();
@@ -188,6 +187,12 @@ Future<void> _submit() async {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      // Add an AppBar to provide a back button
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body: Stack(
         children: [
           const DynamicNebulaBackground(),
