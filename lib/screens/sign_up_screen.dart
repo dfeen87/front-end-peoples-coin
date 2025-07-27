@@ -66,7 +66,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   String encryptPrivateKey(String privateKey, String password) {
     final key = sha256.convert(utf8.encode(password)).bytes;
-    final iv = Uint8List(16); // Using a zero IV, consider a random one for production
+    final iv = Uint8List(16);
     final cipher = pointy.CBCBlockCipher(pointy.AESEngine())
       ..init(
         true,
@@ -187,7 +187,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      // Add an AppBar to provide a back button
+      // --- THIS IS THE FIX ---
+      extendBodyBehindAppBar: true, 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
