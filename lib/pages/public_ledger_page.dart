@@ -140,7 +140,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
   }
 
   Widget _buildBody(LedgerProvider ledgerProvider, String? currentUserWalletId) {
-    if (ledgerProvider.isLoading && ledgerProvider.publicLedgerEntries.isEmpty) {
+  if (ledgerProvider.isInitialLoading && ledgerProvider.publicLedgerEntries.isEmpty) {
       return _buildLoadingShimmer();
     }
 

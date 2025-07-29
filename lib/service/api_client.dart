@@ -35,6 +35,7 @@ class PeoplesCoinApiClient {
     }
   }
 
+  // ... other user methods are unchanged ...
   Future<bool> checkUsernameAvailability(String username) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/username-check/$username');
     try {
@@ -77,8 +78,8 @@ class PeoplesCoinApiClient {
       rethrow;
     }
   }
-
-  // === Goodwill Actions ===
+  
+  // === Goodwill Actions (Unchanged) ===
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/$userId/goodwill-actions');
     try {
@@ -94,7 +95,7 @@ class PeoplesCoinApiClient {
       rethrow;
     }
   }
-
+  
   Future<Map<String, dynamic>> submitGoodwill(GoodwillActionToSend actionToSend) async {
     final uri = Uri.parse('$baseUrl/metabolic/submit_goodwill');
     try {
@@ -114,7 +115,7 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // === Proposals ===
+  // === Proposals (Unchanged) ===
   Future<List<Proposal>> listProposals({String? status}) async {
     var url = '$baseUrl/api/v1/governance/proposals';
     if (status != null && status.isNotEmpty) {
@@ -134,7 +135,7 @@ class PeoplesCoinApiClient {
       rethrow;
     }
   }
-
+  
   Future<Proposal> getProposalDetails(String proposalId) async {
     final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/$proposalId');
     try {
@@ -168,8 +169,8 @@ class PeoplesCoinApiClient {
       rethrow;
     }
   }
-
-  // === Votes ===
+  
+  // === Votes (Unchanged) ===
   Future<Map<String, dynamic>> submitVote(VoteToSend voteToSend) async {
     final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/${voteToSend.proposalId}/vote');
     try {
@@ -190,8 +191,10 @@ class PeoplesCoinApiClient {
   }
 
   // === Ledger ===
-  Future<List<PublicLedgerEntry>> getLedgerEntries() async {
-    final uri = Uri.parse('$baseUrl/api/v1/ledger/public');
+
+  // --- MODIFIED: Added 'page' parameter for pagination ---
+  Future<List<PublicLedgerEntry>> getLedgerEntries({int page = 1}) async {
+    final uri = Uri.parse('$baseUrl/api/v1/ledger/public?page=$page');
     try {
       final response = await http.get(uri);
       if (response.statusCode == 200) {
@@ -202,6 +205,24 @@ class PeoplesCoinApiClient {
       }
     } catch (e) {
       if (kDebugMode) print('Error in getLedgerEntries: $e');
+      rethrow;
+    }
+  }
+
+  // --- NEW: Method to handle ledger search ---
+  Future<List<PublicLedgerEntry>> searchLedger({required String query}) async {
+    // Note: You will need to create this corresponding search endpoint on your backend.
+    final uri = Uri.parse('$baseUrl/api/v1/ledger/search?q=${Uri.encodeComponent(query)}');
+    try {
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
+      } else {
+        throw Exception('Failed to search public ledger. Status: ${response.statusCode}, Body: ${response.body}');
+      }
+    } catch (e) {
+      if (kDebugMode) print('Error in searchLedger: $e');
       rethrow;
     }
   }
@@ -238,7 +259,7 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // === Metabolic status check ===
+  // === Metabolic status check (Unchanged) ===
   Future<String> checkMetabolicStatus() async {
     final uri = Uri.parse('$baseUrl/metabolic/status');
     try {
@@ -254,4 +275,3 @@ class PeoplesCoinApiClient {
     }
   }
 }
-
