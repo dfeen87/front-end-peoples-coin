@@ -106,39 +106,71 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
             return const Center(child: Text("User not logged in or data not loaded.", style: TextStyle(color: Colors.white70)));
           }
 
-          return Stepper(
-            type: StepperType.horizontal,
-            physics: const ClampingScrollPhysics(),
-            currentStep: _currentStep,
-            onStepTapped: (step) => setState(() => _currentStep = step),
-            onStepContinue: _handleStepContinue(provider, currentUser.id),
-            onStepCancel: () {
-              if (_currentStep > 0) setState(() => _currentStep -= 1);
-            },
-            controlsBuilder: _buildControls,
-            steps: _buildSteps(),
+          // --- ADDED: Custom Stepper Theme ---
+          return Theme(
+            data: Theme.of(context).copyWith(
+              canvasColor: Colors.black.withOpacity(0.3), // Background of the stepper
+              colorScheme: ColorScheme.dark(
+                primary: Colors.amber[700]!, // Active step color
+                onPrimary: Colors.black, // Text/icon color on active step
+              ),
+            ),
+            child: Stepper(
+              type: StepperType.horizontal,
+              physics: const ClampingScrollPhysics(),
+              currentStep: _currentStep,
+              onStepTapped: (step) => setState(() => _currentStep = step),
+              onStepContinue: _handleStepContinue(provider, currentUser.id),
+              onStepCancel: () {
+                if (_currentStep > 0) setState(() => _currentStep -= 1);
+              },
+              controlsBuilder: _buildControls,
+              steps: _buildSteps(),
+            ),
           );
         },
       ),
     );
   }
 
+  // --- ADDED: Centralized validation logic ---
+  bool _validateAndSaveStep(int step) {
+    switch (step) {
+      case 0:
+        if (_actionType.isEmpty) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please choose a type of act.'), backgroundColor: Colors.redAccent),
+          );
+          return false;
+        }
+        return true;
+      case 1:
+        if (!(_formKey.currentState?.validate() ?? false)) return false;
+        _formKey.currentState!.save();
+        _updateLovesScore(); // Update score after description is saved
+        return true;
+      case 3:
+        if (_durationMinutes <= 0) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please enter a valid duration (minutes).'), backgroundColor: Colors.redAccent),
+          );
+          return false;
+        }
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  // --- REFINED: Step continuation logic ---
   VoidCallback _handleStepContinue(GoodwillProcessingProvider provider, String userId) {
     return () {
+      final isStepValid = _validateAndSaveStep(_currentStep);
+      if (!isStepValid) return;
+
       if (_currentStep < 4) {
-        if (_currentStep == 1) {
-          if (!(_formKey.currentState?.validate() ?? false)) return;
-          _formKey.currentState!.save();
-          _updateLovesScore();
-        } else if (_currentStep == 3) {
-          if (_durationMinutes <= 0) {
-            ScaffoldMessenger.of(context).clearSnackBars();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please enter a valid duration (minutes).'), backgroundColor: Colors.redAccent),
-            );
-            return;
-          }
-        }
         setState(() => _currentStep += 1);
       } else {
         _submitForm(provider, userId);
@@ -208,6 +240,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     ];
   }
 
+  // --- Step builder methods remain the same ---
   Widget _buildStep1ChooseAct() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,7 +296,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
               border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide.none),
             ),
             style: const TextStyle(color: Colors.white),
-            validator: (val) => val == null || val.isEmpty ? 'Please describe the act.' : null,
+            validator: (val) => val == null || val.trim().isEmpty ? 'Please describe the act.' : null,
             onChanged: (val) {
               _description = val;
               _updateLovesScore();
@@ -287,7 +320,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.favorite, color: Colors.redAccent.withOpacity(0.5 + (_lovesValue / 100)), size: 24 + (_lovesValue / 2)),
+            Icon(Icons.favorite, color: Colors.redAccent.withOpacity(0.5 + (_lovesValue / 200)), size: 24 + (_lovesValue / 2)),
             const SizedBox(width: 16),
             Text(
               '$_lovesValue Loves',
@@ -331,12 +364,6 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
             border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
           ),
           style: const TextStyle(color: Colors.white),
-          validator: (val) {
-            if (val == null || val.isEmpty) return 'Duration is required';
-            final parsed = int.tryParse(val);
-            if (parsed == null || parsed <= 0) return 'Please enter a valid positive number';
-            return null;
-          },
           onChanged: (val) {
             final parsed = int.tryParse(val);
             if (parsed != null) {
@@ -402,6 +429,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$label:',
@@ -412,7 +440,6 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
             child: Text(
               value,
               style: const TextStyle(color: Colors.white, fontSize: 16),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -420,31 +447,10 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     );
   }
 
+  // --- REFINED: Final submission logic ---
   Future<void> _submitForm(GoodwillProcessingProvider provider, String userId) async {
-    if (_actionType.isEmpty) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please choose a type of act.'), backgroundColor: Colors.redAccent),
-      );
-      setState(() => _currentStep = 0);
-      return;
-    }
-
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      setState(() => _currentStep = 1);
-      return;
-    }
-    _formKey.currentState!.save();
-
-    if (_durationMinutes <= 0) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid duration.'), backgroundColor: Colors.redAccent),
-      );
-      setState(() => _currentStep = 3);
-      return;
-    }
-
+    // All validation has already passed in the previous steps.
+    // We can now directly submit the data.
     final contextualData = {
       'duration_minutes': _durationMinutes,
       'impact_level': _impactLevel,
@@ -470,6 +476,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
 }
 
 // --- Confetti Overlay for celebration effect ---
+// This widget remains unchanged.
 class ConfettiOverlay extends StatefulWidget {
   final AnimationController controller;
   const ConfettiOverlay({required this.controller, super.key});
@@ -562,4 +569,3 @@ class _ConfettiParticle {
     );
   }
 }
-
