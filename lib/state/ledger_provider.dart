@@ -3,101 +3,151 @@
 import 'package:flutter/foundation.dart';
 import 'dart:collection'; // Required for UnmodifiableListView
 
-// Import your PublicLedgerEntry model (assuming it exists and is correct)
 import '../models/public_ledger_entry.dart';
-// Import your API client
-import '../service/api_client.dart'; // Ensure this path is correct for PeoplesCoinApiClient
+import '../service/api_client.dart';
 
 class LedgerProvider with ChangeNotifier {
-  final PeoplesCoinApiClient _apiClient; // Your API client instance
+  final PeoplesCoinApiClient _apiClient;
 
-  // Private fields to hold the state
+  // --- PRIVATE STATE ---
   List<PublicLedgerEntry> _publicLedgerEntries = [];
-  bool _isLoading = false;
   String? _errorMessage;
 
-  // Public getters to access the state
+  // --- PAGINATION STATE ---
+  int _currentPage = 1;
+  bool _hasMore = true;
+  // Separate loading states for initial load vs. fetching more
+  bool _isInitialLoading = false;
+  bool _isFetchingMore = false;
+
+  // --- ACTION-SPECIFIC STATE ---
+  bool _isSendingLoves = false;
+
+
+  // --- PUBLIC GETTERS ---
   UnmodifiableListView<PublicLedgerEntry> get publicLedgerEntries => UnmodifiableListView(_publicLedgerEntries);
-  bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  // Constructor to inject the API client dependency
+  // Renamed for clarity in the UI
+  bool get isInitialLoading => _isInitialLoading;
+  bool get isFetchingMore => _isFetchingMore;
+  bool get isSendingLoves => _isSendingLoves;
+
+
   LedgerProvider(this._apiClient);
 
-  /// Fetches the public ledger entries from backend API
-  Future<void> fetchPublicLedgerEntries() async {
-    _isLoading = true;
-    _errorMessage = null; // Clear any previous errors
-    notifyListeners(); // Notify listeners that loading has started
+
+  /// --- ENHANCED: Now supports pagination and refresh ---
+  /// Fetches ledger entries page by page.
+  Future<void> fetchPublicLedgerEntries({bool isRefresh = false}) async {
+    // On refresh, reset state completely
+    if (isRefresh) {
+      _currentPage = 1;
+      _hasMore = true;
+      _publicLedgerEntries = [];
+    }
+
+    // Prevent duplicate calls if we're already fetching or there's no more data
+    if (_isFetchingMore || !_hasMore) return;
+
+    // Set appropriate loading states
+    if (isRefresh || _publicLedgerEntries.isEmpty) {
+      _isInitialLoading = true;
+    } else {
+      _isFetchingMore = true;
+    }
+    _errorMessage = null;
+    notifyListeners();
 
     try {
-      // Call the API client method to get ledger entries
-      _publicLedgerEntries = await _apiClient.getLedgerEntries();
-      if (kDebugMode) print('[LedgerProvider] Fetched ${_publicLedgerEntries.length} public ledger entries.');
-      _errorMessage = null; // Clear error on success
+      // Assumes your API client is updated to take a 'page' parameter
+      final newEntries = await _apiClient.getLedgerEntries(page: _currentPage);
+
+      if (newEntries.isNotEmpty) {
+        _publicLedgerEntries.addAll(newEntries);
+        _currentPage++;
+      } else {
+        // If the API returns an empty list, we've reached the end
+        _hasMore = false;
+      }
     } catch (e) {
       _errorMessage = "Failed to fetch public ledger: $e";
       if (kDebugMode) print('[LedgerProvider] Error fetching public ledger: $e');
     } finally {
-      _isLoading = false; // Always set loading to false when done
-      notifyListeners(); // Notify listeners that state has changed (either loaded or error)
+      _isInitialLoading = false;
+      _isFetchingMore = false;
+      notifyListeners();
     }
   }
 
-  /// Sends loves to a recipient wallet ID from a sender wallet ID with specified amount and optional memo.
-  /// Returns true if successful, false otherwise.
+  /// --- ENHANCED: Now handles its own loading state and avoids a full list refresh ---
+  /// This prevents the user's scroll position from being reset after sending Loves.
   Future<bool> sendLoves({
     required String senderWalletId,
     required String recipientWalletId,
     required int amount,
-    String? memo, // Added optional memo parameter
+    String? memo,
   }) async {
     if (amount <= 0) {
-      _errorMessage = "Amount of loves to send must be greater than zero.";
+      _errorMessage = "Amount must be greater than zero.";
       notifyListeners();
       return false;
     }
 
-    _isLoading = true; // Set loading true before API call
-    _errorMessage = null; // Clear any previous errors
-    notifyListeners(); // Notify listeners that sending process has started
+    _isSendingLoves = true;
+    _errorMessage = null;
+    notifyListeners();
 
     try {
       final response = await _apiClient.sendLoves(
         senderWalletId: senderWalletId,
         recipientWalletId: recipientWalletId,
         amount: amount,
-        memo: memo, // Pass memo
+        memo: memo,
       );
 
-      // Assuming your API client's sendLoves returns a Map with a 'success' key
       if (response['success'] == true) {
-        if (kDebugMode) {
-          print('[LedgerProvider] Successfully sent $amount loves from $senderWalletId to $recipientWalletId');
-        }
-        // Refresh ledger after sending to reflect updated balances and entries
-        // Calling fetchPublicLedgerEntries will automatically update _isLoading and _errorMessage
-        // and call notifyListeners().
-        await fetchPublicLedgerEntries();
+        // Don't auto-refresh the whole list. The UI can show a success message,
+        // and the user can pull-to-refresh to see the new transaction at the top.
+        // This provides a much better UX in an infinitely-scrolled list.
         return true;
       } else {
-        // Handle API-specific error messages if your backend provides them
-        _errorMessage = response['message'] ?? 'Failed to send loves.'; // Changed from 'error' to 'message' as a common key
-        notifyListeners(); // Notify listeners about the error
+        _errorMessage = response['message'] ?? 'Failed to send loves.';
         return false;
       }
     } catch (e) {
       _errorMessage = 'Unexpected error sending loves: $e';
-      if (kDebugMode) print('[LedgerProvider] Error sending loves: $e');
-      notifyListeners(); // Notify listeners about the unexpected error
       return false;
     } finally {
-      // _isLoading will be set to false by fetchPublicLedgerEntries() if it's successful,
-      // or directly by the catch block if an error occurs.
-      // We only need to ensure it's false if no `fetchPublicLedgerEntries` call happens
-      // or in case of early exit. Redundant but safe.
-      _isLoading = false;
-      // No extra notifyListeners() here, as it's handled by fetchPublicLedgerEntries or error catch.
+      _isSendingLoves = false;
+      notifyListeners();
+    }
+  }
+
+  /// --- NEW: Method for handling search ---
+  /// This replaces the current list with search results.
+  Future<void> searchEntries(String query) async {
+    // If the query is empty, just refresh the main list.
+    if (query.trim().isEmpty) {
+      await fetchPublicLedgerEntries(isRefresh: true);
+      return;
+    }
+
+    _isInitialLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // Assumes your API client has a method for searching
+      _publicLedgerEntries = await _apiClient.searchLedger(query: query);
+    } catch (e) {
+      _errorMessage = "Search failed: $e";
+    } finally {
+      _isInitialLoading = false;
+      // In search mode, we aren't paginating, so these are false.
+      _isFetchingMore = false;
+      _hasMore = false;
+      notifyListeners();
     }
   }
 

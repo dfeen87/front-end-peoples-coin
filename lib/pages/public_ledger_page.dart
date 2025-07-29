@@ -17,7 +17,9 @@ class PublicLedgerPage extends StatefulWidget {
 }
 
 class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProviderStateMixin {
-  late AnimationController _listAnimationController;
+  late final AnimationController _listAnimationController;
+  // --- ENHANCEMENT 1: For Pagination ---
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -27,19 +29,39 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
       duration: const Duration(milliseconds: 1000),
     );
 
+    // --- ENHANCEMENT 1: Add listener for infinite scrolling ---
+    _scrollController.addListener(_onScroll);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = Provider.of<LedgerProvider>(context, listen: false);
-      provider.fetchPublicLedgerEntries().then((_) {
-        if (mounted) {
-          _listAnimationController.forward();
-        }
-      });
+      _fetchInitialData();
     });
+  }
+
+  void _fetchInitialData() {
+    // Fetch initial data and reset animations
+    _listAnimationController.reset();
+    final provider = Provider.of<LedgerProvider>(context, listen: false);
+    // Assumes provider is updated for pagination
+    provider.fetchPublicLedgerEntries(isRefresh: true).then((_) {
+      if (mounted) {
+        _listAnimationController.forward();
+      }
+    });
+  }
+
+  // --- ENHANCEMENT 1: Scroll listener logic ---
+  void _onScroll() {
+    // If the user scrolls to the near bottom of the list, fetch more data.
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
+      // Assumes provider has logic to prevent multiple fetches
+      context.read<LedgerProvider>().fetchPublicLedgerEntries();
+    }
   }
 
   @override
   void dispose() {
     _listAnimationController.dispose();
+    _scrollController.dispose(); // Dispose the scroll controller
     super.dispose();
   }
 
@@ -47,7 +69,6 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
   Widget build(BuildContext context) {
     final ledgerProvider = context.watch<LedgerProvider>();
     final userProvider = context.watch<UserProvider>();
-    // --- FIX: Using 'walletId' as confirmed in your user_account.dart model ---
     final currentUserWalletId = userProvider.currentUser?.walletId;
 
     return Scaffold(
@@ -57,21 +78,63 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
         title: const Text('Public Ledger'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        // --- ENHANCEMENT 2: Add actions for filtering ---
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () {
+              // TODO: Implement filter dialog/bottom sheet
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Filter functionality coming soon!')),
+              );
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
           const DynamicNebulaBackground(),
-          RefreshIndicator(
-            onRefresh: () async {
-              _listAnimationController.reset();
-              await ledgerProvider.fetchPublicLedgerEntries();
-              _listAnimationController.forward();
-            },
-            color: Colors.amber,
-            backgroundColor: Colors.grey[800],
-            child: _buildBody(ledgerProvider, currentUserWalletId),
+          Column(
+            children: [
+              // --- ENHANCEMENT 2: UI for Search ---
+              _buildSearchHeader(),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    _fetchInitialData();
+                  },
+                  color: Colors.amber,
+                  backgroundColor: Colors.grey[800],
+                  child: _buildBody(ledgerProvider, currentUserWalletId),
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchHeader() {
+    return Padding(
+      padding: EdgeInsets.only(top: kToolbarHeight + MediaQuery.of(context).padding.top, left: 16, right: 16, bottom: 8),
+      child: TextField(
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          hintText: 'Search by Wallet ID or Title...',
+          hintStyle: const TextStyle(color: Colors.white54),
+          prefixIcon: const Icon(Icons.search, color: Colors.white54),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.1),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        onChanged: (query) {
+          // TODO: Implement search logic with debouncing
+          // context.read<LedgerProvider>().search(query);
+        },
       ),
     );
   }
@@ -89,15 +152,29 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
       return const Center(child: Text('No public ledger entries found.', style: TextStyle(color: Colors.white70)));
     }
 
+    // --- ENHANCEMENT 1: Update itemCount for loading indicator ---
+    final itemCount = ledgerProvider.publicLedgerEntries.length + (ledgerProvider.isFetchingMore ? 1 : 0);
+
     return ListView.builder(
-      padding: EdgeInsets.only(top: kToolbarHeight + 20, left: 12, right: 12, bottom: 20),
-      itemCount: ledgerProvider.publicLedgerEntries.length,
+      controller: _scrollController,
+      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 20),
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        // --- ENHANCEMENT 1: Show loading indicator at the end of the list ---
+        if (index >= ledgerProvider.publicLedgerEntries.length) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(color: Colors.amber),
+            ),
+          );
+        }
+
         final entry = ledgerProvider.publicLedgerEntries[index];
         final animation = Tween(begin: 0.0, end: 1.0).animate(
           CurvedAnimation(
             parent: _listAnimationController,
-            curve: Interval((1 / ledgerProvider.publicLedgerEntries.length) * index, 1.0, curve: Curves.easeOut),
+            curve: Interval((1 / (ledgerProvider.publicLedgerEntries.length)) * index, 1.0, curve: Curves.easeOut),
           ),
         );
 
@@ -131,7 +208,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
       baseColor: Colors.grey[850]!,
       highlightColor: Colors.grey[800]!,
       child: ListView.builder(
-        padding: const EdgeInsets.only(top: kToolbarHeight + 20, left: 12, right: 12, bottom: 20),
+        padding: const EdgeInsets.only(left: 12, right: 12, bottom: 20, top: 20),
         itemCount: 5,
         itemBuilder: (_, __) => Card(
           margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -146,6 +223,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
 
 typedef OnSendLovesCallback = Future<void> Function(String recipientWalletId, int amount, String? memo);
 
+// --- ENHANCEMENT 3: Added TickerProviderStateMixin ---
 class PublicActionCard extends StatefulWidget {
   final PublicLedgerEntry entry;
   final OnSendLovesCallback? onSendLoves;
@@ -156,17 +234,30 @@ class PublicActionCard extends StatefulWidget {
   State<PublicActionCard> createState() => _PublicActionCardState();
 }
 
-class _PublicActionCardState extends State<PublicActionCard> {
+class _PublicActionCardState extends State<PublicActionCard> with TickerProviderStateMixin {
   bool _isExpanded = false;
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
   bool _isSending = false;
 
+  // --- ENHANCEMENT 3: Animation controller for form fade-in ---
+  late final AnimationController _formAnimationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _formAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
   @override
   void dispose() {
     _amountController.dispose();
     _memoController.dispose();
+    _formAnimationController.dispose(); // Dispose the controller
     super.dispose();
   }
 
@@ -193,7 +284,10 @@ class _PublicActionCardState extends State<PublicActionCard> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully sent $amount Loves!')));
         _amountController.clear();
         _memoController.clear();
-        setState(() => _isExpanded = false);
+        setState(() {
+          _isExpanded = false;
+          _formAnimationController.reverse();
+        });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error sending loves: $e')));
@@ -218,12 +312,17 @@ class _PublicActionCardState extends State<PublicActionCard> {
           children: [
             _buildHeader(),
             const SizedBox(height: 12),
-            // --- FIX: Removed the description Text widget as it doesn't exist in the model ---
             _buildFooter(),
             AnimatedSize(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
-              child: _isExpanded ? _buildExpansionForm() : const SizedBox.shrink(),
+              // --- ENHANCEMENT 3: Wrap form in FadeTransition ---
+              child: _isExpanded
+                  ? FadeTransition(
+                      opacity: _formAnimationController,
+                      child: _buildExpansionForm(),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ],
         ),
@@ -236,7 +335,6 @@ class _PublicActionCardState extends State<PublicActionCard> {
       children: [
         CircleAvatar(
           backgroundColor: Colors.amber.withOpacity(0.2),
-          // --- FIX: Use the first letter of the title since username is not available ---
           child: Text(
             widget.entry.title.isNotEmpty ? widget.entry.title[0].toUpperCase() : '?',
             style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
@@ -247,7 +345,6 @@ class _PublicActionCardState extends State<PublicActionCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- FIX: Display the title from the entry ---
               Text(
                 widget.entry.title,
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
@@ -280,7 +377,15 @@ class _PublicActionCardState extends State<PublicActionCard> {
           style: const TextStyle(color: Colors.white54, fontSize: 12),
         ),
         TextButton.icon(
-          onPressed: () => setState(() => _isExpanded = !_isExpanded),
+          onPressed: () {
+            setState(() => _isExpanded = !_isExpanded);
+            // --- ENHANCEMENT 3: Control the form animation ---
+            if (_isExpanded) {
+              _formAnimationController.forward();
+            } else {
+              _formAnimationController.reverse();
+            }
+          },
           icon: Icon(_isExpanded ? Icons.close : Icons.favorite_outline, size: 18),
           label: Text(_isExpanded ? 'Cancel' : 'Send Loves'),
           style: TextButton.styleFrom(
@@ -291,9 +396,9 @@ class _PublicActionCardState extends State<PublicActionCard> {
       ],
     );
   }
-
+  
+  // The expansion form and input decoration methods remain the same...
   Widget _buildExpansionForm() {
-    // ... (This part of the code was already correct and remains unchanged)
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Form(
@@ -346,4 +451,3 @@ class _PublicActionCardState extends State<PublicActionCard> {
     );
   }
 }
-
