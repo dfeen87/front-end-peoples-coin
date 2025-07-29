@@ -131,7 +131,9 @@ Future<void> main() async {
 // --- ROUTER CONFIGURATION (UPDATED) ---
 
 final _router = GoRouter(
-  initialLocation: '/dev-sign-in',
+  // CHANGED: Set initialLocation to '/welcome' to make WelcomeScreen the landing page.
+  // If you want the AppStartupController to handle initial auth redirects, set to '/'.
+  initialLocation: '/welcome', 
   routes: [
     GoRoute(path: '/', builder: (context, state) => const AppStartupController()),
     GoRoute(path: '/welcome', builder: (context, state) => const WelcomeScreen()),

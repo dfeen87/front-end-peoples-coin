@@ -41,13 +41,14 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAxGoFjc0I-BXyZnOviJBuhc48JpdH4NUg',
-    appId: '1:485820050685:web:70b3bac5cf8e8f6ff5a294',
-    messagingSenderId: '485820050685',
-    projectId: 'brightacts-frontend',
-    authDomain: 'brightacts-frontend.firebaseapp.com',
-    storageBucket: 'brightacts-frontend.firebasestorage.app',
-    measurementId: 'G-Q0GXVST7B5',
+    apiKey: 'AIzaSyAS6QDkw9jZxb_TXcZUv_D4NB8qcPF5SLY',
+    appId: '1:105378934751:web:28897b3d83884e6c411e6a',
+    messagingSenderId: '105378934751',
+    projectId: 'heroic-tide-428421-q7',
+    authDomain: 'heroic-tide-428421-q7.firebaseapp.com',
+    databaseURL: 'https://heroic-tide-428421-q7-default-rtdb.firebaseio.com',
+    storageBucket: 'heroic-tide-428421-q7.firebasestorage.app',
+    measurementId: 'G-Q4JVFC4LMM',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
