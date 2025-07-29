@@ -1,40 +1,40 @@
 name: Build and Deploy to Firebase
 
-on: # This line must start at column 0
-  push:
-    branches:
-      - main
+    on: # This line must start at column 0
+      push:
+        branches:
+          - main
 
-jobs: # This line must also start at column 0
-  build_and_deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    jobs: # This line must also start at column 0
+      build_and_deploy:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v4
 
-      - name: Create .env file
-        run: echo "${{ secrets.DOT_ENV }}" > .env
+          - name: Create .env file
+            run: echo "${{ secrets.DOT_ENV }}" > .env
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
+          - name: Setup Flutter
+            uses: subosito/flutter-action@v2
+            with:
+              channel: 'stable'
 
-      - name: Install dependencies
-        run: flutter pub get
+          - name: Install dependencies
+            run: flutter pub get
 
-      - name: Verify that the .env file was created
-        run: ls -la
+          - name: Verify that the .env file was created
+            run: ls -la
 
-      - name: Build web release
-        run: flutter build web --release
+          - name: Build web release
+            run: flutter build web --release
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          channelId: live
-          # THIS IS THE CRITICAL FIX: Point to your new hosting project ID
-          projectId: 'brightacts-frontend-50f58' # <--- THIS MUST BE THIS VALUE
-
+          - name: Deploy to Firebase Hosting
+            uses: FirebaseExtended/action-hosting-deploy@v0
+            with:
+              repoToken: '${{ secrets.GITHUB_TOKEN }}'
+              firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+              channelId: live
+              # THIS IS THE CRITICAL FIX: Point to your new hosting project ID
+              projectId: 'brightacts-frontend-50f58' # <--- THIS MUST BE THIS VALUE
+    
