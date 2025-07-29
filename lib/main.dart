@@ -116,7 +116,7 @@ Future<void> main() async {
 
 // --- ROUTER CONFIGURATION ---
 final _router = GoRouter(
-  initialLocation: '/welcome',
+  initialLocation: '/dev-sign-in',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const AppStartupController()),
     GoRoute(path: '/welcome', builder: (context, state) => const WelcomeScreen()),
