@@ -1,14 +1,15 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart'; // Added for animations
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/dynamic_nebula_background.dart';
-import 'package:brightacts_frontend_app/models/tech_system.dart'; // Import TechSystem from its central location
-import 'code_display_page.dart'; // CodeDisplayPage now expects TechSystem directly
+import 'package:brightacts_frontend_app/models/tech_system.dart';
+import 'code_display_page.dart';
 
-// Data list for backend systems. Consider moving this to a separate data file for better organization.
+// Data list for backend systems.
 final List<TechSystem> backendSystems = [
   const TechSystem(
     icon: Icons.cloud_queue,
@@ -32,7 +33,6 @@ class CloudManager:
   ),
   // Add other TechSystem objects here...
 ];
-
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -88,7 +88,7 @@ class WelcomeScreen extends StatelessWidget {
                   const SizedBox(height: 48),
                   _buildFooterLinks(context),
                 ],
-              ),
+              ).animate().fadeIn(duration: 500.ms, curve: Curves.easeIn), // Animate the whole column
             ),
           ),
         ],
@@ -106,14 +106,10 @@ class WelcomeScreen extends StatelessWidget {
         color: Colors.white,
         letterSpacing: 1.4,
         shadows: [
-          Shadow(
-            offset: Offset(0, 2),
-            blurRadius: 8,
-            color: Colors.black54,
-          ),
+          Shadow(offset: Offset(0, 2), blurRadius: 8, color: Colors.black54),
         ],
       ),
-    );
+    ).animate().fade(duration: 900.ms).slideY(begin: 0.5, curve: Curves.easeOutCubic);
   }
 
   Widget _buildMissionStatement() {
@@ -163,7 +159,7 @@ class WelcomeScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ).animate().fade(delay: 200.ms, duration: 900.ms).slideY(begin: 0.4, curve: Curves.easeOutCubic);
   }
 
   Widget _buildActionButtons(BuildContext context) {
@@ -186,7 +182,7 @@ class WelcomeScreen extends StatelessWidget {
           text: 'Sign In',
         ),
       ],
-    );
+    ).animate().fade(delay: 400.ms, duration: 900.ms).slideY(begin: 0.3, curve: Curves.easeOutCubic);
   }
 
   Widget _buildTechShowcase(BuildContext context) {
@@ -199,11 +195,7 @@ class WelcomeScreen extends StatelessWidget {
             fontWeight: FontWeight.w900,
             color: Colors.white,
             shadows: [
-              Shadow(
-                offset: Offset(0, 1),
-                blurRadius: 5,
-                color: Colors.black38,
-              ),
+              Shadow(offset: Offset(0, 1), blurRadius: 5, color: Colors.black38),
             ],
           ),
         ),
@@ -232,12 +224,12 @@ class WelcomeScreen extends StatelessWidget {
               return _TechSystemCard(
                 system: backendSystems[index],
                 onTap: () => _showCodeViewer(context, backendSystems[index]),
-              );
+              ).animate().fade(delay: (200 * index).ms, duration: 600.ms).slideX(begin: 0.5);
             },
           ),
         ),
       ],
-    );
+    ).animate().fade(delay: 600.ms, duration: 900.ms);
   }
 
   Widget _buildHintText() {
@@ -287,22 +279,16 @@ class _TechSystemCard extends StatefulWidget {
 class _TechSystemCardState extends State<_TechSystemCard> {
   bool _isHoveredOrTapped = false;
 
-  void _setHover(bool hovered) {
-    setState(() {
-      _isHoveredOrTapped = hovered;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final color = widget.system.color;
     return MouseRegion(
-      onEnter: (_) => _setHover(true),
-      onExit: (_) => _setHover(false),
+      onEnter: (_) => setState(() => _isHoveredOrTapped = true),
+      onExit: (_) => setState(() => _isHoveredOrTapped = false),
       child: GestureDetector(
-        onTapDown: (_) => _setHover(true),
-        onTapUp: (_) => _setHover(false),
-        onTapCancel: () => _setHover(false),
+        onTapDown: (_) => setState(() => _isHoveredOrTapped = true),
+        onTapUp: (_) => setState(() => _isHoveredOrTapped = false),
+        onTapCancel: () => setState(() => _isHoveredOrTapped = false),
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
@@ -314,7 +300,7 @@ class _TechSystemCardState extends State<_TechSystemCard> {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: color.withOpacity(_isHoveredOrTapped ? 0.5 : 0.3),
-              width: _isHoveredOrTapped ? 2 : 1,
+              width: _isHoveredOrTapped ? 2 : 1.5,
             ),
             boxShadow: _isHoveredOrTapped
                 ? [
@@ -325,6 +311,15 @@ class _TechSystemCardState extends State<_TechSystemCard> {
                     )
                   ]
                 : [],
+            // Added Gradient for visual polish
+            gradient: LinearGradient(
+              colors: [
+                color.withOpacity(0.25),
+                color.withOpacity(0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
           padding: const EdgeInsets.all(18),
           child: Column(
@@ -403,10 +398,6 @@ class _FooterLinkState extends State<_FooterLink> {
   }
 }
 
-// -------------------------------------------------------------------
-// -- FIXED WIDGET: _AnimatedScaleButton
-// -------------------------------------------------------------------
-
 class _AnimatedScaleButton extends StatefulWidget {
   final VoidCallback onTap;
   final Color backgroundColor;
@@ -439,24 +430,23 @@ class _AnimatedScaleButtonState extends State<_AnimatedScaleButton>
     _controller = AnimationController(
       duration: const Duration(milliseconds: 150),
       vsync: this,
-      value: 1.0, // Start at full scale
+      value: 1.0,
     );
-    // Use a CurveTween for a nicer bounce effect
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
   }
 
   void _onTapDown(TapDownDetails _) {
-    _controller.reverse(from: 1.0); // Animate to smaller scale
+    _controller.reverse(from: 1.0);
   }
 
   void _onTapUp(TapUpDetails _) {
-    _controller.forward(from: 0.0); // Animate back to full scale
+    _controller.forward(from: 0.0);
   }
 
   void _onTapCancel() {
-    _controller.forward(from: 0.0); // Animate back to full scale
+    _controller.forward(from: 0.0);
   }
 
   @override
@@ -491,19 +481,17 @@ class _AnimatedScaleButtonState extends State<_AnimatedScaleButton>
     return ScaleTransition(
       scale: _scaleAnimation,
       child: GestureDetector(
-        // The GestureDetector is now only for the visual animation.
         onTapDown: _onTapDown,
         onTapUp: _onTapUp,
         onTapCancel: _onTapCancel,
-        // The button itself handles the tap action, making it accessible.
         child: widget.isOutlined
             ? OutlinedButton(
-                onPressed: widget.onTap, // <-- CORRECTED
+                onPressed: widget.onTap,
                 style: buttonStyle,
                 child: Text(widget.text),
               )
             : ElevatedButton(
-                onPressed: widget.onTap, // <-- CORRECTED
+                onPressed: widget.onTap,
                 style: buttonStyle,
                 child: Text(widget.text),
               ),
