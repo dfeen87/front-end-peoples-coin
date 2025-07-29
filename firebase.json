@@ -1,4 +1,4 @@
-{
+ {
       "hosting": {
         "target": "brightacts-site",
         "public": "build/web",
@@ -13,41 +13,6 @@
             "destination": "/index.html"
           }
         ]
-      },
-      "flutter": {
-        "platforms": {
-          "android": {
-            "default": {
-              "projectId": "brightacts-frontend",
-              "appId": "1:485820050685:android:51977b91fe3344bff5a294",
-              "fileOutput": "android/app/google-services.json"
-            }
-          },
-          "ios": {
-            "default": {
-              "projectId": "brightacts-frontend",
-              "appId": "1:485820050685:ios:fde1cd45bca84989f5a294",
-              "uploadDebugSymbols": false,
-              "fileOutput": "ios/Runner/GoogleService-Info.plist"
-            }
-          },
-          "macos": {
-            "default": {
-              "projectId": "brightacts-frontend",
-              "appId": "1:485820050685:ios:fde1cd45bca84989f5a294",
-              "uploadDebugSymbols": false,
-              "fileOutput": "macos/Runner/GoogleService-Info.plist"
-            }
-          },
-          "dart": {
-            "lib/firebase_options.dart": {
-              "projectId": "heroic-tide-428421-q7",
-              "configurations": {
-                "web": "1:105378934751:web:28897b3d83884e6c411e6a"
-              }
-            }
-          }
-        }
       }
     }
     
