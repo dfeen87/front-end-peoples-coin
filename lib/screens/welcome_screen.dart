@@ -1,80 +1,79 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
+import 'package.go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/dynamic_nebula_background.dart';
 import 'package:brightacts_frontend_app/models/tech_system.dart';
 import 'code_display_page.dart';
 
-// --- DEFINED new brand color ---
-const Color brandBlue = Color(0xFF0A2540); // A deep, professional dark blue
-const Color cardBackground = Color(0xFFF6F9FC); // A very light, clean background for cards
+// --- DEFINED new brand color and card background ---
+const Color brandBlue = Color(0xFF0A2540);
+const Color cardBackground = Colors.white;
 
-// Data list for backend systems.
+// --- Data for all backend system cards ---
 final List<TechSystem> backendSystems = [
   const TechSystem(
-    icon: Icons.cloud_queue,
-    title: 'Cloud Infrastructure',
-    description: 'Manages scalable cloud resources and services.',
-    color: Colors.blueAccent,
-    code: '''...''' // Code omitted for brevity
-  ),
-  // Add other TechSystem objects here...
+      icon: Icons.cloud_queue,
+      title: 'Cloud Infrastructure',
+      description: 'Manages scalable cloud resources and services.',
+      color: Colors.blueAccent,
+      code: '...'),
+  const TechSystem(
+      icon: Icons.security,
+      title: 'Security Protocol',
+      description: 'Ensures data integrity and user authentication.',
+      color: Colors.redAccent,
+      code: '...'),
+  const TechSystem(
+      icon: Icons.analytics,
+      title: 'Data Analytics',
+      description: 'Processes and visualizes community impact data.',
+      color: Colors.purpleAccent,
+      code: '...'),
+  const TechSystem(
+      icon: Icons.storage,
+      title: 'Blockchain Ledger',
+      description: 'Records acts of goodwill on an immutable ledger.',
+      color: Colors.greenAccent,
+      code: '...'),
 ];
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   void _showCodeViewer(BuildContext context, TechSystem system) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: Colors.black.withOpacity(0.5),
-        pageBuilder: (context, animation, secondaryAnimation) {
-          return FadeTransition(
-            opacity: animation,
-            child: CodeDisplayPage(title: 'Code Viewer', system: system),
-          );
-        },
-      ),
-    );
+    context.go('/code-viewer', extra: system);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Using a solid color for the page background to ensure text readability
     return Scaffold(
-      backgroundColor: cardBackground,
+      // --- CHANGED: Made background transparent to show the nebula ---
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          const DynamicNebulaBackground(), // Still here for a dynamic feel underneath
+          // --- RESTORED: The dynamic background is the bottom layer ---
+          const DynamicNebulaBackground(),
           Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 48.0),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Spacer(flex: 2),
                   _buildHeader(),
-                  const SizedBox(height: 36),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: _buildMissionStatement(),
-                  ),
-                  const SizedBox(height: 36),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: _buildActionButtons(context),
-                  ),
-                  const SizedBox(height: 72),
+                  const SizedBox(height: 24),
+                  _buildMissionStatement(),
+                  const SizedBox(height: 24),
+                  _buildActionButtons(context),
+                  const Spacer(flex: 3),
                   _buildTechShowcase(context),
-                  const SizedBox(height: 16),
-                  _buildHintText(),
-                  const SizedBox(height: 48),
+                  const Spacer(flex: 1),
                   _buildFooterLinks(context),
+                  const Spacer(flex: 1),
                 ],
               ).animate().fadeIn(duration: 500.ms, curve: Curves.easeIn),
             ),
@@ -85,138 +84,106 @@ class WelcomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeader() {
+    // --- To ensure readability on the dynamic background, we add a subtle shadow ---
     return const Text(
       'Welcome to Bright Acts',
       textAlign: TextAlign.center,
       style: TextStyle(
-        fontSize: 40,
+        fontSize: 36,
         fontWeight: FontWeight.w900,
-        // CHANGED: Text color to brandBlue
-        color: brandBlue,
-        letterSpacing: 1.4,
+        color: Colors.white, // Text color changed back to white
+        shadows: [
+          Shadow(
+            blurRadius: 10.0,
+            color: Colors.black54,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-    ).animate().fade(duration: 900.ms).slideY(begin: 0.5, curve: Curves.easeOutCubic);
+    ).animate().fade(duration: 900.ms).slideY(begin: 0.5);
   }
 
-  // --- REDESIGNED: Mission statement card for better contrast ---
+  // --- Using the glassmorphism effect again for the mission statement ---
   Widget _buildMissionStatement() {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Colors.white, // Solid white for max contrast
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: brandBlue.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          )
-        ],
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Our Goal: A Decentralized Community for Good.',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: brandBlue,
-            ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16.0),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
           ),
-          SizedBox(height: 14),
-          Text(
-            'Bright Acts is a Web3 platform built on the principles of transparency, community ownership, and rewarding positive impact. Every act of goodwill is recorded on a public ledger, and our governance is shaped by the community through proposals and voting.',
+          child: const Text(
+            'A Web3 platform for recognizing and rewarding positive community impact through a transparent, decentralized public ledger.',
+            textAlign: TextAlign.center,
             style: TextStyle(
-              color: brandBlue,
+              color: Colors.white, // Text color changed back to white
               fontSize: 16,
-              height: 1.6,
+              height: 1.5,
+              shadows: [Shadow(blurRadius: 5.0, color: Colors.black38)],
             ),
           ),
-        ],
+        ),
       ),
-    ).animate().fade(delay: 200.ms, duration: 900.ms).slideY(begin: 0.4, curve: Curves.easeOutCubic);
+    ).animate().fade(delay: 200.ms, duration: 900.ms).slideY(begin: 0.4);
   }
 
   Widget _buildActionButtons(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
       children: [
-        _AnimatedScaleButton(
-          onTap: () => context.go('/sign_up'),
-          backgroundColor: Colors.amber[800]!,
-          foregroundColor: Colors.black,
-          text: 'Join the Community',
+        Expanded(
+          child: _AnimatedScaleButton(
+            onTap: () => context.go('/sign_up'),
+            backgroundColor: Colors.amber[800]!,
+            foregroundColor: Colors.black,
+            text: 'Join',
+          ),
         ),
-        const SizedBox(height: 14),
-        _AnimatedScaleButton(
-          onTap: () => context.go('/sign_in'),
-          backgroundColor: Colors.transparent,
-          // CHANGED: Button text color to brandBlue
-          foregroundColor: brandBlue,
-          borderColor: brandBlue,
-          isOutlined: true,
-          text: 'Sign In',
+        const SizedBox(width: 16),
+        Expanded(
+          child: _AnimatedScaleButton(
+            onTap: () => context.go('/sign_in'),
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white, // Changed back to white
+            borderColor: Colors.white,   // Changed back to white
+            isOutlined: true,
+            text: 'Sign In',
+          ),
         ),
       ],
-    ).animate().fade(delay: 400.ms, duration: 900.ms).slideY(begin: 0.3, curve: Curves.easeOutCubic);
+    ).animate().fade(delay: 400.ms, duration: 900.ms).slideY(begin: 0.3);
   }
 
   Widget _buildTechShowcase(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
           'A Living Ecosystem',
           style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w900,
-            color: brandBlue,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.white, // Changed back to white
+            shadows: [Shadow(blurRadius: 5.0, color: Colors.black38)],
           ),
         ),
-        const SizedBox(height: 10),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.0),
-          child: Text(
-            'Tap a system to view its backend code and architecture.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: brandBlue,
-              fontSize: 14,
-            ),
-          ),
-        ),
-        const SizedBox(height: 28),
-        SizedBox(
-          height: 220,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            itemCount: backendSystems.length,
-            itemBuilder: (context, index) {
-              return _TechSystemCard(
-                system: backendSystems[index],
-                onTap: () => _showCodeViewer(context, backendSystems[index]),
-              ).animate().fade(delay: (200 * index).ms, duration: 600.ms).slideX(begin: 0.5);
-            },
-          ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: backendSystems.map((system) {
+            return Flexible(
+              child: _TechSystemCard(
+                system: system,
+                onTap: () => _showCodeViewer(context, system),
+              ).animate().fade(delay: (200 * backendSystems.indexOf(system)).ms).slideX(begin: 0.5),
+            );
+          }).toList(),
         ),
       ],
     ).animate().fade(delay: 600.ms, duration: 900.ms);
-  }
-
-  Widget _buildHintText() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24),
-      child: Text(
-        'Explore the core backend systems and see how Bright Acts works behind the scenes.',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: brandBlue,
-          fontStyle: FontStyle.italic,
-          fontSize: 13,
-        ),
-      ),
-    );
   }
 
   Widget _buildFooterLinks(BuildContext context) {
@@ -227,7 +194,7 @@ class WelcomeScreen extends StatelessWidget {
           url: 'https://github.com/DonMichaelFeeney/Brightacts',
           text: 'View Full Codebase',
         ),
-        const Text(' | ', style: TextStyle(color: brandBlue)),
+        const Text('  |  ', style: TextStyle(color: Colors.white70)),
         _FooterLink(
           url: 'https://www.linkedin.com/company/the-people-s-coin/',
           text: 'Follow Us',
@@ -237,88 +204,51 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-// --- REDESIGNED: Tech card for better contrast and a cleaner look ---
-class _TechSystemCard extends StatefulWidget {
+// --- Tech System Card adapted for nebula background ---
+class _TechSystemCard extends StatelessWidget {
   final TechSystem system;
   final VoidCallback onTap;
-
   const _TechSystemCard({required this.system, required this.onTap});
 
   @override
-  State<_TechSystemCard> createState() => _TechSystemCardState();
-}
-
-class _TechSystemCardState extends State<_TechSystemCard> {
-  bool _isHoveredOrTapped = false;
-
-  @override
   Widget build(BuildContext context) {
-    final color = widget.system.color;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHoveredOrTapped = true),
-      onExit: (_) => setState(() => _isHoveredOrTapped = false),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _isHoveredOrTapped = true),
-        onTapUp: (_) => setState(() => _isHoveredOrTapped = false),
-        onTapCancel: () => setState(() => _isHoveredOrTapped = false),
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          width: 210,
-          margin: const EdgeInsets.symmetric(horizontal: 8.0),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: _isHoveredOrTapped ? color : Colors.grey.shade300,
-              width: _isHoveredOrTapped ? 2 : 1,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+          child: Container(
+            width: 140,
+            height: 140,
+            margin: const EdgeInsets.symmetric(horizontal: 8.0),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: system.color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: system.color.withOpacity(0.4)),
             ),
-            boxShadow: _isHoveredOrTapped
-                ? [
-                    BoxShadow(
-                      color: color.withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ]
-                : [
-                    BoxShadow(
-                      color: brandBlue.withOpacity(0.05),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
-                    )
-                  ],
-          ),
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                backgroundColor: color.withOpacity(0.15),
-                child: Icon(widget.system.icon, color: color, size: 28),
-              ),
-              const Spacer(),
-              Text(
-                widget.system.title,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: brandBlue, // CHANGED to dark blue
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white.withOpacity(0.1),
+                  child: Icon(system.icon, color: Colors.white, size: 24),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                widget.system.description,
-                style: TextStyle(
-                  color: brandBlue.withOpacity(0.7), // CHANGED
-                  fontSize: 13,
-                  height: 1.5,
+                const SizedBox(height: 12),
+                Text(
+                  system.title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 14,
+                    shadows: [Shadow(blurRadius: 3.0, color: Colors.black54)],
+                  ),
                 ),
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -326,50 +256,35 @@ class _TechSystemCardState extends State<_TechSystemCard> {
   }
 }
 
-class _FooterLink extends StatefulWidget {
+// --- Footer Link adapted for nebula background ---
+class _FooterLink extends StatelessWidget {
   final String url;
   final String text;
-
   const _FooterLink({required this.url, required this.text});
-
-  @override
-  State<_FooterLink> createState() => _FooterLinkState();
-}
-
-class _FooterLinkState extends State<_FooterLink> {
-  bool _hovering = false;
-
-  Future<void> _launch() async {
-    final uri = Uri.parse(widget.url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: TextButton(
-        onPressed: _launch,
-        style: TextButton.styleFrom(
-          // CHANGED: Colors for dark blue text
-          foregroundColor: _hovering ? Colors.amber[800] : brandBlue,
-          textStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+        }
+      },
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+          shadows: [Shadow(blurRadius: 3.0, color: Colors.black54)],
         ),
-        child: Text(widget.text),
       ),
     );
   }
 }
 
-
-// --- This button widget remains unchanged but is included for completeness ---
+// --- Animated Button (unchanged) ---
 class _AnimatedScaleButton extends StatefulWidget {
+  // ... (rest of the button code is unchanged)
   final VoidCallback onTap;
   final Color backgroundColor;
   final Color foregroundColor;
@@ -426,38 +341,28 @@ class _AnimatedScaleButtonState extends State<_AnimatedScaleButton>
                 color: widget.borderColor ?? widget.foregroundColor, width: 2),
             foregroundColor: widget.foregroundColor,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            textStyle:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
           )
         : ElevatedButton.styleFrom(
             backgroundColor: widget.backgroundColor,
             foregroundColor: widget.foregroundColor,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            textStyle:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            shadowColor: Colors.black45,
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             elevation: 4,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
           );
 
     return ScaleTransition(
       scale: _scaleAnimation,
       child: GestureDetector(
+        onTap: widget.onTap,
         onTapDown: _onTapDown,
         onTapUp: _onTapUp,
         onTapCancel: _onTapCancel,
         child: widget.isOutlined
-            ? OutlinedButton(
-                onPressed: widget.onTap,
-                style: buttonStyle,
-                child: Text(widget.text),
-              )
-            : ElevatedButton(
-                onPressed: widget.onTap,
-                style: buttonStyle,
-                child: Text(widget.text),
-              ),
+            ? OutlinedButton(onPressed: widget.onTap, style: buttonStyle, child: Text(widget.text))
+            : ElevatedButton(onPressed: widget.onTap, style: buttonStyle, child: Text(widget.text)),
       ),
     );
   }
