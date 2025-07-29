@@ -1,18 +1,15 @@
+import 'dart:async';
 import 'dart:ui';
-import 'package:flutter/material.dart';
+import 'package.flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package.go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/dynamic_nebula_background.dart';
-import 'package:brightacts_frontend_app/models/tech_system.dart';
+import 'package.brightacts_frontend_app/models/tech_system.dart';
 import 'code_display_page.dart';
 
-// --- DEFINED new brand color and card background ---
-const Color brandBlue = Color(0xFF0A2540);
-const Color cardBackground = Colors.white;
-
-// --- Data for all backend system cards ---
+// Data for all backend system cards
 final List<TechSystem> backendSystems = [
   const TechSystem(
       icon: Icons.cloud_queue,
@@ -50,11 +47,9 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // --- CHANGED: Made background transparent to show the nebula ---
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // --- RESTORED: The dynamic background is the bottom layer ---
           const DynamicNebulaBackground(),
           Center(
             child: Padding(
@@ -84,26 +79,25 @@ class WelcomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeader() {
-    // --- To ensure readability on the dynamic background, we add a subtle shadow ---
-    return const Text(
-      'Welcome to Bright Acts',
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        fontSize: 36,
-        fontWeight: FontWeight.w900,
-        color: Colors.white, // Text color changed back to white
-        shadows: [
-          Shadow(
-            blurRadius: 10.0,
-            color: Colors.black54,
-            offset: Offset(0, 2),
+    return Column(
+      children: [
+        const Text(
+          'Welcome to Bright Acts',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            shadows: [Shadow(blurRadius: 10.0, color: Colors.black54, offset: Offset(0, 2))],
           ),
-        ],
-      ),
-    ).animate().fade(duration: 900.ms).slideY(begin: 0.5);
+        ).animate().fade(duration: 900.ms).slideY(begin: 0.5),
+        const SizedBox(height: 8),
+        // --- ENHANCEMENT: Dynamic cycling tagline ---
+        const DynamicTagline(),
+      ],
+    );
   }
 
-  // --- Using the glassmorphism effect again for the mission statement ---
   Widget _buildMissionStatement() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16.0),
@@ -116,16 +110,17 @@ class WelcomeScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white.withOpacity(0.2)),
           ),
+          // --- ENHANCEMENT: Typewriter text effect ---
           child: const Text(
             'A Web3 platform for recognizing and rewarding positive community impact through a transparent, decentralized public ledger.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white, // Text color changed back to white
+              color: Colors.white,
               fontSize: 16,
               height: 1.5,
               shadows: [Shadow(blurRadius: 5.0, color: Colors.black38)],
             ),
-          ),
+          ).animate().fadeIn(delay: 600.ms).moveY(begin: 10),
         ),
       ),
     ).animate().fade(delay: 200.ms, duration: 900.ms).slideY(begin: 0.4);
@@ -135,20 +130,22 @@ class WelcomeScreen extends StatelessWidget {
     return Row(
       children: [
         Expanded(
+          // --- ENHANCEMENT: Pulsating animation on primary button ---
           child: _AnimatedScaleButton(
             onTap: () => context.go('/sign_up'),
             backgroundColor: Colors.amber[800]!,
             foregroundColor: Colors.black,
-            text: 'Join',
-          ),
+            text: 'Join the Movement', // Refined CTA text
+          ).animate(onPlay: (controller) => controller.repeat())
+             .shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: _AnimatedScaleButton(
             onTap: () => context.go('/sign_in'),
             backgroundColor: Colors.transparent,
-            foregroundColor: Colors.white, // Changed back to white
-            borderColor: Colors.white,   // Changed back to white
+            foregroundColor: Colors.white,
+            borderColor: Colors.white,
             isOutlined: true,
             text: 'Sign In',
           ),
@@ -166,7 +163,7 @@ class WelcomeScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: Colors.white, // Changed back to white
+            color: Colors.white,
             shadows: [Shadow(blurRadius: 5.0, color: Colors.black38)],
           ),
         ),
@@ -174,16 +171,17 @@ class WelcomeScreen extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: backendSystems.map((system) {
+            final index = backendSystems.indexOf(system);
             return Flexible(
               child: _TechSystemCard(
                 system: system,
                 onTap: () => _showCodeViewer(context, system),
-              ).animate().fade(delay: (200 * backendSystems.indexOf(system)).ms).slideX(begin: 0.5),
+              ).animate().fade(delay: (800 + (200 * index)).ms).slideX(begin: 0.5),
             );
           }).toList(),
         ),
       ],
-    ).animate().fade(delay: 600.ms, duration: 900.ms);
+    );
   }
 
   Widget _buildFooterLinks(BuildContext context) {
@@ -204,50 +202,128 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-// --- Tech System Card adapted for nebula background ---
-class _TechSystemCard extends StatelessWidget {
+// --- NEW WIDGET: For cycling tagline ---
+class DynamicTagline extends StatefulWidget {
+  const DynamicTagline({super.key});
+
+  @override
+  State<DynamicTagline> createState() => _DynamicTaglineState();
+}
+
+class _DynamicTaglineState extends State<DynamicTagline> {
+  final List<String> _taglines = ['Transparency', 'Community', 'Goodwill'];
+  int _currentIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      setState(() {
+        _currentIndex = (_currentIndex + 1) % _taglines.length;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: Text(
+        _taglines[_currentIndex],
+        key: ValueKey<String>(_taglines[_currentIndex]), // Important for AnimatedSwitcher
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 18,
+          shadows: [Shadow(blurRadius: 5.0, color: Colors.black38)],
+        ),
+      ),
+    );
+  }
+}
+
+// --- Tech System Card with Micro-interactions ---
+class _TechSystemCard extends StatefulWidget {
   final TechSystem system;
   final VoidCallback onTap;
   const _TechSystemCard({required this.system, required this.onTap});
 
   @override
+  State<_TechSystemCard> createState() => _TechSystemCardState();
+}
+
+class _TechSystemCardState extends State<_TechSystemCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-          child: Container(
-            width: 140,
-            height: 140,
-            margin: const EdgeInsets.symmetric(horizontal: 8.0),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: system.color.withOpacity(0.2),
+    return Semantics(
+      label: 'Technology card for ${widget.system.title}. Tap to view code.',
+      button: true,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: InkWell(
+          onTap: widget.onTap,
+          onHover: (hovering) => setState(() => _isHovered = hovering),
+          borderRadius: BorderRadius.circular(12),
+          splashColor: widget.system.color.withOpacity(0.4),
+          highlightColor: widget.system.color.withOpacity(0.2),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            transform: _isHovered ? (Matrix4.identity()..scale(1.05)) : Matrix4.identity(),
+            transformAlignment: Alignment.center,
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: system.color.withOpacity(0.4)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.white.withOpacity(0.1),
-                  child: Icon(system.icon, color: Colors.white, size: 24),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  system.title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontSize: 14,
-                    shadows: [Shadow(blurRadius: 3.0, color: Colors.black54)],
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  margin: const EdgeInsets.symmetric(horizontal: 8.0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: widget.system.color.withOpacity(_isHovered ? 0.3 : 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: widget.system.color.withOpacity(0.4)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.white.withOpacity(0.1),
+                        child: Icon(widget.system.icon, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.system.title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 14,
+                          shadows: [Shadow(blurRadius: 3.0, color: Colors.black54)],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -256,31 +332,39 @@ class _TechSystemCard extends StatelessWidget {
   }
 }
 
-// --- Footer Link adapted for nebula background ---
+// --- Footer Link Widget ---
 class _FooterLink extends StatelessWidget {
   final String url;
   final String text;
   const _FooterLink({required this.url, required this.text});
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () async {
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
-        }
-      },
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-          shadows: [Shadow(blurRadius: 3.0, color: Colors.black54)],
+    return Semantics(
+      label: '$text. Opens in a new tab.',
+      link: true,
+      child: InkWell(
+        onTap: () async {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri);
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              shadows: [Shadow(blurRadius: 3.0, color: Colors.black54)],
+            ),
+          ),
         ),
       ),
     );
   }
 }
+
 
 // --- Animated Button (unchanged) ---
 class _AnimatedScaleButton extends StatefulWidget {
@@ -324,7 +408,7 @@ class _AnimatedScaleButtonState extends State<_AnimatedScaleButton>
   }
 
   void _onTapDown(TapDownDetails _) => _controller.reverse(from: 1.0);
-  void _onTapUp(TapUpDetails _) => _controller.forward(from: 0.0);
+  void _onTapUp(TapDownDetails _) => _controller.forward(from: 0.0);
   void _onTapCancel() => _controller.forward(from: 0.0);
 
   @override
@@ -335,35 +419,41 @@ class _AnimatedScaleButtonState extends State<_AnimatedScaleButton>
 
   @override
   Widget build(BuildContext context) {
-    final buttonStyle = widget.isOutlined
-        ? OutlinedButton.styleFrom(
-            side: BorderSide(
-                color: widget.borderColor ?? widget.foregroundColor, width: 2),
-            foregroundColor: widget.foregroundColor,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-          )
-        : ElevatedButton.styleFrom(
-            backgroundColor: widget.backgroundColor,
-            foregroundColor: widget.foregroundColor,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-          );
-
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onTapDown: _onTapDown,
-        onTapUp: _onTapUp,
-        onTapCancel: _onTapCancel,
-        child: widget.isOutlined
-            ? OutlinedButton(onPressed: widget.onTap, style: buttonStyle, child: Text(widget.text))
-            : ElevatedButton(onPressed: widget.onTap, style: buttonStyle, child: Text(widget.text)),
+    return Semantics(
+      label: widget.text,
+      button: true,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          onTapDown: _onTapDown,
+          onTapUp: _onTapUp,
+          onTapCancel: _onTapCancel,
+          child: widget.isOutlined
+              ? OutlinedButton(onPressed: widget.onTap, style: _buttonStyle(), child: Text(widget.text))
+              : ElevatedButton(onPressed: widget.onTap, style: _buttonStyle(), child: Text(widget.text)),
+        ),
       ),
     );
+  }
+
+  ButtonStyle _buttonStyle() {
+    return widget.isOutlined
+      ? OutlinedButton.styleFrom(
+          side: BorderSide(
+              color: widget.borderColor ?? widget.foregroundColor, width: 2),
+          foregroundColor: widget.foregroundColor,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        )
+      : ElevatedButton.styleFrom(
+          backgroundColor: widget.backgroundColor,
+          foregroundColor: widget.foregroundColor,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        );
   }
 }
