@@ -1,130 +1,179 @@
-// lib/screens/welcome_screen.dart
-
 import 'dart:async';
-import 'dart:ui';
-// --- CORRECTED IMPORTS: Replaced '.' with ':' ---
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_syntax_view/flutter_syntax_view.dart';
 
 import '../widgets/dynamic_nebula_background.dart';
 import 'package:brightacts_frontend_app/models/tech_system.dart';
-import 'code_display_page.dart';
 
-// Data for all backend system cards
+// --- UPDATED: More detailed code examples for each card ---
 final List<TechSystem> backendSystems = [
   const TechSystem(
-      icon: Icons.cloud_queue,
-      title: 'Cloud Infrastructure',
-      description: 'Manages scalable cloud resources and services.',
-      color: Colors.blueAccent,
-      code: '...'),
+    icon: Icons.cloud_queue,
+    title: 'Cloud Infrastructure',
+    description: 'Manages scalable cloud resources and services.',
+    color: Colors.blueAccent,
+    code: r'''
+# Manages scalable cloud resources via IaC.
+class CloudManager:
+    def __init__(self, provider='gcp'):
+        self.provider = provider
+        self.services = []
+        print(f"Cloud Manager on {provider.upper()} ready.")
+
+    def provision_server(self, region, spec):
+        server_id = f"server-{random.randint(1000, 9999)}"
+        self.services.append(server_id)
+        print(f"Provisioning {spec} server in {region}...")
+        return server_id
+
+    def deploy_app(self, server_id, app_name):
+        if server_id in self.services:
+            print(f"Deploying {app_name} to {server_id}.")
+            return {"status": "deployed", "app": app_name}
+        return {"status": "error", "reason": "Server not found"}
+''',
+  ),
   const TechSystem(
-      icon: Icons.security,
-      title: 'Security Protocol',
-      description: 'Ensures data integrity and user authentication.',
-      color: Colors.redAccent,
-      code: '...'),
+    icon: Icons.security,
+    title: 'Security Protocol',
+    description: 'Ensures data integrity and user authentication.',
+    color: Colors.redAccent,
+    code: r'''
+# Handles JWT-based user authentication.
+import jwt
+
+class SecurityModule:
+    def __init__(self, secret_key):
+        self.secret = secret_key
+
+    def create_token(self, user_id):
+        payload = {'user_id': user_id, 'exp': time.time() + 3600}
+        token = jwt.encode(payload, self.secret, algorithm='HS256')
+        return token
+
+    def verify_token(self, token):
+        try:
+            jwt.decode(token, self.secret, algorithms=['HS256'])
+            return True
+        except jwt.ExpiredSignatureError:
+            return False
+''',
+  ),
   const TechSystem(
-      icon: Icons.analytics,
-      title: 'Data Analytics',
-      description: 'Processes and visualizes community impact data.',
-      color: Colors.purpleAccent,
-      code: '...'),
+    icon: Icons.analytics,
+    title: 'Data Analytics',
+    description: 'Processes and visualizes community impact data.',
+    color: Colors.purpleAccent,
+    code: r'''
+# Processes raw data streams for insights.
+import pandas as pd
+
+class AnalyticsEngine:
+    def process_acts(self, act_data):
+        df = pd.DataFrame(act_data)
+        total_acts = len(df)
+        avg_loves = df['loves'].mean()
+        print(f"Analyzed {total_acts} acts.")
+        return {
+            "total_acts": total_acts,
+            "average_loves": avg_loves
+        }
+''',
+  ),
   const TechSystem(
-      icon: Icons.storage,
-      title: 'Blockchain Ledger',
-      description: 'Records acts of goodwill on an immutable ledger.',
-      color: Colors.greenAccent,
-      code: '...'),
+    icon: Icons.storage,
+    title: 'Blockchain Ledger',
+    description: 'Records acts of goodwill on an immutable ledger.',
+    color: Colors.greenAccent,
+    code: r'''
+# Simplified blockchain logic for transactions.
+import hashlib
+
+class Blockchain:
+    def __init__(self):
+        self.chain = []
+        self.create_block(proof=1, prev_hash='0')
+
+    def create_block(self, proof, prev_hash):
+        block = {
+            'index': len(self.chain) + 1,
+            'proof': proof,
+            'previous_hash': prev_hash
+        }
+        self.chain.append(block)
+        return block
+''',
+  ),
 ];
+
+// A key to manage the state of the card group
+final GlobalKey<FlippableCardGroupState> cardGroupKey = GlobalKey();
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
-
-  void _showCodeViewer(BuildContext context, TechSystem system) {
-    context.go('/code-viewer', extra: system);
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          const DynamicNebulaBackground(),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Spacer(flex: 2),
-                  _buildHeader(),
-                  const SizedBox(height: 24),
-                  _buildMissionStatement(),
-                  const SizedBox(height: 24),
-                  _buildActionButtons(context),
-                  const Spacer(flex: 3),
-                  _buildTechShowcase(context),
-                  const Spacer(flex: 1),
-                  _buildFooterLinks(context),
-                  const Spacer(flex: 1),
-                ],
-              ).animate().fadeIn(duration: 500.ms, curve: Curves.easeIn),
+      body: GestureDetector(
+        onTap: () => cardGroupKey.currentState?.resetAllCards(),
+        child: Stack(
+          children: [
+            const DynamicNebulaBackground(),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Spacer(flex: 2),
+                    _buildHeader(),
+                    const SizedBox(height: 24),
+                    _buildMissionStatement(),
+                    const SizedBox(height: 24),
+                    _buildActionButtons(context),
+                    const Spacer(flex: 3),
+                    _buildTechShowcase(context),
+                    const Spacer(flex: 1),
+                    _buildFooterLinks(),
+                    const Spacer(flex: 1),
+                  ],
+                ).animate().fadeIn(duration: 500.ms, curve: Curves.easeIn),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHeader() {
-    return Column(
+    return const Column(
       children: [
-        const Text(
-          'Welcome to Bright Acts',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            shadows: [Shadow(blurRadius: 10.0, color: Colors.black54, offset: Offset(0, 2))],
-          ),
-        ).animate().fade(duration: 900.ms).slideY(begin: 0.5),
-        const SizedBox(height: 8),
-        const DynamicTagline(),
+        StrokedText(
+          text: 'Welcome to Bright Acts',
+          fontSize: 36,
+          fontWeight: FontWeight.w900,
+        ),
+        SizedBox(height: 8),
+        DynamicTagline(),
       ],
     );
   }
 
   Widget _buildMissionStatement() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16.0),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
-          ),
-          child: const Text(
-            'A Web3 platform for recognizing and rewarding positive community impact through a transparent, decentralized public ledger.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              height: 1.5,
-              shadows: [Shadow(blurRadius: 5.0, color: Colors.black38)],
-            ),
-          ).animate().fadeIn(delay: 600.ms).moveY(begin: 10),
-        ),
-      ),
-    ).animate().fade(delay: 200.ms, duration: 900.ms).slideY(begin: 0.4);
+    return const StrokedText(
+      text: 'A Web3 platform for recognizing and rewarding positive community impact through a transparent, decentralized public ledger.',
+      fontSize: 16,
+      fontWeight: FontWeight.w500,
+      textAlign: TextAlign.center,
+    );
   }
 
   Widget _buildActionButtons(BuildContext context) {
@@ -143,12 +192,11 @@ class WelcomeScreen extends StatelessWidget {
         Expanded(
           child: _AnimatedScaleButton(
             onTap: () => context.go('/sign_in'),
-            backgroundColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            borderColor: Colors.white,
-            isOutlined: true,
+            backgroundColor: Colors.amber[800]!,
+            foregroundColor: Colors.black,
             text: 'Sign In',
-          ),
+          ).animate(onPlay: (controller) => controller.repeat())
+             .shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
         ),
       ],
     ).animate().fade(delay: 400.ms, duration: 900.ms).slideY(begin: 0.3);
@@ -158,41 +206,29 @@ class WelcomeScreen extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'A Living Ecosystem',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            shadows: [Shadow(blurRadius: 5.0, color: Colors.black38)],
-          ),
+        const StrokedText(
+          text: 'A Living Ecosystem',
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
         ),
         const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: backendSystems.map((system) {
-            final index = backendSystems.indexOf(system);
-            return Flexible(
-              child: _TechSystemCard(
-                system: system,
-                onTap: () => _showCodeViewer(context, system),
-              ).animate().fade(delay: (800 + (200 * index)).ms).slideX(begin: 0.5),
-            );
-          }).toList(),
+        FlippableCardGroup(
+          key: cardGroupKey,
+          systems: backendSystems,
         ),
       ],
     );
   }
 
-  Widget _buildFooterLinks(BuildContext context) {
-    return Row(
+  Widget _buildFooterLinks() {
+    return const Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _FooterLink(
           url: 'https://github.com/DonMichaelFeeney/Brightacts',
           text: 'View Full Codebase',
         ),
-        const Text('  |  ', style: TextStyle(color: Colors.white70)),
+        StrokedText(text: '  |  ', fontSize: 14),
         _FooterLink(
           url: 'https://www.linkedin.com/company/the-people-s-coin/',
           text: 'Follow Us',
@@ -202,9 +238,240 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
+class FlippableCardGroup extends StatefulWidget {
+  final List<TechSystem> systems;
+  const FlippableCardGroup({required this.systems, super.key});
+
+  @override
+  State<FlippableCardGroup> createState() => FlippableCardGroupState();
+}
+
+class FlippableCardGroupState extends State<FlippableCardGroup> {
+  int? _currentlyFlippedIndex;
+
+  void flipCard(int index) {
+    setState(() {
+      if (_currentlyFlippedIndex == index) {
+        _currentlyFlippedIndex = null;
+      } else {
+        _currentlyFlippedIndex = index;
+      }
+    });
+  }
+
+  void resetAllCards() {
+    setState(() {
+      _currentlyFlippedIndex = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: widget.systems.map((system) {
+        final index = widget.systems.indexOf(system);
+        return Flexible(
+          child: FlippableTechCard(
+            system: system,
+            isFlipped: _currentlyFlippedIndex == index,
+            onTap: () => flipCard(index),
+          ).animate().fade(delay: (800 + (200 * index)).ms).slideX(begin: 0.5),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class FlippableTechCard extends StatefulWidget {
+  final TechSystem system;
+  final bool isFlipped;
+  final VoidCallback onTap;
+
+  const FlippableTechCard({
+    required this.system,
+    required this.isFlipped,
+    required this.onTap,
+    super.key,
+  });
+
+  @override
+  State<FlippableTechCard> createState() => _FlippableTechCardState();
+}
+
+class _FlippableTechCardState extends State<FlippableTechCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant FlippableTechCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isFlipped != oldWidget.isFlipped) {
+      if (widget.isFlipped) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, child) {
+          final isFront = animation.value < 0.5;
+          final transform = Matrix4.identity()
+            ..setEntry(3, 2, 0.001)
+            ..rotateY(pi * animation.value);
+
+          return Transform(
+            transform: transform,
+            alignment: Alignment.center,
+            child: isFront
+                ? _buildCardFace()
+                : Transform(
+                    transform: Matrix4.identity()..rotateY(pi),
+                    alignment: Alignment.center,
+                    child: _buildCardBack(),
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCardFace() {
+    return Container(
+      width: 140,
+      height: 140,
+      margin: const EdgeInsets.symmetric(horizontal: 8.0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: widget.system.color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: widget.system.color.withOpacity(0.4)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.white.withOpacity(0.1),
+            child: Icon(widget.system.icon, color: Colors.white, size: 24),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            widget.system.title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 14,
+              shadows: [Shadow(blurRadius: 3.0, color: Colors.black54)],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardBack() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      width: widget.isFlipped ? 250 : 140,
+      height: widget.isFlipped ? 250 : 140,
+      margin: const EdgeInsets.symmetric(horizontal: 8.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2E3440),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: widget.system.color),
+        boxShadow: [BoxShadow(color: widget.system.color.withOpacity(0.3), blurRadius: 20)],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(12),
+          child: SyntaxView(
+            code: widget.system.code,
+            syntax: Syntax.DART,
+            syntaxTheme: SyntaxTheme.vscodeDark(),
+            fontSize: 13.0,
+            withZoom: false,
+            withLinesCount: false,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class StrokedText extends StatelessWidget {
+  final String text;
+  final double fontSize;
+  final FontWeight fontWeight;
+  final TextAlign textAlign;
+
+  const StrokedText({
+    super.key,
+    required this.text,
+    required this.fontSize,
+    this.fontWeight = FontWeight.normal,
+    this.textAlign = TextAlign.center,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Text(
+          text,
+          textAlign: textAlign,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.5
+              ..color = Colors.white,
+          ),
+        ),
+        Text(
+          text,
+          textAlign: textAlign,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            color: Colors.black,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class DynamicTagline extends StatefulWidget {
   const DynamicTagline({super.key});
-
   @override
   State<DynamicTagline> createState() => _DynamicTaglineState();
 }
@@ -219,9 +486,7 @@ class _DynamicTaglineState extends State<DynamicTagline> {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (mounted) {
-        setState(() {
-          _currentIndex = (_currentIndex + 1) % _taglines.length;
-        });
+        setState(() => _currentIndex = (_currentIndex + 1) % _taglines.length);
       }
     });
   }
@@ -245,88 +510,11 @@ class _DynamicTaglineState extends State<DynamicTagline> {
           ),
         );
       },
-      child: Text(
-        _taglines[_currentIndex],
+      child: StrokedText(
         key: ValueKey<String>(_taglines[_currentIndex]),
-        style: const TextStyle(
-          color: Colors.white70,
-          fontSize: 18,
-          shadows: [Shadow(blurRadius: 5.0, color: Colors.black38)],
-        ),
-      ),
-    );
-  }
-}
-
-class _TechSystemCard extends StatefulWidget {
-  final TechSystem system;
-  final VoidCallback onTap;
-  const _TechSystemCard({required this.system, required this.onTap});
-
-  @override
-  State<_TechSystemCard> createState() => _TechSystemCardState();
-}
-
-class _TechSystemCardState extends State<_TechSystemCard> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Technology card for ${widget.system.title}. Tap to view code.',
-      button: true,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
-        child: InkWell(
-          onTap: widget.onTap,
-          onHover: (hovering) => setState(() => _isHovered = hovering),
-          borderRadius: BorderRadius.circular(12),
-          splashColor: widget.system.color.withOpacity(0.4),
-          highlightColor: widget.system.color.withOpacity(0.2),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            transform: _isHovered ? (Matrix4.identity()..scale(1.05)) : Matrix4.identity(),
-            transformAlignment: Alignment.center,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-                child: Container(
-                  width: 140,
-                  height: 140,
-                  margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: widget.system.color.withOpacity(_isHovered ? 0.3 : 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: widget.system.color.withOpacity(0.4)),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: Colors.white.withOpacity(0.1),
-                        child: Icon(widget.system.icon, color: Colors.white, size: 24),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.system.title,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontSize: 14,
-                          shadows: [Shadow(blurRadius: 3.0, color: Colors.black54)],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+        text: _taglines[_currentIndex],
+        fontSize: 18,
+        fontWeight: FontWeight.w500,
       ),
     );
   }
@@ -338,26 +526,19 @@ class _FooterLink extends StatelessWidget {
   const _FooterLink({required this.url, required this.text});
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: '$text. Opens in a new tab.',
-      link: true,
-      child: InkWell(
-        onTap: () async {
-          final uri = Uri.parse(url);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri);
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-              shadows: [Shadow(blurRadius: 3.0, color: Colors.black54)],
-            ),
-          ),
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: StrokedText(
+          text: text,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -368,16 +549,12 @@ class _AnimatedScaleButton extends StatefulWidget {
   final VoidCallback onTap;
   final Color backgroundColor;
   final Color foregroundColor;
-  final Color? borderColor;
-  final bool isOutlined;
   final String text;
 
   const _AnimatedScaleButton({
     required this.onTap,
     required this.backgroundColor,
     required this.foregroundColor,
-    this.borderColor,
-    this.isOutlined = false,
     required this.text,
   });
 
@@ -404,7 +581,7 @@ class _AnimatedScaleButtonState extends State<_AnimatedScaleButton>
   }
 
   void _onTapDown(TapDownDetails _) => _controller.reverse(from: 1.0);
-  void _onTapUp(TapDownDetails _) => _controller.forward(from: 0.0);
+  void _onTapUp(TapUpDetails _) => _controller.forward(from: 0.0);
   void _onTapCancel() => _controller.forward(from: 0.0);
 
   @override
@@ -415,41 +592,26 @@ class _AnimatedScaleButtonState extends State<_AnimatedScaleButton>
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: widget.text,
-      button: true,
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: GestureDetector(
-          onTap: widget.onTap,
-          onTapDown: _onTapDown,
-          onTapUp: _onTapUp,
-          onTapCancel: _onTapCancel,
-          child: widget.isOutlined
-              ? OutlinedButton(onPressed: widget.onTap, style: _buttonStyle(), child: Text(widget.text))
-              : ElevatedButton(onPressed: widget.onTap, style: _buttonStyle(), child: Text(widget.text)),
-        ),
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        child: ElevatedButton(onPressed: widget.onTap, style: _buttonStyle(), child: Text(widget.text)),
       ),
     );
   }
 
   ButtonStyle _buttonStyle() {
-    return widget.isOutlined
-      ? OutlinedButton.styleFrom(
-          side: BorderSide(
-              color: widget.borderColor ?? widget.foregroundColor, width: 2),
-          foregroundColor: widget.foregroundColor,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        )
-      : ElevatedButton.styleFrom(
-          backgroundColor: widget.backgroundColor,
-          foregroundColor: widget.foregroundColor,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        );
+    return ElevatedButton.styleFrom(
+      backgroundColor: widget.backgroundColor,
+      foregroundColor: widget.foregroundColor,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    );
   }
 }
