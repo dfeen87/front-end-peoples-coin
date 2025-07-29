@@ -8,11 +8,8 @@ import '../widgets/dynamic_nebula_background.dart';
 import 'package:brightacts_frontend_app/models/tech_system.dart'; // Import TechSystem from its central location
 import 'code_display_page.dart'; // CodeDisplayPage now expects TechSystem directly
 
-// Removed the duplicate TechSystem class definition from here.
-// It is now defined only in 'package:brightacts_frontend_app/models/tech_system.dart'.
-
+// Data list for backend systems. Consider moving this to a separate data file for better organization.
 final List<TechSystem> backendSystems = [
-  // Example systems (you might have more defined in your actual project)
   const TechSystem(
     icon: Icons.cloud_queue,
     title: 'Cloud Infrastructure',
@@ -28,151 +25,12 @@ class CloudManager:
     def deploy_service(self, service_name, config):
         """Deploys a new service with given configuration."""
         print(f"Deploying {service_name} with config: {config}")
-        # Simulate deployment logic
         return {"status": "success", "service_id": f"svc-{hash(service_name)}"}
 
-    def scale_resources(self, service_id, scale_factor):
-        """Scales resources for an existing service."""
-        print(f"Scaling service {service_id} by factor {scale_factor}")
-        # Simulate scaling logic
-        return {"status": "scaled", "new_capacity": 100 * scale_factor}
-
-# Example usage:
-if __name__ == "__main__":
-    manager = CloudManager(provider='Google Cloud')
-    app_config = {"memory": "2GB", "cpu": "2 cores"}
-    service_result = manager.deploy_service("WebApp", app_config)
-    print(service_result)
-    manager.scale_resources(service_result["service_id"], 2)
+# ... other systems ...
 '''
   ),
-  const TechSystem(
-    icon: Icons.security,
-    title: 'Security Protocol',
-    description: 'Ensures data integrity and user authentication.',
-    color: Colors.redAccent,
-    code: '''
-# Example Python code for Security Protocol
-class SecurityModule:
-    def __init__(self, encryption_algo='AES256'):
-        self.encryption_algo = encryption_algo
-        print(f"Security module initialized with {self.encryption_algo} encryption.")
-
-    def encrypt_data(self, data):
-        """Encrypts sensitive data."""
-        encrypted_data = f"ENCRYPTED_{data}_{self.encryption_algo}"
-        print(f"Data encrypted: {encrypted_data[:20]}...")
-        return encrypted_data
-
-    def authenticate_user(self, username, password_hash):
-        """Authenticates a user against stored credentials."""
-        # In a real system, this would involve hashing and comparison
-        if username == "admin" and password_hash == "hashed_password":
-            print("User authenticated successfully.")
-            return True
-        print("Authentication failed.")
-        return False
-
-# Example usage:
-if __name__ == "__main__":
-    security = SecurityModule()
-    sensitive_info = "MySecretData123"
-    encrypted = security.encrypt_data(sensitive_info)
-    
-    security.authenticate_user("admin", "hashed_password")
-    security.authenticate_user("guest", "wrong_password")
-'''
-  ),
-  const TechSystem(
-    icon: Icons.analytics,
-    title: 'Data Analytics Engine',
-    description: 'Processes and visualizes community impact data.',
-    color: Colors.purpleAccent,
-    code: '''
-# Example Python code for Data Analytics Engine
-import pandas as pd
-import numpy as np
-
-class AnalyticsEngine:
-    def __init__(self):
-        print("Analytics engine ready.")
-
-    def process_data(self, raw_data):
-        """Processes raw data into a structured DataFrame."""
-        df = pd.DataFrame(raw_data)
-        print("Data processed into DataFrame.")
-        return df
-
-    def generate_report(self, dataframe):
-        """Generates a summary report from the DataFrame."""
-        total_acts = len(dataframe)
-        avg_loves = dataframe['loves'].mean()
-        print(f"Report Generated: Total Acts = {total_acts}, Average Loves = {avg_loves:.2f}")
-        return {"total_acts": total_acts, "avg_loves": avg_loves}
-
-# Example usage:
-if __name__ == "__main__":
-    engine = AnalyticsEngine()
-    data = [
-        {"user": "Alice", "loves": 10, "type": "Donation"},
-        {"user": "Bob", "loves": 15, "type": "Volunteering"},
-        {"user": "Charlie", "loves": 8, "type": "Donation"},
-    ]
-    processed_df = engine.process_data(data)
-    report = engine.generate_report(processed_df)
-    print(report)
-'''
-  ),
-  const TechSystem(
-    icon: Icons.storage,
-    title: 'Blockchain Ledger',
-    description: 'Records all acts of goodwill on an immutable blockchain.',
-    color: Colors.greenAccent,
-    code: '''
-# Example Python code for Blockchain Ledger (simplified)
-import hashlib
-import json
-import time
-
-class Block:
-    def __init__(self, index, timestamp, data, previous_hash):
-        self.index = index
-        self.timestamp = timestamp
-        self.data = data
-        self.previous_hash = previous_hash
-        self.hash = self.calculate_hash()
-
-    def calculate_hash(self):
-        block_string = json.dumps(self.__dict__, sort_keys=True)
-        return hashlib.sha256(block_string.encode()).hexdigest()
-
-class Blockchain:
-    def __init__(self):
-        self.chain = [self.create_genesis_block()]
-
-    def create_genesis_block(self):
-        return Block(0, time.time(), "Genesis Block", "0")
-
-    def get_latest_block(self):
-        return self.chain[-1]
-
-    def add_block(self, new_block):
-        new_block.previous_hash = self.get_latest_block().hash
-        new_block.hash = new_block.calculate_hash()
-        self.chain.append(new_block)
-
-# Example usage:
-if __name__ == "__main__":
-    brightacts_chain = Blockchain()
-    
-    brightacts_chain.add_block(Block(1, time.time(), {"act": "Donated blood", "user": "Alice"}, ""))
-    brightacts_chain.add_block(Block(2, time.time(), {"act": "Volunteered at shelter", "user": "Bob"}, ""))
-    
-    print("Blockchain created:")
-    for block in brightacts_chain.chain:
-        print(f"Block #{block.index}: Hash={block.hash}, Data={block.data}")
-'''
-  ),
+  // Add other TechSystem objects here...
 ];
 
 
@@ -190,7 +48,6 @@ class WelcomeScreen extends StatelessWidget {
             opacity: animation,
             child: CodeDisplayPage(
               title: 'Code Viewer',
-              // Pass the TechSystem object directly, as CodeDisplayPage now expects it.
               system: system,
             ),
           );
@@ -407,7 +264,7 @@ class WelcomeScreen extends StatelessWidget {
           url: 'https://github.com/DonMichaelFeeney/Brightacts',
           text: 'View Full Codebase',
         ),
-        const Text('|', style: TextStyle(color: Colors.white24)),
+        const Text(' | ', style: TextStyle(color: Colors.white24)),
         _FooterLink(
           url: 'https://www.linkedin.com/company/the-people-s-coin/',
           text: 'Follow Us',
@@ -421,7 +278,7 @@ class _TechSystemCard extends StatefulWidget {
   final TechSystem system;
   final VoidCallback onTap;
 
-  const _TechSystemCard({required this.system, required this.onTap, Key? key}) : super(key: key);
+  const _TechSystemCard({required this.system, required this.onTap});
 
   @override
   State<_TechSystemCard> createState() => _TechSystemCardState();
@@ -509,7 +366,7 @@ class _FooterLink extends StatefulWidget {
   final String url;
   final String text;
 
-  const _FooterLink({required this.url, required this.text, Key? key}) : super(key: key);
+  const _FooterLink({required this.url, required this.text});
 
   @override
   State<_FooterLink> createState() => _FooterLinkState();
@@ -517,12 +374,6 @@ class _FooterLink extends StatefulWidget {
 
 class _FooterLinkState extends State<_FooterLink> {
   bool _hovering = false;
-
-  void _onHover(bool hover) {
-    setState(() {
-      _hovering = hover;
-    });
-  }
 
   Future<void> _launch() async {
     final uri = Uri.parse(widget.url);
@@ -534,8 +385,8 @@ class _FooterLinkState extends State<_FooterLink> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => _onHover(true),
-      onExit: (_) => _onHover(false),
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
       child: TextButton(
         onPressed: _launch,
         style: TextButton.styleFrom(
@@ -552,6 +403,10 @@ class _FooterLinkState extends State<_FooterLink> {
   }
 }
 
+// -------------------------------------------------------------------
+// -- FIXED WIDGET: _AnimatedScaleButton
+// -------------------------------------------------------------------
+
 class _AnimatedScaleButton extends StatefulWidget {
   final VoidCallback onTap;
   final Color backgroundColor;
@@ -567,38 +422,42 @@ class _AnimatedScaleButton extends StatefulWidget {
     this.borderColor,
     this.isOutlined = false,
     required this.text,
-    Key? key,
-  }) : super(key: key);
+  });
 
   @override
   State<_AnimatedScaleButton> createState() => _AnimatedScaleButtonState();
 }
 
-class _AnimatedScaleButtonState extends State<_AnimatedScaleButton> with SingleTickerProviderStateMixin {
+class _AnimatedScaleButtonState extends State<_AnimatedScaleButton>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _scaleAnim;
+  late final Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 150),
       vsync: this,
-      lowerBound: 0.95,
-      upperBound: 1.0,
-      value: 1.0,
+      value: 1.0, // Start at full scale
     );
-    _scaleAnim = _controller.drive(Tween(begin: 1.0, end: 0.95));
+    // Use a CurveTween for a nicer bounce effect
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
   }
 
-  void _onTapDown(TapDownDetails _) => _controller.reverse();
+  void _onTapDown(TapDownDetails _) {
+    _controller.reverse(from: 1.0); // Animate to smaller scale
+  }
 
   void _onTapUp(TapUpDetails _) {
-    _controller.forward();
-    widget.onTap();
+    _controller.forward(from: 0.0); // Animate back to full scale
   }
 
-  void _onTapCancel() => _controller.forward();
+  void _onTapCancel() {
+    _controller.forward(from: 0.0); // Animate back to full scale
+  }
 
   @override
   void dispose() {
@@ -608,41 +467,47 @@ class _AnimatedScaleButtonState extends State<_AnimatedScaleButton> with SingleT
 
   @override
   Widget build(BuildContext context) {
-    final btn = widget.isOutlined
-        ? OutlinedButton(
-            onPressed: () {},
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: widget.borderColor ?? widget.foregroundColor, width: 2),
-              foregroundColor: widget.foregroundColor,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            child: Text(widget.text),
+    final buttonStyle = widget.isOutlined
+        ? OutlinedButton.styleFrom(
+            side: BorderSide(
+                color: widget.borderColor ?? widget.foregroundColor, width: 2),
+            foregroundColor: widget.foregroundColor,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            textStyle:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           )
-        : ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: widget.backgroundColor,
-              foregroundColor: widget.foregroundColor,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              shadowColor: Colors.black45,
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text(widget.text),
+        : ElevatedButton.styleFrom(
+            backgroundColor: widget.backgroundColor,
+            foregroundColor: widget.foregroundColor,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            textStyle:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            shadowColor: Colors.black45,
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
           );
 
     return ScaleTransition(
-      scale: _scaleAnim,
+      scale: _scaleAnimation,
       child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
+        // The GestureDetector is now only for the visual animation.
         onTapDown: _onTapDown,
         onTapUp: _onTapUp,
         onTapCancel: _onTapCancel,
-        child: btn,
+        // The button itself handles the tap action, making it accessible.
+        child: widget.isOutlined
+            ? OutlinedButton(
+                onPressed: widget.onTap, // <-- CORRECTED
+                style: buttonStyle,
+                child: Text(widget.text),
+              )
+            : ElevatedButton(
+                onPressed: widget.onTap, // <-- CORRECTED
+                style: buttonStyle,
+                child: Text(widget.text),
+              ),
       ),
     );
   }
 }
-
