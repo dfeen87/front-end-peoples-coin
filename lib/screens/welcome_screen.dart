@@ -1,12 +1,15 @@
+// lib/screens/welcome_screen.dart
+
 import 'dart:async';
 import 'dart:ui';
-import 'package.flutter/material.dart';
+// --- CORRECTED IMPORTS: Replaced '.' with ':' ---
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package.go_router/go_router.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/dynamic_nebula_background.dart';
-import 'package.brightacts_frontend_app/models/tech_system.dart';
+import 'package:brightacts_frontend_app/models/tech_system.dart';
 import 'code_display_page.dart';
 
 // Data for all backend system cards
@@ -92,7 +95,6 @@ class WelcomeScreen extends StatelessWidget {
           ),
         ).animate().fade(duration: 900.ms).slideY(begin: 0.5),
         const SizedBox(height: 8),
-        // --- ENHANCEMENT: Dynamic cycling tagline ---
         const DynamicTagline(),
       ],
     );
@@ -110,7 +112,6 @@ class WelcomeScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white.withOpacity(0.2)),
           ),
-          // --- ENHANCEMENT: Typewriter text effect ---
           child: const Text(
             'A Web3 platform for recognizing and rewarding positive community impact through a transparent, decentralized public ledger.',
             textAlign: TextAlign.center,
@@ -130,12 +131,11 @@ class WelcomeScreen extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          // --- ENHANCEMENT: Pulsating animation on primary button ---
           child: _AnimatedScaleButton(
             onTap: () => context.go('/sign_up'),
             backgroundColor: Colors.amber[800]!,
             foregroundColor: Colors.black,
-            text: 'Join the Movement', // Refined CTA text
+            text: 'Join the Movement',
           ).animate(onPlay: (controller) => controller.repeat())
              .shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
         ),
@@ -202,7 +202,6 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-// --- NEW WIDGET: For cycling tagline ---
 class DynamicTagline extends StatefulWidget {
   const DynamicTagline({super.key});
 
@@ -219,9 +218,11 @@ class _DynamicTaglineState extends State<DynamicTagline> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      setState(() {
-        _currentIndex = (_currentIndex + 1) % _taglines.length;
-      });
+      if (mounted) {
+        setState(() {
+          _currentIndex = (_currentIndex + 1) % _taglines.length;
+        });
+      }
     });
   }
 
@@ -246,7 +247,7 @@ class _DynamicTaglineState extends State<DynamicTagline> {
       },
       child: Text(
         _taglines[_currentIndex],
-        key: ValueKey<String>(_taglines[_currentIndex]), // Important for AnimatedSwitcher
+        key: ValueKey<String>(_taglines[_currentIndex]),
         style: const TextStyle(
           color: Colors.white70,
           fontSize: 18,
@@ -257,7 +258,6 @@ class _DynamicTaglineState extends State<DynamicTagline> {
   }
 }
 
-// --- Tech System Card with Micro-interactions ---
 class _TechSystemCard extends StatefulWidget {
   final TechSystem system;
   final VoidCallback onTap;
@@ -332,7 +332,6 @@ class _TechSystemCardState extends State<_TechSystemCard> {
   }
 }
 
-// --- Footer Link Widget ---
 class _FooterLink extends StatelessWidget {
   final String url;
   final String text;
@@ -365,10 +364,7 @@ class _FooterLink extends StatelessWidget {
   }
 }
 
-
-// --- Animated Button (unchanged) ---
 class _AnimatedScaleButton extends StatefulWidget {
-  // ... (rest of the button code is unchanged)
   final VoidCallback onTap;
   final Color backgroundColor;
   final Color foregroundColor;
