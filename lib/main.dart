@@ -21,9 +21,18 @@ import 'pages/my_portfolio_page.dart';
 import 'pages/governance_page.dart';
 import 'pages/my_wallet_page.dart';
 import 'pages/public_ledger_page.dart';
-import 'screens/dev_access_screen.dart';
-import 'screens/sign_up_screen.dart';
-import 'screens/sign_in_screen.dart';
+import 'screens/welcome_screen.dart';
+// Import TechSystem from its new central location
+import 'package:brightacts_frontend_app/models/tech_system.dart';
+import 'screens/code_display_page.dart'; // Import the new code page
+
+// Using aliases for sign-in and sign-up screens to prevent potential import conflicts
+import 'screens/sign_up_screen.dart' as sign_up;
+import 'screens/sign_in_screen.dart' as sign_in;
+
+// Import DevAccessScreen from its assumed location
+import 'pages/dev_access_screen.dart'; // <--- ADDED THIS IMPORT
+
 import 'state/auth_provider.dart' as MyAppAuthProvider;
 import 'firebase_options.dart';
 import 'widgets/dynamic_nebula_background.dart';
@@ -119,14 +128,31 @@ Future<void> main() async {
   );
 }
 
-// --- ROUTER CONFIGURATION ---
+// --- ROUTER CONFIGURATION (UPDATED) ---
 
 final _router = GoRouter(
+  initialLocation: '/dev-sign-in',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const AppStartupController()),
-    GoRoute(path: '/dev_access', builder: (context, state) => const DevAccessScreen()),
-    GoRoute(path: '/sign_in', builder: (context, state) => const SignInScreen()),
-    GoRoute(path: '/sign_up', builder: (context, state) => const SignUpScreen()),
+    GoRoute(path: '/welcome', builder: (context, state) => const WelcomeScreen()),
+    // Using aliased imports for sign-in and sign-up screens
+    GoRoute(path: '/sign_in', builder: (context, state) => const sign_in.SignInScreen()),
+    GoRoute(path: '/sign_up', builder: (context, state) => const sign_up.SignUpScreen()),
+    // DevAccessScreen is now imported
+    GoRoute(path: '/dev-sign-in', builder: (context, state) => const DevAccessScreen()),
+    // --- NEW: Route for the code viewer page ---
+    GoRoute(
+      path: '/code-viewer',
+      builder: (context, state) {
+        // Safely cast the extra parameter to the TechSystem object
+        final system = state.extra as TechSystem?;
+        if (system != null) {
+          return CodeDisplayPage(title: 'Code Viewer', system: system);
+        }
+        // Fallback if the parameter is missing (should not happen in normal flow)
+        return const Scaffold(body: Center(child: Text('Error: No system data provided.')));
+      },
+    ),
     ShellRoute(
       builder: (context, state, child) => AppShell(child: child),
       routes: [
@@ -196,7 +222,7 @@ class _AppStartupControllerState extends State<AppStartupController> {
     await authProvider.checkCurrentUser();
     if (mounted) {
       if (authProvider.user == null) {
-        context.go('/dev_access');
+        context.go('/welcome');
       } else {
         context.read<UserProvider>().fetchUser(authProvider.user!.uid);
         context.go('/home');
@@ -214,6 +240,8 @@ class _AppStartupControllerState extends State<AppStartupController> {
 }
 
 // --- HOME PAGE WIDGET ---
+// ... (The rest of your main.dart file remains the same)
+// I have omitted it here for brevity.
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -475,16 +503,13 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// --- ENHANCED SettingsBottomSheet WIDGET ---
+// --- SettingsBottomSheet ---
 class SettingsBottomSheet extends StatelessWidget {
   const SettingsBottomSheet({super.key});
 
-  // --- NEW: Helper for the "cool support ticket" email ---
   void _launchSupportEmail(BuildContext context) async {
-    // Replace with your actual business email
     const String businessEmail = 'support@brightacts.com';
     const String subject = 'Bright Acts Support Request';
-    // A helpful template for the user
     const String body = '''
       Please describe your issue or question in detail below.
       
@@ -537,29 +562,30 @@ class SettingsBottomSheet extends StatelessWidget {
             const SizedBox(height: 20),
             const Text('Settings & Info', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-
-            // --- NEW: Donate Button (Placeholder) ---
+            
             _buildLinkButton(
               context: context,
               text: 'Donate to Bright Acts',
-              icon: Icons.volunteer_activism, // A more fitting icon
-              color: Colors.pinkAccent, // A standout color
-              onPressed: () {
-                // Placeholder action until you have the Stripe link
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Donation link coming soon. Thank you for your support!')),
-                );
-              },
+              icon: Icons.volunteer_activism,
+              color: Colors.pinkAccent,
+              url: 'https://buy.stripe.com/4gM3cv65RfBnbOue7i24000',
             ),
             const SizedBox(height: 10),
 
-            // --- NEW: Change Background Button (Disabled) ---
             _buildLinkButton(
               context: context,
               text: 'Change Background',
               icon: Icons.wallpaper,
-              // Set onPressed to null to disable the button
-              onPressed: null, 
+              onPressed: null,
+            ),
+            const SizedBox(height: 10),
+
+            _buildLinkButton(
+              context: context,
+              text: 'Follow on LinkedIn',
+              icon: Icons.group_work,
+              color: Colors.lightBlueAccent,
+              url: 'https://www.linkedin.com/company/the-people-s-coin/',
             ),
             const SizedBox(height: 10),
 
@@ -571,7 +597,6 @@ class SettingsBottomSheet extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // --- ENHANCED: Get Support Button ---
             _buildLinkButton(
               context: context,
               text: 'Get Support',
@@ -588,7 +613,7 @@ class SettingsBottomSheet extends StatelessWidget {
                 HapticFeedback.heavyImpact();
                 Navigator.of(context).pop();
                 await context.read<MyAppAuthProvider.AuthProvider>().signOut();
-                context.go('/dev_access');
+                context.go('/welcome');
               },
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom),
@@ -598,15 +623,7 @@ class SettingsBottomSheet extends StatelessWidget {
     );
   }
 
-  // --- ENHANCED: _buildLinkButton helper ---
-  Widget _buildLinkButton({
-    required BuildContext context,
-    required String text,
-    required IconData icon,
-    Color? color,
-    String? url,
-    VoidCallback? onPressed,
-  }) {
+  Widget _buildLinkButton({required BuildContext context, required String text, required IconData icon, Color? color, String? url, VoidCallback? onPressed}) {
     final bool isEnabled = onPressed != null || url != null;
     final Color enabledColor = color ?? Colors.amber[700]!;
     final Color disabledColor = Colors.grey[600]!;
@@ -618,16 +635,10 @@ class SettingsBottomSheet extends StatelessWidget {
         children: [
           Text(
             text,
-            style: TextStyle(
-              color: isEnabled ? Colors.white : Colors.grey[600],
-              fontSize: 16,
-            ),
+            style: TextStyle(color: isEnabled ? Colors.white : Colors.grey[600], fontSize: 16),
           ),
           if (!isEnabled)
-            const Text(
-              ' (Coming Soon)',
-              style: TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
-            ),
+            const Text(' (Coming Soon)', style: TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic)),
         ],
       ),
       onPressed: isEnabled ? (onPressed ?? () async {
@@ -641,7 +652,7 @@ class SettingsBottomSheet extends StatelessWidget {
             );
           }
         }
-      }) : null, // Pass null to onPressed to automatically disable the button
+      }) : null,
     );
   }
 }

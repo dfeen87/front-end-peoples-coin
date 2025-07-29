@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../state/auth_provider.dart'; // Using the correct path to your provider in 'state'
 
 class VerifyPhoneScreen extends ConsumerStatefulWidget {
   final String verificationId;
@@ -26,10 +25,19 @@ class VerifyPhoneScreen extends ConsumerStatefulWidget {
 class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
   final _otpController = TextEditingController();
   bool _isLoading = false;
+  String? _error;
+
+  bool get _isOtpValid => _otpController.text.trim().length == 6;
 
   Future<void> _verifyOtpAndFinishSignUp() async {
-    if (_otpController.text.isEmpty) return;
-    setState(() { _isLoading = true; });
+    if (!_isOtpValid) {
+      setState(() => _error = 'Please enter a 6-digit code.');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       final credential = PhoneAuthProvider.credential(
@@ -39,27 +47,38 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
 
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception("No user is signed in to link phone.");
-      
+
       await user.linkWithCredential(credential);
 
-      // This should call your backend API to create the user in your database
-      // You'll need to implement this logic in your AuthProvider or ApiService
-      // final authProvider = ref.read(authProvider);
-      // await authProvider.createUserInDatabase( ... );
+      // TODO: Call your backend API here if you want to finalize user creation
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account created and verified!')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account created and phone verified!')),
+        );
+      }
 
-      // The AuthGate will handle navigation automatically
+      // Your app's navigation or AuthGate will handle routing after this
 
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _error = 'Verification Failed: ${e.message}';
+      });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Verification Failed: $e'), backgroundColor: Colors.red),
-      );
+      setState(() {
+        _error = 'Verification Failed: $e';
+      });
     } finally {
-      if (mounted) setState(() { _isLoading = false; });
+      if (mounted) setState(() {
+        _isLoading = false;
+      });
     }
+  }
+
+  @override
+  void dispose() {
+    _otpController.dispose();
+    super.dispose();
   }
 
   @override
@@ -71,18 +90,29 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Enter the 6-digit code sent to ${widget.phoneNumber}', textAlign: TextAlign.center),
+            Text(
+              'Enter the 6-digit code sent to ${widget.phoneNumber}',
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 20),
             TextField(
               controller: _otpController,
-              decoration: const InputDecoration(labelText: 'OTP Code'),
+              decoration: InputDecoration(
+                labelText: 'OTP Code',
+                errorText: _error,
+                counterText: '',
+              ),
               keyboardType: TextInputType.number,
+              maxLength: 6,
+              onChanged: (_) {
+                if (_error != null) setState(() => _error = null);
+              },
             ),
             const SizedBox(height: 24),
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : ElevatedButton(
-                    onPressed: _verifyOtpAndFinishSignUp,
+                    onPressed: _isOtpValid ? _verifyOtpAndFinishSignUp : null,
                     child: const Text('Verify & Finish'),
                   ),
           ],
@@ -91,3 +121,4 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
     );
   }
 }
+

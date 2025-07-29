@@ -1,7 +1,8 @@
+// lib/service/api_client.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter/foundation.dart'; // Import for kDebugMode
+import 'package:flutter/foundation.dart'; // For kDebugMode
 
 import '../models/user_account.dart';
 import '../models/goodwill_action.dart';
@@ -29,10 +30,8 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to fetch user account. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in getUserById: $e');
-      }
-      rethrow; // Re-throw to allow higher-level error handling
+      if (kDebugMode) print('Error in getUserById: $e');
+      rethrow;
     }
   }
 
@@ -46,26 +45,21 @@ class PeoplesCoinApiClient {
       }
       throw Exception('Failed to check username availability. Status: ${response.statusCode}, Body: ${response.body}');
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in checkUsernameAvailability: $e');
-      }
+      if (kDebugMode) print('Error in checkUsernameAvailability: $e');
       rethrow;
     }
   }
 
-  // --- THIS FUNCTION IS CORRECTED ---
   Future<void> createUserWallet({
     required String username,
     required String publicKey,
     required String encryptedPrivateKey,
-    // The 'recaptchaToken' parameter has been removed.
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/register-wallet');
     final body = json.encode({
       'username': username,
       'public_key': publicKey,
       'encrypted_private_key': encryptedPrivateKey,
-      // The 'recaptcha_token' field has been removed from the body.
     });
 
     try {
@@ -79,14 +73,12 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to create user wallet. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in createUserWallet: $e');
-      }
+      if (kDebugMode) print('Error in createUserWallet: $e');
       rethrow;
     }
   }
 
-  // === GoodwillActions ===
+  // === Goodwill Actions ===
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/$userId/goodwill-actions');
     try {
@@ -98,9 +90,7 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to fetch goodwill actions. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in getUserGoodwillActions: $e');
-      }
+      if (kDebugMode) print('Error in getUserGoodwillActions: $e');
       rethrow;
     }
   }
@@ -119,9 +109,7 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to submit goodwill. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in submitGoodwill: $e');
-      }
+      if (kDebugMode) print('Error in submitGoodwill: $e');
       rethrow;
     }
   }
@@ -142,9 +130,7 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to fetch proposals. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in listProposals: $e');
-      }
+      if (kDebugMode) print('Error in listProposals: $e');
       rethrow;
     }
   }
@@ -159,9 +145,7 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to fetch proposal details. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in getProposalDetails: $e');
-      }
+      if (kDebugMode) print('Error in getProposalDetails: $e');
       rethrow;
     }
   }
@@ -180,9 +164,7 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to create proposal. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in createProposal: $e');
-      }
+      if (kDebugMode) print('Error in createProposal: $e');
       rethrow;
     }
   }
@@ -202,9 +184,7 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to submit vote. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in submitVote: $e');
-      }
+      if (kDebugMode) print('Error in submitVote: $e');
       rethrow;
     }
   }
@@ -221,9 +201,7 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to fetch public ledger. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in getLedgerEntries: $e');
-      }
+      if (kDebugMode) print('Error in getLedgerEntries: $e');
       rethrow;
     }
   }
@@ -255,9 +233,7 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to send loves. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in sendLoves: $e');
-      }
+      if (kDebugMode) print('Error in sendLoves: $e');
       rethrow;
     }
   }
@@ -273,9 +249,7 @@ class PeoplesCoinApiClient {
         throw Exception('Failed to check metabolic status. Status: ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in checkMetabolicStatus: $e');
-      }
+      if (kDebugMode) print('Error in checkMetabolicStatus: $e');
       rethrow;
     }
   }

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart'; // Import Provider
+import 'package:provider/provider.dart'; // For reading providers
 import 'dart:ui';
 
 import '../widgets/dynamic_nebula_background.dart';
-import '../state/auth_provider.dart' as MyAppAuthProvider; // Import your providers
+import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../state/user_provider.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -23,7 +23,6 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _isLoading = false;
   String? _error;
 
-  // --- THIS IS THE CORRECTED SIGN-IN FUNCTION ---
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -42,40 +41,36 @@ class _SignInScreenState extends State<SignInScreen> {
 
       if (!mounted) return;
 
-      // Fetch user profile data *after* logging in and *before* navigating.
-      print("Updating AuthProvider state...");
+      // Update AuthProvider state
       final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-      await authProvider.checkCurrentUser(); // Ensure auth provider state is updated
-      
-      if (authProvider.user != null) {
-        print("Fetching user profile from UserProvider for UID: ${authProvider.user!.uid}");
-        await context.read<UserProvider>().fetchUser(authProvider.user!.uid);
-        print("User profile fetched successfully.");
+      await authProvider.checkCurrentUser();
 
-        // Now it's safe to navigate to the home page.
-        print("Navigating to /home...");
+      if (authProvider.user != null) {
+        // Fetch user profile in UserProvider
+        await context.read<UserProvider>().fetchUser(authProvider.user!.uid);
+
+        // Navigate to home screen
         context.go('/home');
       } else {
         throw Exception("Failed to update auth state after sign-in.");
       }
-
     } on FirebaseAuthException catch (e) {
       print('FirebaseAuthException caught: ${e.code} - ${e.message}');
-      if (e.code == 'user-not-found' || e.code == 'invalid-credential' || e.code == 'wrong-password') {
+      if (e.code == 'user-not-found' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'wrong-password') {
         _error = 'Incorrect email or password.';
       } else {
         _error = 'An error occurred during sign-in. Please try again.';
       }
       if (mounted) setState(() {});
     } catch (e) {
-      print('An unexpected error occurred during sign-in: $e');
+      print('Unexpected error during sign-in: $e');
       if (mounted) {
         setState(() => _error = 'An unexpected error occurred. Please check your connection.');
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -84,8 +79,9 @@ class _SignInScreenState extends State<SignInScreen> {
     if (email.isEmpty || !email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please enter a valid email address first.'),
-            backgroundColor: Colors.redAccent),
+          content: Text('Please enter a valid email address first.'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
       return;
     }
@@ -94,8 +90,9 @@ class _SignInScreenState extends State<SignInScreen> {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Password reset link sent to your email.'),
-            backgroundColor: Colors.green),
+          content: Text('Password reset link sent to your email.'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -110,7 +107,7 @@ class _SignInScreenState extends State<SignInScreen> {
     _passwordController.dispose();
     super.dispose();
   }
-  
+
   InputDecoration _buildInputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
@@ -133,12 +130,11 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,  
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text(''),  
+        title: const Text(''),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // This ensures the back button is white and visible
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Stack(
@@ -146,7 +142,7 @@ class _SignInScreenState extends State<SignInScreen> {
           const DynamicNebulaBackground(),
           Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: ClipRRect(
@@ -163,8 +159,8 @@ class _SignInScreenState extends State<SignInScreen> {
                       child: Form(
                         key: _formKey,
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Text(
                               'Welcome Back',
@@ -189,7 +185,8 @@ class _SignInScreenState extends State<SignInScreen> {
                               controller: _emailController,
                               decoration: _buildInputDecoration('Email', Icons.email_outlined),
                               keyboardType: TextInputType.emailAddress,
-                              validator: (val) => val != null && val.contains('@') ? null : 'Please enter a valid email',
+                              validator: (val) =>
+                                  val != null && val.contains('@') ? null : 'Please enter a valid email',
                             ),
                             const SizedBox(height: 16),
                             TextFormField(

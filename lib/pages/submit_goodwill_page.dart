@@ -6,7 +6,7 @@ import 'dart:ui';
 import '../state/goodwill_processing_provider.dart';
 import '../state/user_provider.dart';
 
-// --- NEW: A map of predefined act types with icons for a better UI ---
+// --- Predefined act types with icons for UI clarity ---
 const Map<String, IconData> _actTypes = {
   'Mentorship': Icons.school_outlined,
   'Volunteering': Icons.volunteer_activism_outlined,
@@ -27,15 +27,17 @@ class SubmitGoodwillPage extends StatefulWidget {
 
 class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  
-  // State variables for the stepper
+
   int _currentStep = 0;
+
   String _actionType = '';
   String _description = '';
-  int _lovesValue = 25;
+  String _impactLevel = 'Medium';
 
-  // --- NEW: Animation controller for the success confetti ---
-  late AnimationController _confettiController;
+  int _lovesValue = 25;
+  int _durationMinutes = 0;
+
+  late final AnimationController _confettiController;
 
   @override
   void initState() {
@@ -52,22 +54,35 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     super.dispose();
   }
 
-  // --- NEW: Function to show the success overlay ---
+  void _updateLovesScore() {
+    int baseFromDescription = (_description.trim().length / 2).clamp(10, 50).toInt();
+    int durationScore = ((_durationMinutes.clamp(0, 120) / 120) * 50).toInt();
+
+    final impactMultipliers = {
+      'Low': 0.8,
+      'Medium': 1.0,
+      'High': 1.2,
+    };
+    double impactMultiplier = impactMultipliers[_impactLevel] ?? 1.0;
+
+    final calculatedLoves = ((baseFromDescription + durationScore) * impactMultiplier).clamp(1, 100).toInt();
+
+    setState(() {
+      _lovesValue = calculatedLoves;
+    });
+  }
+
   void _showSuccessOverlay() {
-    final overlay = Overlay.of(context).context.findRenderObject();
+    final overlay = Overlay.of(context);
     if (overlay == null) return;
 
-    final confetti = ConfettiOverlay(controller: _confettiController);
-    final overlayEntry = OverlayEntry(builder: (context) => confetti);
-
-    Overlay.of(context).insert(overlayEntry);
+    final overlayEntry = OverlayEntry(builder: (context) => ConfettiOverlay(controller: _confettiController));
+    overlay.insert(overlayEntry);
     _confettiController.forward(from: 0.0);
 
     Future.delayed(const Duration(seconds: 3), () {
       overlayEntry.remove();
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      if (mounted) Navigator.of(context).pop();
     });
   }
 
@@ -79,66 +94,28 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
         title: const Text('Record a Bright Act'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const SizedBox.shrink(), // Remove back button
+        leading: const SizedBox.shrink(),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
+          IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
         ],
       ),
       body: Consumer<GoodwillProcessingProvider>(
-        builder: (context, provider, child) {
+        builder: (context, provider, _) {
           final currentUser = context.watch<UserProvider>().currentUser;
           if (currentUser == null) {
-            return const Center(child: Text("User not logged in or data not loaded."));
+            return const Center(child: Text("User not logged in or data not loaded.", style: TextStyle(color: Colors.white70)));
           }
 
-          // --- NEW: The Stepper UI ---
           return Stepper(
             type: StepperType.horizontal,
+            physics: const ClampingScrollPhysics(),
             currentStep: _currentStep,
             onStepTapped: (step) => setState(() => _currentStep = step),
-            onStepContinue: () {
-              if (_currentStep < 2) {
-                setState(() => _currentStep += 1);
-              } else {
-                // This is the final submit action
-                _submitForm(provider, currentUser.id);
-              }
-            },
+            onStepContinue: _handleStepContinue(provider, currentUser.id),
             onStepCancel: () {
-              if (_currentStep > 0) {
-                setState(() => _currentStep -= 1);
-              }
+              if (_currentStep > 0) setState(() => _currentStep -= 1);
             },
-            // --- NEW: Custom Stepper styling ---
-            controlsBuilder: (context, details) {
-              return Padding(
-                padding: const EdgeInsets.only(top: 24.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    if (_currentStep > 0)
-                      TextButton.icon(
-                        onPressed: details.onStepCancel,
-                        icon: const Icon(Icons.arrow_back, color: Colors.white70),
-                        label: const Text('Back', style: TextStyle(color: Colors.white70)),
-                      ),
-                    const Spacer(),
-                    ElevatedButton.icon(
-                      onPressed: details.onStepContinue,
-                      icon: Icon(_currentStep == 2 ? Icons.check_circle_outline : Icons.arrow_forward),
-                      label: Text(_currentStep == 2 ? 'Submit' : 'Next'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber[800],
-                        foregroundColor: Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+            controlsBuilder: _buildControls,
             steps: _buildSteps(),
           );
         },
@@ -146,7 +123,56 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     );
   }
 
-  // --- NEW: Helper to build the list of steps ---
+  VoidCallback _handleStepContinue(GoodwillProcessingProvider provider, String userId) {
+    return () {
+      if (_currentStep < 4) {
+        if (_currentStep == 1) {
+          if (!(_formKey.currentState?.validate() ?? false)) return;
+          _formKey.currentState!.save();
+          _updateLovesScore();
+        } else if (_currentStep == 3) {
+          if (_durationMinutes <= 0) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please enter a valid duration (minutes).'), backgroundColor: Colors.redAccent),
+            );
+            return;
+          }
+        }
+        setState(() => _currentStep += 1);
+      } else {
+        _submitForm(provider, userId);
+      }
+    };
+  }
+
+  Widget _buildControls(BuildContext context, ControlsDetails details) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          if (_currentStep > 0)
+            TextButton.icon(
+              onPressed: details.onStepCancel,
+              icon: const Icon(Icons.arrow_back, color: Colors.white70),
+              label: const Text('Back', style: TextStyle(color: Colors.white70)),
+            ),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: details.onStepContinue,
+            icon: Icon(_currentStep == 4 ? Icons.check_circle_outline : Icons.arrow_forward),
+            label: Text(_currentStep == 4 ? 'Submit' : 'Next'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber[800],
+              foregroundColor: Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Step> _buildSteps() {
     return [
       Step(
@@ -163,14 +189,25 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
       ),
       Step(
         title: const Text('Value', style: TextStyle(color: Colors.white)),
-        content: _buildStep3SetValue(),
+        content: _buildStep3LovesSlider(),
         isActive: _currentStep >= 2,
         state: _currentStep > 2 ? StepState.complete : StepState.indexed,
+      ),
+      Step(
+        title: const Text('Details', style: TextStyle(color: Colors.white)),
+        content: _buildStep4DurationImpact(),
+        isActive: _currentStep >= 3,
+        state: _currentStep > 3 ? StepState.complete : StepState.indexed,
+      ),
+      Step(
+        title: const Text('Confirm', style: TextStyle(color: Colors.white)),
+        content: _buildStep5Summary(),
+        isActive: _currentStep >= 4,
+        state: _currentStep > 4 ? StepState.complete : StepState.indexed,
       ),
     ];
   }
 
-  // --- NEW: Content for Step 1 ---
   Widget _buildStep1ChooseAct() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,13 +218,14 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
         ),
         const SizedBox(height: 16),
         Wrap(
-          spacing: 8.0,
-          runSpacing: 8.0,
+          spacing: 8,
+          runSpacing: 8,
           children: _actTypes.entries.map((entry) {
+            final selected = _actionType == entry.key;
             return ChoiceChip(
               label: Text(entry.key),
-              avatar: Icon(entry.value, color: _actionType == entry.key ? Colors.black : Colors.white70),
-              selected: _actionType == entry.key,
+              avatar: Icon(entry.value, color: selected ? Colors.black : Colors.white70),
+              selected: selected,
               onSelected: (isSelected) {
                 if (isSelected) {
                   setState(() => _actionType = entry.key);
@@ -195,7 +233,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
               },
               selectedColor: Colors.amber[700],
               backgroundColor: Colors.white.withOpacity(0.1),
-              labelStyle: TextStyle(color: _actionType == entry.key ? Colors.black : Colors.white),
+              labelStyle: TextStyle(color: selected ? Colors.black : Colors.white),
             );
           }).toList(),
         ),
@@ -203,7 +241,6 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     );
   }
 
-  // --- NEW: Content for Step 2 ---
   Widget _buildStep2Describe() {
     return Form(
       key: _formKey,
@@ -217,6 +254,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
           const SizedBox(height: 16),
           TextFormField(
             initialValue: _description,
+            maxLines: 5,
             decoration: const InputDecoration(
               hintText: 'Describe the act of goodwill...',
               hintStyle: TextStyle(color: Colors.white54),
@@ -225,17 +263,19 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
               border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide.none),
             ),
             style: const TextStyle(color: Colors.white),
-            maxLines: 5,
-            validator: (value) => value == null || value.isEmpty ? 'Please describe the act.' : null,
-            onSaved: (value) => _description = value!,
+            validator: (val) => val == null || val.isEmpty ? 'Please describe the act.' : null,
+            onChanged: (val) {
+              _description = val;
+              _updateLovesScore();
+            },
+            onSaved: (val) => _description = val ?? '',
           ),
         ],
       ),
     );
   }
 
-  // --- NEW: Content for Step 3 ---
-  Widget _buildStep3SetValue() {
+  Widget _buildStep3LovesSlider() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -249,7 +289,10 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
           children: [
             Icon(Icons.favorite, color: Colors.redAccent.withOpacity(0.5 + (_lovesValue / 100)), size: 24 + (_lovesValue / 2)),
             const SizedBox(width: 16),
-            Text('$_lovesValue Loves', style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
+            Text(
+              '$_lovesValue Loves',
+              style: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         Slider(
@@ -257,8 +300,10 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
           min: 1,
           max: 100,
           divisions: 99,
-          label: _lovesValue.round().toString(),
-          onChanged: (double newValue) => setState(() => _lovesValue = newValue.round()),
+          label: _lovesValue.toString(),
+          onChanged: (val) {
+            setState(() => _lovesValue = val.round());
+          },
           activeColor: Colors.redAccent,
           inactiveColor: Colors.redAccent.withOpacity(0.3),
         ),
@@ -266,18 +311,118 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     );
   }
 
-  // --- NEW: The final submit logic ---
+  Widget _buildStep4DurationImpact() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Duration and Impact",
+          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          key: const ValueKey('duration'),
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Duration (minutes)',
+            hintText: 'How long did this act last?',
+            filled: true,
+            fillColor: Colors.white10,
+            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+          ),
+          style: const TextStyle(color: Colors.white),
+          validator: (val) {
+            if (val == null || val.isEmpty) return 'Duration is required';
+            final parsed = int.tryParse(val);
+            if (parsed == null || parsed <= 0) return 'Please enter a valid positive number';
+            return null;
+          },
+          onChanged: (val) {
+            final parsed = int.tryParse(val);
+            if (parsed != null) {
+              setState(() {
+                _durationMinutes = parsed;
+                _updateLovesScore();
+              });
+            }
+          },
+          onSaved: (val) {
+            _durationMinutes = int.tryParse(val ?? '') ?? 0;
+          },
+        ),
+        const SizedBox(height: 24),
+        DropdownButtonFormField<String>(
+          decoration: const InputDecoration(
+            labelText: 'Impact Level',
+            filled: true,
+            fillColor: Colors.white10,
+            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+          ),
+          value: _impactLevel,
+          dropdownColor: Colors.grey[900],
+          style: const TextStyle(color: Colors.white),
+          items: ['Low', 'Medium', 'High']
+              .map((level) => DropdownMenuItem(value: level, child: Text(level)))
+              .toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _impactLevel = val;
+                _updateLovesScore();
+              });
+            }
+          },
+          onSaved: (val) {
+            if (val != null) _impactLevel = val;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep5Summary() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Review and Confirm",
+          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        _buildSummaryRow('Type', _actionType),
+        _buildSummaryRow('Description', _description),
+        _buildSummaryRow('Duration', '$_durationMinutes minutes'),
+        _buildSummaryRow('Impact', _impactLevel),
+        _buildSummaryRow('Loves', '$_lovesValue'),
+      ],
+    );
+  }
+
+  Widget _buildSummaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Text(
+            '$label:',
+            style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submitForm(GoodwillProcessingProvider provider, String userId) async {
-    // Manually trigger save on the form
-    if (_formKey.currentState?.validate() ?? false) {
-      _formKey.currentState!.save();
-    } else {
-      // If validation fails on step 2, jump back to it.
-      setState(() => _currentStep = 1);
-      return;
-    }
-    
     if (_actionType.isEmpty) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please choose a type of act.'), backgroundColor: Colors.redAccent),
       );
@@ -285,15 +430,38 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
       return;
     }
 
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      setState(() => _currentStep = 1);
+      return;
+    }
+    _formKey.currentState!.save();
+
+    if (_durationMinutes <= 0) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid duration.'), backgroundColor: Colors.redAccent),
+      );
+      setState(() => _currentStep = 3);
+      return;
+    }
+
+    final contextualData = {
+      'duration_minutes': _durationMinutes,
+      'impact_level': _impactLevel,
+    };
+
     final success = await provider.submitGoodwill(
       performerUserId: userId,
       actionType: _actionType,
-      description: _description,
+      description: _description.trim(),
       lovesValue: _lovesValue,
+      contextualData: contextualData,
     );
+
     if (success && mounted) {
-      _showSuccessOverlay(); // Show confetti and then pop
+      _showSuccessOverlay();
     } else if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to submit act: ${provider.error}')),
       );
@@ -301,7 +469,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
   }
 }
 
-// --- NEW: Confetti Overlay Widget for Success Animation ---
+// --- Confetti Overlay for celebration effect ---
 class ConfettiOverlay extends StatefulWidget {
   final AnimationController controller;
   const ConfettiOverlay({required this.controller, super.key});
@@ -311,19 +479,19 @@ class ConfettiOverlay extends StatefulWidget {
 }
 
 class _ConfettiOverlayState extends State<ConfettiOverlay> {
-  late List<_ConfettiParticle> _particles;
+  late final List<_ConfettiParticle> _particles;
 
   @override
   void initState() {
     super.initState();
-    _particles = List.generate(100, (index) => _ConfettiParticle());
+    _particles = List.generate(100, (_) => _ConfettiParticle());
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.controller,
-      builder: (context, child) {
+      builder: (context, _) {
         return IgnorePointer(
           child: Scaffold(
             backgroundColor: Colors.black.withOpacity(0.8 * widget.controller.value),
@@ -335,10 +503,10 @@ class _ConfettiOverlayState extends State<ConfettiOverlay> {
                     scale: CurvedAnimation(parent: widget.controller, curve: Curves.elasticOut),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                      children: const [
                         Icon(Icons.check_circle, color: Colors.greenAccent, size: 100),
-                        const SizedBox(height: 16),
-                        const Text(
+                        SizedBox(height: 16),
+                        Text(
                           "Act Recorded!",
                           style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold),
                         ),
@@ -372,7 +540,7 @@ class _ConfettiParticle {
   Widget build(BuildContext context, double progress) {
     final t = (progress - (delay.inMilliseconds / 1000)).clamp(0.0, 1.0);
     final y = lerpDouble(startY, endY, t)!;
-    
+
     return Positioned.fill(
       child: Align(
         alignment: Alignment(startX, y),
@@ -383,7 +551,10 @@ class _ConfettiParticle {
             child: Container(
               width: 10,
               height: 10,
-              color: color,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(3),
+              ),
             ),
           ),
         ),

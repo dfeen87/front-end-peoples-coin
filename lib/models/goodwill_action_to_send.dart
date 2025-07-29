@@ -9,26 +9,27 @@ class GoodwillActionToSend {
   final String description;
   final int lovesValue;
   final Map<String, dynamic>? contextualData;
-  final DateTime timestamp; // ADDED: Field for timestamp (from your existing code)
+  final DateTime timestamp; // Field for timestamp
 
   const GoodwillActionToSend({
-    required this.performerUserId, // Correct parameter name in constructor
+    required this.performerUserId,
     required this.actionType,
     required this.description,
     required this.lovesValue,
     this.contextualData,
-    required this.timestamp, // ADDED: Parameter in constructor
+    required this.timestamp,
   });
 
   /// Converts this object into a JSON map for the API request body.
   Map<String, dynamic> toJson() {
     return {
-      'performer_user_id': performerUserId, // Correct JSON key
+      'performer_user_id': performerUserId, // Matches backend expected key
       'action_type': actionType,
       'description': description,
       'loves_value': lovesValue,
       'contextual_data': contextualData ?? {},
-      'timestamp': timestamp.toIso8601String(), // Convert DateTime to ISO 8601 string
+      'timestamp': timestamp.toIso8601String(),
     };
   }
 }
+
