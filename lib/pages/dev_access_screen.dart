@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../widgets/dynamic_nebula_background.dart';
 
 /// A screen for developers to enter an access code.
-/// Upon successful validation, it navigates to the sign-up screen.
+/// Upon successful validation, it now navigates to the welcome screen.
 class DevAccessScreen extends StatefulWidget {
   const DevAccessScreen({Key? key}) : super(key: key);
 
@@ -34,13 +34,13 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
   }
 
   /// Validates the entered access code.
-  /// If valid, navigates to the sign-up screen. Otherwise, shows an error.
+  /// If valid, navigates to the welcome screen. Otherwise, shows an error.
   void _validateAccess() {
     final input = _codeController.text.trim();
     if (input == _devAccessCode) {
-      // Use context.go() to navigate to the sign-up screen.
-      // The path '/sign_up' is defined in your main.dart router config.
-      context.go('/sign_up');
+      // --- CHANGED: Navigate to the welcome screen on success ---
+      // The path '/welcome' is defined in your main.dart router config.
+      context.go('/welcome');
     } else {
       setState(() {
         _errorText = 'Invalid access code. Please try again.';
@@ -134,4 +134,3 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
     );
   }
 }
-
