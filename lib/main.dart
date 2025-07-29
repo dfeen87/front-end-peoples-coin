@@ -22,16 +22,13 @@ import 'pages/governance_page.dart';
 import 'pages/my_wallet_page.dart';
 import 'pages/public_ledger_page.dart';
 import 'screens/welcome_screen.dart';
-// Import TechSystem from its new central location
 import 'package:brightacts_frontend_app/models/tech_system.dart';
-import 'screens/code_display_page.dart'; // Import the new code page
+import 'screens/code_display_page.dart';
 
-// Using aliases for sign-in and sign-up screens to prevent potential import conflicts
 import 'screens/sign_up_screen.dart' as sign_up;
 import 'screens/sign_in_screen.dart' as sign_in;
 
-// Import DevAccessScreen from its assumed location
-import 'pages/dev_access_screen.dart'; // <--- ADDED THIS IMPORT
+import 'pages/dev_access_screen.dart';
 
 import 'state/auth_provider.dart' as MyAppAuthProvider;
 import 'firebase_options.dart';
@@ -102,56 +99,37 @@ Future<void> main() async {
     MultiProvider(
       providers: [
         Provider<PeoplesCoinApiClient>(create: (_) => PeoplesCoinApiClient()),
-        ChangeNotifierProxyProvider<PeoplesCoinApiClient, MyAppAuthProvider.AuthProvider>(
-          create: (context) => MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>()),
-          update: (context, apiClient, previous) => MyAppAuthProvider.AuthProvider(apiClient),
-        ),
-        ChangeNotifierProxyProvider<PeoplesCoinApiClient, UserProvider>(
-          create: (context) => UserProvider(context.read<PeoplesCoinApiClient>()),
-          update: (context, apiClient, previous) => UserProvider(apiClient),
-        ),
-        ChangeNotifierProxyProvider<PeoplesCoinApiClient, ProposalProvider>(
-          create: (context) => ProposalProvider(context.read<PeoplesCoinApiClient>()),
-          update: (context, apiClient, previous) => ProposalProvider(apiClient),
-        ),
-        ChangeNotifierProxyProvider<PeoplesCoinApiClient, GoodwillProcessingProvider>(
-          create: (context) => GoodwillProcessingProvider(context.read<PeoplesCoinApiClient>()),
-          update: (context, apiClient, previous) => GoodwillProcessingProvider(apiClient),
-        ),
-        ChangeNotifierProxyProvider<PeoplesCoinApiClient, LedgerProvider>(
-          create: (context) => LedgerProvider(context.read<PeoplesCoinApiClient>()),
-          update: (context, apiClient, previous) => LedgerProvider(apiClient),
-        ),
+
+        // --- Provider setup simplified ---
+        // Since the providers only depend on the static ApiClient, we can use the simpler
+        // ChangeNotifierProvider instead of ChangeNotifierProxyProvider.
+        ChangeNotifierProvider(create: (context) => MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>())),
+        ChangeNotifierProvider(create: (context) => UserProvider(context.read<PeoplesCoinApiClient>())),
+        ChangeNotifierProvider(create: (context) => ProposalProvider(context.read<PeoplesCoinApiClient>())),
+        ChangeNotifierProvider(create: (context) => GoodwillProcessingProvider(context.read<PeoplesCoinApiClient>())),
+        ChangeNotifierProvider(create: (context) => LedgerProvider(context.read<PeoplesCoinApiClient>())),
       ],
       child: const BrightActsApp(),
     ),
   );
 }
 
-// --- ROUTER CONFIGURATION (UPDATED) ---
-
+// --- ROUTER CONFIGURATION ---
 final _router = GoRouter(
-  // CHANGED: Set initialLocation to '/welcome' to make WelcomeScreen the landing page.
-  // If you want the AppStartupController to handle initial auth redirects, set to '/'.
-  initialLocation: '/welcome', 
+  initialLocation: '/welcome',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const AppStartupController()),
     GoRoute(path: '/welcome', builder: (context, state) => const WelcomeScreen()),
-    // Using aliased imports for sign-in and sign-up screens
     GoRoute(path: '/sign_in', builder: (context, state) => const sign_in.SignInScreen()),
     GoRoute(path: '/sign_up', builder: (context, state) => const sign_up.SignUpScreen()),
-    // DevAccessScreen is now imported
     GoRoute(path: '/dev-sign-in', builder: (context, state) => const DevAccessScreen()),
-    // --- NEW: Route for the code viewer page ---
     GoRoute(
       path: '/code-viewer',
       builder: (context, state) {
-        // Safely cast the extra parameter to the TechSystem object
         final system = state.extra as TechSystem?;
         if (system != null) {
           return CodeDisplayPage(title: 'Code Viewer', system: system);
         }
-        // Fallback if the parameter is missing (should not happen in normal flow)
         return const Scaffold(body: Center(child: Text('Error: No system data provided.')));
       },
     ),
@@ -164,7 +142,7 @@ final _router = GoRouter(
   ],
 );
 
-// --- APP SHELL WIDGET ---
+// --- APP SHELL, ROOT APP, and STARTUP CONTROLLER WIDGETS (Unchanged) ---
 class AppShell extends StatelessWidget {
   final Widget child;
   const AppShell({required this.child, super.key});
@@ -179,8 +157,6 @@ class AppShell extends StatelessWidget {
     );
   }
 }
-
-// --- ROOT APP WIDGET ---
 
 class BrightActsApp extends StatelessWidget {
   const BrightActsApp({super.key});
@@ -202,8 +178,6 @@ class BrightActsApp extends StatelessWidget {
     );
   }
 }
-
-// --- App Startup Controller ---
 
 class AppStartupController extends StatefulWidget {
   const AppStartupController({super.key});
@@ -241,10 +215,8 @@ class _AppStartupControllerState extends State<AppStartupController> {
   }
 }
 
-// --- HOME PAGE WIDGET ---
-// ... (The rest of your main.dart file remains the same)
-// I have omitted it here for brevity.
 
+// --- HOME PAGE WIDGET ---
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
   @override
@@ -264,15 +236,54 @@ class _HomePageState extends State<HomePage> {
     _pages = _buildPages();
   }
 
+  // --- Descriptions Updated ---
   List<Widget> _buildPages() {
     return [
-      _buildNavigationPage(title: 'Governance', description: 'View active proposals, create new ones, and cast your votes.', icon: Icons.gavel, cardColor: AppColors.governance, buttonText: "View Proposals", pageToOpen: const GovernancePage()),
-      _buildNavigationPage(title: 'My Portfolio', description: 'Track your personal acts of goodwill and contributions.', icon: Icons.account_balance_wallet, cardColor: AppColors.portfolio, buttonText: "View My Acts", pageToOpen: const MyPortfolioPage()),
-      _buildNavigationPage(title: 'Record Act', description: 'Share a new act of kindness or contribution and earn Loves.', icon: Icons.favorite, cardColor: AppColors.recordAct, buttonText: "Submit a Bright Act", pageToOpen: const SubmitGoodwillPage()),
-      _buildNavigationPage(title: 'Public Ledger', description: 'View all recorded acts of goodwill on the blockchain.', icon: Icons.public, cardColor: AppColors.ledger, buttonText: "View Ledger", pageToOpen: const PublicLedgerPage()),
-      _buildNavigationPage(title: 'My Wallet', description: 'Manage your Loves balance, send, and receive.', icon: Icons.wallet, cardColor: AppColors.wallet, buttonText: "Open Wallet", pageToOpen: const MyWalletPage()),
+      _buildNavigationPage(
+        title: 'Governance',
+        description: 'Influence the future of the platform. View active proposals, create new ones, and cast your votes on community-led initiatives.',
+        icon: Icons.gavel,
+        cardColor: AppColors.governance,
+        buttonText: "View Proposals",
+        pageToOpen: const GovernancePage(),
+      ),
+      _buildNavigationPage(
+        title: 'My Portfolio',
+        description: 'Review your personal history of contributions, track your impact, and see how your acts have strengthened the community.',
+        icon: Icons.account_balance_wallet,
+        cardColor: AppColors.portfolio,
+        buttonText: "View My Acts",
+        pageToOpen: const MyPortfolioPage(),
+      ),
+      _buildNavigationPage(
+        title: 'Record Act',
+        description: 'Document a new act of kindness or contribution. Each verified act is rewarded with \'Loves\' and permanently added to the ledger.',
+        icon: Icons.favorite,
+        cardColor: AppColors.recordAct,
+        buttonText: "Submit a Bright Act",
+        pageToOpen: const SubmitGoodwillPage(),
+      ),
+      _buildNavigationPage(
+        title: 'Public Ledger',
+        description: 'Explore the transparent and immutable record of every act of goodwill submitted by the community. A testament to our collective impact.',
+        icon: Icons.public,
+        cardColor: AppColors.ledger,
+        buttonText: "View Ledger",
+        pageToOpen: const PublicLedgerPage(),
+      ),
+      _buildNavigationPage(
+        title: 'My Wallet',
+        description: 'Securely manage your \'Loves\' balance, view transaction history, and send tokens to other members of the community.',
+        icon: Icons.wallet,
+        cardColor: AppColors.wallet,
+        buttonText: "Open Wallet",
+        pageToOpen: const MyWalletPage(),
+      ),
     ];
   }
+
+// ... The rest of the HomePage and other widgets remain unchanged ...
+// ... I have omitted them here for brevity as they are identical to your original code ...
 
   @override
   void dispose() {
@@ -678,4 +689,3 @@ class AppBreakpoints {
   static const double tablet = 768;
   static const double desktop = 1200;
 }
-
