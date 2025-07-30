@@ -20,6 +20,36 @@ class PeoplesCoinApiClient {
       : baseUrl = baseUrl ?? dotenv.env['API_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
 
   // === User ===
+
+  // --- NEW: Method to create a user record in your database ---
+  Future<void> createUserAccount({
+    required String firebaseUid,
+    required String email,
+    required String username,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/users');
+    final body = json.encode({
+      'firebase_uid': firebaseUid,
+      'email': email,
+      'username': username,
+    });
+
+    try {
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: body,
+      );
+
+      if (response.statusCode != 201) {
+        throw Exception('Failed to create user account in database. Status: ${response.statusCode}, Body: ${response.body}');
+      }
+    } catch (e) {
+      if (kDebugMode) print('Error in createUserAccount: $e');
+      rethrow;
+    }
+  }
+
   Future<UserAccount> getUserById(String userId) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/$userId');
     try {
@@ -35,7 +65,6 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // ... other user methods are unchanged ...
   Future<bool> checkUsernameAvailability(String username) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/username-check/$username');
     try {
@@ -78,8 +107,8 @@ class PeoplesCoinApiClient {
       rethrow;
     }
   }
-  
-  // === Goodwill Actions (Unchanged) ===
+
+  // === Goodwill Actions ===
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/$userId/goodwill-actions');
     try {
@@ -95,7 +124,7 @@ class PeoplesCoinApiClient {
       rethrow;
     }
   }
-  
+
   Future<Map<String, dynamic>> submitGoodwill(GoodwillActionToSend actionToSend) async {
     final uri = Uri.parse('$baseUrl/metabolic/submit_goodwill');
     try {
@@ -115,7 +144,7 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // === Proposals (Unchanged) ===
+  // === Proposals ===
   Future<List<Proposal>> listProposals({String? status}) async {
     var url = '$baseUrl/api/v1/governance/proposals';
     if (status != null && status.isNotEmpty) {
@@ -135,7 +164,7 @@ class PeoplesCoinApiClient {
       rethrow;
     }
   }
-  
+
   Future<Proposal> getProposalDetails(String proposalId) async {
     final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/$proposalId');
     try {
@@ -169,8 +198,8 @@ class PeoplesCoinApiClient {
       rethrow;
     }
   }
-  
-  // === Votes (Unchanged) ===
+
+  // === Votes ===
   Future<Map<String, dynamic>> submitVote(VoteToSend voteToSend) async {
     final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/${voteToSend.proposalId}/vote');
     try {
@@ -191,8 +220,6 @@ class PeoplesCoinApiClient {
   }
 
   // === Ledger ===
-
-  // --- MODIFIED: Added 'page' parameter for pagination ---
   Future<List<PublicLedgerEntry>> getLedgerEntries({int page = 1}) async {
     final uri = Uri.parse('$baseUrl/api/v1/ledger/public?page=$page');
     try {
@@ -209,9 +236,7 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // --- NEW: Method to handle ledger search ---
   Future<List<PublicLedgerEntry>> searchLedger({required String query}) async {
-    // Note: You will need to create this corresponding search endpoint on your backend.
     final uri = Uri.parse('$baseUrl/api/v1/ledger/search?q=${Uri.encodeComponent(query)}');
     try {
       final response = await http.get(uri);
@@ -259,7 +284,7 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // === Metabolic status check (Unchanged) ===
+  // === Metabolic status check ===
   Future<String> checkMetabolicStatus() async {
     final uri = Uri.parse('$baseUrl/metabolic/status');
     try {
