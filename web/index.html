@@ -9,19 +9,28 @@
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Bright Acts">
+  <meta name="apple-mobile-web-app-title" content="Bright Acts"> 
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>❤️</text></svg>">
+  
+  <title>Bright Acts</title> <link rel="manifest" href="manifest.json">
 
-  <title>Bright Acts</title>
-  <link rel="manifest" href="manifest.json">
+  <script src="https://www.google.com/recaptcha/api.js?render=6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F&onload=recaptchaOnLoad" async defer></script>
 
-  <!-- reCAPTCHA v3 script -->
-<script src="https://www.google.com/recaptcha/api.js?render=6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F"></script>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="flutter_bootstrap.js" async defer></script>
+  
+  <script>
+    // Updated Flutter initialization to use FlutterLoader.load and template token
+    window.addEventListener('load', function () {
+      _flutter.loader.load().then(function (engineInitializer) {
+        engineInitializer.initializeEngine().then(function (app) {
+          app.run();
+        });
+      });
+    });
+  </script>
 </body>
 </html>
-

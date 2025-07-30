@@ -6,11 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http; // For making API calls
-import '../recaptcha_helper.dart';
 
 // Import your project-specific files
-import '../recaptcha_helper.dart'; // For getV2RecaptchaToken
-import '../widgets/recaptcha_widget.dart'; // The v2 checkbox widget
+import '../recaptcha_helper.dart'; // Import the updated v3 helper
 import '../widgets/dynamic_nebula_background.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -33,6 +31,30 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
   String? _error;
 
+  // Define your reCAPTCHA v3 site key here for consistency
+  // Make sure this matches the key in web/index.html and your build command
+  static const String recaptchaV3SiteKey = '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F'; // <--- Your chosen V3 Public Site Key
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize reCAPTCHA v3 when the screen loads
+    initializeRecaptchaV3(); // Call the initialization function
+
+    _usernameController.addListener(_clearError);
+    _emailController.addListener(_clearError);
+    _passwordController.addListener(_clearError);
+    _confirmPasswordController.addListener(_clearError);
+  }
+
+  void _clearError() {
+    if (_error != null) {
+      setState(() {
+        _error = null;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _usernameController.dispose();
@@ -42,7 +64,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  // UPDATED _signUp function for reCAPTCHA v2
+  // UPDATED _signUp function for reCAPTCHA v3
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -61,15 +83,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      // Step 1: Get the token from the v2 checkbox widget.
-      final String recaptchaToken = getV2RecaptchaToken();
+      // Step 1: Get the reCAPTCHA v3 token.
+      // The 'signup' action helps Google analyze user behavior specifically for signup.
+      final String recaptchaToken = await getRecaptchaToken(recaptchaV3SiteKey, 'signup');
+      print('reCAPTCHA v3 token: $recaptchaToken');
 
-      // Step 2: Check if the user solved the reCAPTCHA.
-      if (recaptchaToken.isEmpty) {
-        throw Exception('Please solve the reCAPTCHA challenge.');
-      }
 
-      // Step 3: Send user details and token to your backend.
+      // Step 2: Send user details and token to your backend.
       // The backend will verify reCAPTCHA and then create the user.
       final response = await http.post(
         Uri.parse('https://peoples-coin-service-105378934751.us-central1.run.app/api/signup'),
@@ -78,7 +98,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           'username': _usernameController.text.trim(),
           'email': _emailController.text.trim(),
           'password': _passwordController.text,
-          'token': recaptchaToken,
+          'token': recaptchaToken, // Send the v3 token
         }),
       );
 
@@ -234,9 +254,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               validator: (val) => val == _passwordController.text ? null : 'Passwords do not match.',
                             ),
                             const SizedBox(height: 24),
-                            // ADD THE V2 CHECKBOX WIDGET HERE
-                            const RecaptchaV2Widget(),
-                            const SizedBox(height: 24),
+                            // Removed RecaptchaV2Widget
+                            const SizedBox(height: 24), // Keep spacing consistent
                             _isLoading
                                 ? const Center(child: CircularProgressIndicator())
                                 : ElevatedButton(

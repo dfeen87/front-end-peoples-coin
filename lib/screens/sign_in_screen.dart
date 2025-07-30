@@ -26,7 +26,36 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _isLoading = false;
   String? _error;
 
-  // UPDATED _signIn function for reCAPTCHA v3
+  // Define your reCAPTCHA v3 site key here for consistency
+  // Make sure this matches the key in web/index.html and your build command
+  static const String recaptchaV3SiteKey = '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F'; // <--- Your chosen V3 Public Site Key
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize reCAPTCHA v3 when the screen loads
+    initializeRecaptchaV3(); 
+
+    _emailController.addListener(_clearError);
+    _passwordController.addListener(_clearError);
+  }
+
+  void _clearError() {
+    if (_error != null) {
+      setState(() {
+        _error = null;
+      });
+    }
+  }
+
+  // This is the ONLY dispose method that should be in this class
+  @override
+  void dispose() { 
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -37,35 +66,36 @@ class _SignInScreenState extends State<SignInScreen> {
 
     try {
       // Step 1: Get the invisible v3 token.
-      final recaptchaToken = await getRecaptchaV3Token('6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F', 'login'); // ⚠️ Update with your v3 Site Key
+      final recaptchaToken = await getRecaptchaToken(recaptchaV3SiteKey, 'login'); 
 
       // Step 2: Send token to your backend. Your backend MUST check the score.
       final response = await http.post(
-        Uri.parse('https://peoples-coin-service-105378934751.us-central1.run.app/api/verify_login'), // ⚠️ Update with your backend URL
+        Uri.parse('https://peoples-coin-service-105378934751.us-central1.run.app/api/verify_login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'token': recaptchaToken}),
       );
 
-      if (response.statusCode != 200) {
-        throw Exception('reCAPTCHA verification failed.');
-      }
+      if (response.statusCode == 200) { 
+        // Step 3: Proceed with Firebase sign-in.
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
-      // Step 3: Proceed with Firebase sign-in.
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+        if (!mounted) return;
 
-      if (!mounted) return;
+        final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
+        await authProvider.checkCurrentUser();
 
-      final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-      await authProvider.checkCurrentUser();
-
-      if (authProvider.user != null) {
-        await context.read<UserProvider>().fetchUser(authProvider.user!.uid);
-        context.go('/home');
+        if (authProvider.user != null) {
+          await context.read<UserProvider>().fetchUser(authProvider.user!.uid);
+          context.go('/home');
+        } else {
+          throw Exception("Failed to update auth state after sign-in.");
+        }
       } else {
-        throw Exception("Failed to update auth state after sign-in.");
+        final responseBody = jsonDecode(response.body);
+        throw Exception(responseBody['error'] ?? 'reCAPTCHA verification failed or an unknown backend error occurred.');
       }
     } on FirebaseAuthException catch (e) {
       _error = 'Incorrect email or password.';
@@ -105,13 +135,7 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
+  // --- ADDED THIS MISSING METHOD ---
   InputDecoration _buildInputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
@@ -129,6 +153,7 @@ class _SignInScreenState extends State<SignInScreen> {
       ),
     );
   }
+  // --- END OF ADDED METHOD ---
 
   @override
   Widget build(BuildContext context) {
