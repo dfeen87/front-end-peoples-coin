@@ -49,16 +49,74 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   void _onUsernameChanged() {
-    // ... your existing username availability check logic here ...
+    // You can implement debounce logic here if you want username availability check
+    // For now leaving it empty or implement your logic
   }
 
   Future<void> _signUp() async {
-    // ... your existing email/password sign-up logic here ...
+    if (!_formKey.currentState!.validate()) {
+      // Invalid form
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      final User? user = userCredential.user;
+
+      if (user != null && mounted) {
+        // Call your backend API client to create the user account record
+        await context.read<PeoplesCoinApiClient>().createUserAccount(
+              firebaseUid: user.uid,
+              email: user.email!,
+              username: _usernameController.text.trim(),
+            );
+
+        // Navigate to home screen after success
+        context.go('/home');
+      }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = 'Failed to create account.';
+      if (e.code == 'email-already-in-use') {
+        errorMessage = 'This email is already registered.';
+      } else if (e.code == 'weak-password') {
+        errorMessage = 'Password is too weak.';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'Invalid email address.';
+      }
+
+      if (mounted) {
+        setState(() {
+          _error = errorMessage;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'An unexpected error occurred. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
-  // --- UPDATED Google Sign-In for Flutter Web ---
+  // Google Sign-In for Flutter Web
   Future<void> _signInWithGoogle() async {
-    print("Google Sign-In button pressed"); // Debug log
+    print("Google Sign-In button pressed");
     setState(() {
       _isLoading = true;
       _error = null;
@@ -83,7 +141,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         context.go('/home');
       }
     } catch (e) {
-      print("Google Sign-In error: $e"); // Debug error log
+      print("Google Sign-In error: $e");
       if (mounted) {
         setState(() {
           _error = 'Google Sign-In failed. Please try again.';
@@ -125,6 +183,38 @@ class _SignUpScreenState extends State<SignUpScreen> {
           const SizedBox(width: 12),
           Expanded(child: Text(_error!, style: const TextStyle(color: Colors.white))),
         ],
+      ),
+    );
+  }
+
+  Widget? _buildUsernameSuffixIcon() {
+    if (_isCheckingUsername) {
+      return const Padding(
+        padding: EdgeInsets.all(12.0),
+        child:
+            SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (_isUsernameAvailable != null) {
+      return Icon(
+        _isUsernameAvailable! ? Icons.check_circle_outline : Icons.error_outline,
+        color: _isUsernameAvailable! ? Colors.greenAccent : Colors.redAccent,
+      );
+    }
+    return null;
+  }
+
+  Widget _buildSocialButton({VoidCallback? onPressed, required String asset}) {
+    return Material(
+      color: Colors.white.withOpacity(0.1),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Image.asset(asset, height: 32),
+        ),
       ),
     );
   }
@@ -315,38 +405,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget? _buildUsernameSuffixIcon() {
-    if (_isCheckingUsername) {
-      return const Padding(
-        padding: EdgeInsets.all(12.0),
-        child:
-            SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-      );
-    }
-    if (_isUsernameAvailable != null) {
-      return Icon(
-        _isUsernameAvailable! ? Icons.check_circle_outline : Icons.error_outline,
-        color: _isUsernameAvailable! ? Colors.greenAccent : Colors.redAccent,
-      );
-    }
-    return null;
-  }
-
-  Widget _buildSocialButton({VoidCallback? onPressed, required String asset}) {
-    return Material(
-      color: Colors.white.withOpacity(0.1),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Image.asset(asset, height: 32),
-        ),
       ),
     );
   }
