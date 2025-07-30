@@ -5,9 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Essential for Firebase Authentication
 import 'package:go_router/go_router.dart'; // For navigation
 import 'package:provider/provider.dart'; // For accessing API client
-
-// Removed google_sign_in import as it's no longer used
-// Removed flutter/foundation.dart kIsWeb import as it's not needed without Google Sign-In specific web logic here
+import '../recaptcha_helper.dart';  // adjust path if needed
 
 // Import your project-specific files
 import '../widgets/dynamic_nebula_background.dart';
@@ -33,9 +31,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
   String? _error; // To display error messages to the user
 
-  // Removed GoogleSignIn instance as it's no longer used
-  // final GoogleSignIn _googleSignIn = ...;
-
   @override
   void dispose() {
     _usernameController.dispose();
@@ -46,7 +41,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _signUp() async {
-    // First, validate all form fields. If validation fails, stop.
+    // Validate form fields
     if (!_formKey.currentState!.validate()) {
       setState(() {
         _error = 'Please correct the errors in the form.';
@@ -54,7 +49,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    // Check if passwords match
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() {
         _error = 'Passwords do not match.';
@@ -63,12 +57,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     setState(() {
-      _isLoading = true; // Show loading indicator
-      _error = null;      // Clear previous errors
+      _isLoading = true;
+      _error = null;
     });
 
     try {
-      // Attempt to create a user with email and password using Firebase Auth
+      // Get reCAPTCHA token before signup
+      final recaptchaToken = await getRecaptchaToken('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs', 'sign_up');
+      print('reCAPTCHA token: $recaptchaToken');
+
+      // TODO: Optionally send recaptchaToken to backend for verification
+
+      // Create user with Firebase Authentication
       final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -77,26 +77,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final user = userCredential.user;
 
       if (user != null) {
-        // Update Firebase user's display name with the provided username
         await user.updateDisplayName(_usernameController.text.trim());
 
-        // Create user account in your backend API
-        // Ensure the context is still valid before using it after an await
         if (mounted) {
           await context.read<PeoplesCoinApiClient>().createUserAccount(
                 firebaseUid: user.uid,
                 email: user.email!,
-                username: _usernameController.text.trim(), // Pass the username to your API
+                username: _usernameController.text.trim(),
               );
         }
 
-        // Navigate to the home screen on successful signup
-        if (!mounted) return; // Check mounted again before navigation
-        context.go('/home'); 
-
+        if (!mounted) return;
+        context.go('/home');
       }
     } on FirebaseAuthException catch (e) {
-      // Catch specific Firebase Authentication errors
       String errorMessage;
       switch (e.code) {
         case 'weak-password':
@@ -115,17 +109,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
         _error = errorMessage;
       });
     } catch (e) {
-      // Catch any other unexpected errors
       setState(() {
         _error = 'An unexpected error occurred: ${e.toString()}';
       });
     } finally {
-      // Always stop loading, regardless of success or failure
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Helper method to build consistent input field decorations
   InputDecoration _buildInputDecoration(String label, IconData icon, {Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
@@ -145,12 +136,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // Helper method to display error messages
   Widget _buildErrorWidget() {
     if (_error == null || _error!.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0), // Add some spacing below the error
+      padding: const EdgeInsets.only(bottom: 16.0),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
@@ -169,36 +159,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // Removed _buildSocialButton as Google Sign-In is removed
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // Background is handled by DynamicNebulaBackground
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Dynamic Nebula Background (assuming it's positioned to fill the screen)
-          const DynamicNebulaBackground(), 
-          
-          // Centered content for the signup form
+          const DynamicNebulaBackground(),
           Center(
-            child: SingleChildScrollView( // Allows scrolling if keyboard overlaps fields
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400), // Max width for desktop/web
-                child: ClipRRect( // Clip to apply border radius before blur
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter( // Apply blur effect to content behind
+                  child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                     child: Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.4), // Semi-transparent background
+                        color: Colors.black.withOpacity(0.4),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(0.2)), // Subtle white border
+                        border: Border.all(color: Colors.white.withOpacity(0.2)),
                       ),
                       child: Form(
-                        key: _formKey, // Associate form key for validation
+                        key: _formKey,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -218,10 +203,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               style: TextStyle(color: Colors.white70, fontSize: 16),
                             ),
                             const SizedBox(height: 24),
-                            
-                            _buildErrorWidget(), // Display error messages here
-                            
-                            // Username Input Field
+
+                            _buildErrorWidget(),
+
                             TextFormField(
                               controller: _usernameController,
                               keyboardType: TextInputType.text,
@@ -238,8 +222,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               },
                             ),
                             const SizedBox(height: 16),
-                            
-                            // Email Input Field
+
                             TextFormField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
@@ -254,8 +237,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               },
                             ),
                             const SizedBox(height: 16),
-                            
-                            // Password Input Field
+
                             TextFormField(
                               controller: _passwordController,
                               obscureText: _obscurePassword,
@@ -275,8 +257,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   val != null && val.length >= 6 ? null : 'Password must be at least 6 characters.',
                             ),
                             const SizedBox(height: 16),
-                            
-                            // Confirm Password Input Field
+
                             TextFormField(
                               controller: _confirmPasswordController,
                               obscureText: _obscureConfirmPassword,
@@ -303,12 +284,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               },
                             ),
                             const SizedBox(height: 24),
-                            
-                            // Sign Up Button (shows loading indicator when active)
+
                             _isLoading
                                 ? const Center(child: CircularProgressIndicator())
                                 : ElevatedButton(
-                                    onPressed: _signUp, // Calls the signup logic
+                                    onPressed: _signUp,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.amber[800],
                                       foregroundColor: Colors.black,
@@ -320,13 +300,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                     ),
                                   ),
-                            
-                            // Removed the "OR" divider and social login buttons
-                            // as Google Sign-In is no longer used.
 
                             const SizedBox(height: 20),
-                            
-                            // Link to Sign In page
+
                             Center(
                               child: RichText(
                                 text: TextSpan(
@@ -341,8 +317,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       ),
                                       recognizer: TapGestureRecognizer()
                                         ..onTap = () {
-                                          if (!_isLoading) { // Prevent navigation while loading
-                                            context.go('/sign_in'); 
+                                          if (!_isLoading) {
+                                            context.go('/sign_in');
                                           }
                                         },
                                     ),
@@ -364,3 +340,4 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 }
+

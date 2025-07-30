@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart'; // For reading providers
 import 'dart:ui';
 
+// Removed recaptcha_helper import since no reCAPTCHA is used
+
 import '../widgets/dynamic_nebula_background.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../state/user_provider.dart';

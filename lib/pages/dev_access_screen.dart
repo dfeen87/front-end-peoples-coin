@@ -1,7 +1,7 @@
-// lib/pages/dev_access_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/dynamic_nebula_background.dart';
+import '../recaptcha_helper.dart';  // adjust path if needed
 
 /// A screen for developers to enter an access code.
 /// Upon successful validation, it now navigates to the welcome screen.
@@ -14,11 +14,10 @@ class DevAccessScreen extends StatefulWidget {
 
 class _DevAccessScreenState extends State<DevAccessScreen> {
   final TextEditingController _codeController = TextEditingController();
-  // IMPORTANT: For production, this access code should be managed securely
-  // (e.g., environment variables, backend configuration) and not hardcoded.
   final String _devAccessCode = 'letmein123';
 
   String? _errorText;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -33,17 +32,44 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
     });
   }
 
-  /// Validates the entered access code.
-  /// If valid, navigates to the welcome screen. Otherwise, shows an error.
-  void _validateAccess() {
+  /// Validates the entered access code with reCAPTCHA check.
+  Future<void> _validateAccess() async {
     final input = _codeController.text.trim();
-    if (input == _devAccessCode) {
-      // --- CHANGED: Navigate to the welcome screen on success ---
-      // The path '/welcome' is defined in your main.dart router config.
-      context.go('/welcome');
-    } else {
+    if (input.isEmpty) {
       setState(() {
-        _errorText = 'Invalid access code. Please try again.';
+        _errorText = 'Please enter the access code.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+    });
+
+    try {
+      // Obtain the reCAPTCHA token first
+      final recaptchaToken = await getRecaptchaToken('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs', 'dev_access');
+      print('reCAPTCHA token: $recaptchaToken');
+
+      // TODO: Optionally send token to backend here for verification before proceeding
+
+      // Proceed only if code matches
+      if (input == _devAccessCode) {
+        context.go('/welcome');
+      } else {
+        setState(() {
+          _errorText = 'Invalid access code. Please try again.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorText = 'Failed to verify reCAPTCHA. Please try again.';
+      });
+      print('reCAPTCHA error: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -110,19 +136,21 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        onPressed: _validateAccess, // Call validation function
-                        icon: const Icon(Icons.lock_open),
-                        label: const Text('Enter'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 48), // Full width button
-                          backgroundColor: Colors.amber[800], // Button color
-                          foregroundColor: Colors.black, // Text color on button
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                      _isLoading
+                          ? const CircularProgressIndicator()
+                          : ElevatedButton.icon(
+                              onPressed: _validateAccess, // Call validation function
+                              icon: const Icon(Icons.lock_open),
+                              label: const Text('Enter'),
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 48), // Full width button
+                                backgroundColor: Colors.amber[800], // Button color
+                                foregroundColor: Colors.black, // Text color on button
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
                     ],
                   ),
                 ),
@@ -134,3 +162,4 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
     );
   }
 }
+
