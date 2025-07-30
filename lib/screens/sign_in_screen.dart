@@ -1,11 +1,12 @@
+import 'dart:convert'; // For jsonEncode
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart'; // For reading providers
+import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http; // For http requests
 import 'dart:ui';
 
-// Removed recaptcha_helper import since no reCAPTCHA is used
-
+import '../recaptcha_helper.dart'; // Adjust path if needed
 import '../widgets/dynamic_nebula_background.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../state/user_provider.dart';
@@ -34,6 +35,26 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
+      // Step 1: Get reCAPTCHA token from frontend helper
+      final siteKey = '6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs'; // Your site key here
+      final recaptchaToken = await getRecaptchaToken(siteKey, 'login');
+
+      // Step 2: Send token to backend API for verification
+      final response = await http.post(
+        Uri.parse('https://your-backend-domain.com/api/verify_login'), // Update with your backend URL
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'token': recaptchaToken}),
+      );
+
+      if (response.statusCode != 200) {
+        setState(() {
+          _error = 'reCAPTCHA verification failed. Please try again.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Step 3: Proceed with Firebase Authentication if reCAPTCHA passed
       print("Attempting to sign in with Firebase Auth...");
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
@@ -43,15 +64,11 @@ class _SignInScreenState extends State<SignInScreen> {
 
       if (!mounted) return;
 
-      // Update AuthProvider state
       final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
       await authProvider.checkCurrentUser();
 
       if (authProvider.user != null) {
-        // Fetch user profile in UserProvider
         await context.read<UserProvider>().fetchUser(authProvider.user!.uid);
-
-        // Navigate to home screen
         context.go('/home');
       } else {
         throw Exception("Failed to update auth state after sign-in.");

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart'; // 1. Import go_router
+import 'package:go_router/go_router.dart'; // Navigation
 import '../widgets/dynamic_nebula_background.dart';
 
 class DevAccessScreen extends StatefulWidget {
@@ -11,7 +11,7 @@ class DevAccessScreen extends StatefulWidget {
 
 class _DevAccessScreenState extends State<DevAccessScreen> {
   final TextEditingController _codeController = TextEditingController();
-  final String _devAccessCode = 'letmein123'; // Change for security
+  final String _devAccessCode = 'letmein123'; // Change this to your secure code
 
   String? _errorText;
 
@@ -30,8 +30,7 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
   void _validateAccess() {
     final input = _codeController.text.trim();
     if (input == _devAccessCode) {
-      // 2. Use context.go() to navigate to the sign-up screen.
-      // The path '/sign_up' is defined in your main.dart router config.
+      // Navigate to sign-up screen
       context.go('/sign_up');
     } else {
       setState(() {
@@ -49,7 +48,7 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // transparent for nebula background
+      backgroundColor: Colors.transparent, // Transparent for nebula background
       body: Stack(
         children: [
           const DynamicNebulaBackground(),
