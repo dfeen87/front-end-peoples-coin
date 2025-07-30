@@ -8,7 +8,8 @@ import 'package:firebase_app_check/firebase_app_check.dart'; // Primary App Chec
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, defaultTargetPlatform; // defaultTargetPlatform imported here
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, defaultTargetPlatform;
+import 'package:flutter/foundation.dart';
 
 // Import your project-specific files
 import 'models/user_account.dart';
@@ -41,41 +42,41 @@ import 'widgets/animated_digit_widget.dart';
 
 // --- Global Constants & Definitions ---
 
-const String recaptchaSiteKeyProd = '6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs';
-
-// Define the reCAPTCHA site key for PRODUCTION web builds
-// This value MUST be passed using --dart-define=RECAPTCHA_SITE_KEY_PROD=YOUR_SITE_KEY during flutter build web --release
-const String _reCaptchaSiteKeyProd = String.fromEnvironment(
-  'RECAPTCHA_SITE_KEY_PROD', // This is the variable name that --dart-define will set
-  defaultValue: '', // Default to empty string if not provided (e.g., in debug mode)
+const String reCaptchaSiteKeyProd = String.fromEnvironment(
+  'RECAPTCHA_SITE_KEY_PROD',
+  defaultValue: '',
 );
 
 // --- MAIN ENTRY POINT ---
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Add diagnostic prints for Flutter and Dart versions
+  print('Flutter Version: ${const String.fromEnvironment('FLUTTER_VERSION')}');
+  print('Dart Version: ${const String.fromEnvironment('DART_VERSION')}');
+
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  await dotenv.load(fileName: ".env"); // Load .env for other local env vars
+  await dotenv.load(fileName: ".env");
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
   // --- Firebase App Check Activation ---
-  // Activate App Check with different providers based on platform and build mode
   await FirebaseAppCheck.instance.activate(
-    // Web Provider: Debug for local development, reCAPTCHA v3 for production
-    webProvider: ReCaptchaV3Provider('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccsd'), // For flutter build web --release
+    webProvider: ReCaptchaV3Provider(reCaptchaSiteKeyProd),
   );
 
-  // Consolidated print statements for App Check activation status
+  await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+
+  // --- Console Logging for App Check Activation Status ---
   if (kIsWeb && kDebugMode) {
     print('[App Check] Using DebugProvider for Web (Debug Mode).');
-    // For DebugAppCheckProvider, we can directly get the token
     FirebaseAppCheck.instance.getToken(true).then((String? token) {
       if (token != null && token.isNotEmpty) {
         print('------------------------------------------------------------');
@@ -85,10 +86,9 @@ Future<void> main() async {
       }
     });
   } else if (!kIsWeb) {
-    // For Android/iOS, defaultTargetPlatform is available via flutter/foundation.dart
     print('[App Check] Activated for ${defaultTargetPlatform.name} (DebugMode: $kDebugMode).');
   } else if (kIsWeb && !kDebugMode) { // Web Release Mode
-     if (_reCaptchaSiteKeyProd.isEmpty) {
+     if (reCaptchaSiteKeyProd.isEmpty) {
         print('[App Check] CRITICAL: RECAPTCHA_SITE_KEY_PROD was NOT defined during build. App Check will NOT activate!');
       } else {
         print('[App Check] Activated for Web (Release Mode) using injected reCAPTCHA key.');
@@ -134,7 +134,7 @@ class AppTheme {
       bodyLarge: TextStyle(color: Colors.white70),
       bodyMedium: TextStyle(color: Colors.white70),
       headlineMedium: TextStyle(color: Colors.white),
-      headlineSmall: TextStyle(color: Colors.white),
+      headlineSmall: TextStyle(color: Colors.white), // Corrected: Typo was 'gHeadlineSmall'
       titleLarge: TextStyle(color: Colors.white70),
     ),
     popupMenuTheme: PopupMenuThemeData(
