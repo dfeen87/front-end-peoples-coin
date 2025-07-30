@@ -1,14 +1,13 @@
 import 'dart:async';
+import 'dart:ui'; // For ImageFilter.blur
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:ui';
 import 'package:provider/provider.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 import '../widgets/dynamic_nebula_background.dart';
-import '../service/api_client.dart';
+import '../service/api_client.dart'; // Ensure this path is correct
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -19,13 +18,11 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  final _usernameController = TextEditingController();
-  Timer? _debounce;
-  bool _isCheckingUsername = false;
-  bool? _isUsernameAvailable;
+
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -33,31 +30,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _usernameController.addListener(_onUsernameChanged);
-  }
-
-  @override
   void dispose() {
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _usernameController.dispose();
-    _debounce?.cancel();
     super.dispose();
   }
 
-  void _onUsernameChanged() {
-    // You can implement debounce logic here if you want username availability check
-    // For now leaving it empty or implement your logic
-  }
-
   Future<void> _signUp() async {
-    if (!_formKey.currentState!.validate()) {
-      // Invalid form
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
@@ -65,95 +47,43 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      final UserCredential userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        password: _passwordController.text,
       );
 
-      final User? user = userCredential.user;
+      final user = userCredential.user;
 
-      if (user != null && mounted) {
-        // Call your backend API client to create the user account record
-        await context.read<PeoplesCoinApiClient>().createUserAccount(
-              firebaseUid: user.uid,
-              email: user.email!,
-              username: _usernameController.text.trim(),
-            );
+      if (user != null) {
+        // Optionally update displayName with username
+        await user.updateDisplayName(_usernameController.text.trim());
 
-        // Navigate to home screen after success
-        context.go('/home');
-      }
-    } on FirebaseAuthException catch (e) {
-      String errorMessage = 'Failed to create account.';
-      if (e.code == 'email-already-in-use') {
-        errorMessage = 'This email is already registered.';
-      } else if (e.code == 'weak-password') {
-        errorMessage = 'Password is too weak.';
-      } else if (e.code == 'invalid-email') {
-        errorMessage = 'Invalid email address.';
-      }
-
-      if (mounted) {
-        setState(() {
-          _error = errorMessage;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'An unexpected error occurred. Please try again.';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  // Google Sign-In for Flutter Web
-  Future<void> _signInWithGoogle() async {
-    print("Google Sign-In button pressed");
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-
-      final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithPopup(googleProvider);
-
-      final User? user = userCredential.user;
-
-      if (user != null && mounted) {
-        if (userCredential.additionalUserInfo?.isNewUser == true) {
+        // Create user in your backend API
+        if (mounted) {
           await context.read<PeoplesCoinApiClient>().createUserAccount(
                 firebaseUid: user.uid,
                 email: user.email!,
-                username: user.displayName ?? user.email!.split('@')[0],
+                username: _usernameController.text.trim(),
               );
         }
+
+        if (!mounted) return;
         context.go('/home');
       }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _error = e.message ?? 'Failed to create account.';
+      });
     } catch (e) {
-      print("Google Sign-In error: $e");
-      if (mounted) {
-        setState(() {
-          _error = 'Google Sign-In failed. Please try again.';
-        });
-      }
+      setState(() {
+        _error = 'Unexpected error: $e';
+      });
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData icon,
-      {Widget? suffixIcon}) {
+  InputDecoration _buildInputDecoration(String label, IconData icon, {Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
@@ -162,58 +92,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
       filled: true,
       fillColor: Colors.white.withOpacity(0.1),
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.amber)),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.amber),
+      ),
     );
   }
 
   Widget _buildErrorWidget() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.redAccent.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
-          const SizedBox(width: 12),
-          Expanded(child: Text(_error!, style: const TextStyle(color: Colors.white))),
-        ],
-      ),
-    );
-  }
+    if (_error == null) return const SizedBox.shrink();
 
-  Widget? _buildUsernameSuffixIcon() {
-    if (_isCheckingUsername) {
-      return const Padding(
-        padding: EdgeInsets.all(12.0),
-        child:
-            SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-      );
-    }
-    if (_isUsernameAvailable != null) {
-      return Icon(
-        _isUsernameAvailable! ? Icons.check_circle_outline : Icons.error_outline,
-        color: _isUsernameAvailable! ? Colors.greenAccent : Colors.redAccent,
-      );
-    }
-    return null;
-  }
-
-  Widget _buildSocialButton({VoidCallback? onPressed, required String asset}) {
-    return Material(
-      color: Colors.white.withOpacity(0.1),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Image.asset(asset, height: 32),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0), // Add some spacing
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.redAccent.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.redAccent),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(_error!, style: const TextStyle(color: Colors.white))),
+          ],
         ),
       ),
     );
@@ -247,34 +153,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Text('Create Account',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white)),
+                            const Text(
+                              'Create Account',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                             const SizedBox(height: 8),
-                            const Text('Join the Bright Acts community.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.white70, fontSize: 16)),
+                            const Text(
+                              'Join the Bright Acts community.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.white70, fontSize: 16),
+                            ),
                             const SizedBox(height: 24),
-                            if (_error != null) ...[
-                              _buildErrorWidget(),
-                              const SizedBox(height: 16)
-                            ],
+                            _buildErrorWidget(),
                             TextFormField(
                               controller: _usernameController,
                               keyboardType: TextInputType.text,
                               style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration('Username',
-                                  Icons.person_outline,
-                                  suffixIcon: _buildUsernameSuffixIcon()),
+                              decoration: _buildInputDecoration('Username', Icons.person_outline),
                               validator: (val) {
                                 if (val == null || val.trim().length < 3) {
                                   return 'Username must be at least 3 characters.';
-                                }
-                                if (_isUsernameAvailable == false) {
-                                  return 'This username is already taken.';
                                 }
                                 return null;
                               },
@@ -284,8 +187,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               style: const TextStyle(color: Colors.white),
-                              decoration:
-                                  _buildInputDecoration('Email', Icons.email_outlined),
+                              decoration: _buildInputDecoration('Email', Icons.email_outlined),
                               validator: (val) {
                                 final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
                                 if (val == null || !emailRegex.hasMatch(val)) {
@@ -299,41 +201,37 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               controller: _passwordController,
                               obscureText: _obscurePassword,
                               style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration('Password',
-                                  Icons.lock_outline,
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                        _obscurePassword
-                                            ? Icons.visibility_off
-                                            : Icons.visibility,
-                                        color: Colors.white70),
-                                    onPressed: () =>
-                                        setState(() => _obscurePassword = !_obscurePassword),
-                                  )),
+                              decoration: _buildInputDecoration(
+                                'Password',
+                                Icons.lock_outline,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                    color: Colors.white70,
+                                  ),
+                                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                ),
+                              ),
                               validator: (val) =>
-                                  val != null && val.length >= 6
-                                      ? null
-                                      : 'Password must be at least 6 characters',
+                                  val != null && val.length >= 6 ? null : 'Password must be at least 6 characters',
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: _confirmPasswordController,
                               obscureText: _obscureConfirmPassword,
                               style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration('Confirm Password',
-                                  Icons.lock_outline,
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                        _obscureConfirmPassword
-                                            ? Icons.visibility_off
-                                            : Icons.visibility,
-                                        color: Colors.white70),
-                                    onPressed: () => setState(
-                                        () => _obscureConfirmPassword = !_obscureConfirmPassword),
-                                  )),
-                              validator: (val) => val != _passwordController.text
-                                  ? 'Passwords do not match'
-                                  : null,
+                              decoration: _buildInputDecoration(
+                                'Confirm Password',
+                                Icons.lock_outline,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                    color: Colors.white70,
+                                  ),
+                                  onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                                ),
+                              ),
+                              validator: (val) => val != _passwordController.text ? 'Passwords do not match' : null,
                             ),
                             const SizedBox(height: 24),
                             _isLoading
@@ -343,40 +241,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.amber[800],
                                       foregroundColor: Colors.black,
-                                      padding:
-                                          const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12)),
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
-                                    child: const Text('Create Account',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16)),
+                                    child: const Text(
+                                      'Create Account',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
                                   ),
                             const SizedBox(height: 20),
-                            Row(
-                              children: [
-                                Expanded(
-                                    child: Divider(
-                                        color: Colors.white.withOpacity(0.3))),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 12),
-                                  child: Text('OR',
-                                      style: TextStyle(color: Colors.white70)),
-                                ),
-                                Expanded(
-                                    child: Divider(
-                                        color: Colors.white.withOpacity(0.3))),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            Center(
-                              child: _buildSocialButton(
-                                onPressed: _isLoading ? null : _signInWithGoogle,
-                                asset: 'assets/google_logo.png',
-                              ),
-                            ),
-                            const SizedBox(height: 20),
+                            // Removed the "OR" divider and social button section
+                            // because Google Sign-In is removed.
                             Center(
                               child: RichText(
                                 text: TextSpan(
@@ -386,8 +261,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     TextSpan(
                                       text: 'Sign In',
                                       style: TextStyle(
-                                          color: Colors.amber[400],
-                                          fontWeight: FontWeight.bold),
+                                        color: Colors.amber[400],
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                       recognizer: TapGestureRecognizer()
                                         ..onTap = () => context.go('/sign_in'),
                                     ),
@@ -409,4 +285,3 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 }
-
