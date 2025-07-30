@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'dart:ui'; // For ImageFilter.blur
 import 'package:flutter/material.dart';
@@ -41,6 +40,8 @@ import 'widgets/matrix_text.dart';
 import 'widgets/animated_digit_widget.dart';
 
 // --- Global Constants & Definitions ---
+
+const String recaptchaSiteKeyProd = '6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs';
 
 // Define the reCAPTCHA site key for PRODUCTION web builds
 // This value MUST be passed using --dart-define=RECAPTCHA_SITE_KEY_PROD=YOUR_SITE_KEY during flutter build web --release
