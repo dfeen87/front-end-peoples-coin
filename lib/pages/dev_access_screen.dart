@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/dynamic_nebula_background.dart';
-import '../recaptcha_helper.dart';  // adjust path if needed
 
 /// A screen for developers to enter an access code.
-/// Upon successful validation, it now navigates to the welcome screen.
 class DevAccessScreen extends StatefulWidget {
   const DevAccessScreen({Key? key}) : super(key: key);
 
@@ -22,7 +20,6 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
   @override
   void initState() {
     super.initState();
-    // Clear error text when the user starts typing again
     _codeController.addListener(() {
       if (_errorText != null) {
         setState(() {
@@ -32,7 +29,7 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
     });
   }
 
-  /// Validates the entered access code with reCAPTCHA check.
+  /// Validates the entered access code without reCAPTCHA.
   Future<void> _validateAccess() async {
     final input = _codeController.text.trim();
     if (input.isEmpty) {
@@ -47,27 +44,19 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
       _errorText = null;
     });
 
-    try {
-      // Obtain the reCAPTCHA token first
-      final recaptchaToken = await getRecaptchaToken('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs', 'dev_access');
-      print('reCAPTCHA token: $recaptchaToken');
+    // Simulate a short delay to feel like a real check
+    await Future.delayed(const Duration(milliseconds: 500));
 
-      // TODO: Optionally send token to backend here for verification before proceeding
-
-      // Proceed only if code matches
-      if (input == _devAccessCode) {
-        context.go('/welcome');
-      } else {
-        setState(() {
-          _errorText = 'Invalid access code. Please try again.';
-        });
-      }
-    } catch (e) {
+    // Proceed only if code matches
+    if (input == _devAccessCode) {
+      if (mounted) context.go('/welcome');
+    } else {
       setState(() {
-        _errorText = 'Failed to verify reCAPTCHA. Please try again.';
+        _errorText = 'Invalid access code. Please try again.';
       });
-      print('reCAPTCHA error: $e');
-    } finally {
+    }
+
+    if (mounted) {
       setState(() {
         _isLoading = false;
       });
@@ -162,4 +151,3 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
     );
   }
 }
-

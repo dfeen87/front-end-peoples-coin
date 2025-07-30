@@ -1,15 +1,17 @@
 import 'dart:async';
+import 'dart:convert'; // For jsonEncode
 import 'dart:ui'; // For ImageFilter.blur
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Essential for Firebase Authentication
-import 'package:go_router/go_router.dart'; // For navigation
-import 'package:provider/provider.dart'; // For accessing API client
-import '../recaptcha_helper.dart';  // adjust path if needed
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http; // For making API calls
+import '../recaptcha_helper.dart';
 
 // Import your project-specific files
+import '../recaptcha_helper.dart'; // For getV2RecaptchaToken
+import '../widgets/recaptcha_widget.dart'; // The v2 checkbox widget
 import '../widgets/dynamic_nebula_background.dart';
-import '../service/api_client.dart'; // Ensure this path is correct
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -29,7 +31,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
-  String? _error; // To display error messages to the user
+  String? _error;
 
   @override
   void dispose() {
@@ -40,12 +42,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
+  // UPDATED _signUp function for reCAPTCHA v2
   Future<void> _signUp() async {
-    // Validate form fields
     if (!_formKey.currentState!.validate()) {
-      setState(() {
-        _error = 'Please correct the errors in the form.';
-      });
       return;
     }
 
@@ -62,55 +61,47 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      // Get reCAPTCHA token before signup
-      final recaptchaToken = await getRecaptchaToken('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs', 'sign_up');
-      print('reCAPTCHA token: $recaptchaToken');
+      // Step 1: Get the token from the v2 checkbox widget.
+      final String recaptchaToken = getV2RecaptchaToken();
 
-      // TODO: Optionally send recaptchaToken to backend for verification
+      // Step 2: Check if the user solved the reCAPTCHA.
+      if (recaptchaToken.isEmpty) {
+        throw Exception('Please solve the reCAPTCHA challenge.');
+      }
 
-      // Create user with Firebase Authentication
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      // Step 3: Send user details and token to your backend.
+      // The backend will verify reCAPTCHA and then create the user.
+      final response = await http.post(
+        Uri.parse('https://peoples-coin-service-105378934751.us-central1.run.app/api/signup'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'username': _usernameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'password': _passwordController.text,
+          'token': recaptchaToken,
+        }),
       );
 
-      final user = userCredential.user;
-
-      if (user != null) {
-        await user.updateDisplayName(_usernameController.text.trim());
-
+      if (response.statusCode == 200) {
+        // Backend confirmed success. The user is created.
+        // Now, sign in the user on the client to update the app state.
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+        
         if (mounted) {
-          await context.read<PeoplesCoinApiClient>().createUserAccount(
-                firebaseUid: user.uid,
-                email: user.email!,
-                username: _usernameController.text.trim(),
-              );
+          context.go('/home');
         }
+      } else {
+        // Handle error from the backend
+        final responseBody = jsonDecode(response.body);
+        throw Exception(responseBody['error'] ?? 'An unknown error occurred during sign-up.');
+      }
 
-        if (!mounted) return;
-        context.go('/home');
-      }
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-      switch (e.code) {
-        case 'weak-password':
-          errorMessage = 'The password provided is too weak.';
-          break;
-        case 'email-already-in-use':
-          errorMessage = 'An account already exists for that email.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is not valid.';
-          break;
-        default:
-          errorMessage = e.message ?? 'An unknown Firebase error occurred. Please try again.';
-      }
-      setState(() {
-        _error = errorMessage;
-      });
     } catch (e) {
       setState(() {
-        _error = 'An unexpected error occurred: ${e.toString()}';
+        _error = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -196,48 +187,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 color: Colors.white,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Join the Bright Acts community.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white70, fontSize: 16),
-                            ),
                             const SizedBox(height: 24),
-
                             _buildErrorWidget(),
-
                             TextFormField(
                               controller: _usernameController,
-                              keyboardType: TextInputType.text,
                               style: const TextStyle(color: Colors.white),
                               decoration: _buildInputDecoration('Username', Icons.person_outline),
-                              validator: (val) {
-                                if (val == null || val.trim().isEmpty) {
-                                  return 'Username cannot be empty.';
-                                }
-                                if (val.trim().length < 3) {
-                                  return 'Username must be at least 3 characters.';
-                                }
-                                return null;
-                              },
+                              validator: (val) => val != null && val.trim().length >= 3 ? null : 'Username must be at least 3 characters.',
                             ),
                             const SizedBox(height: 16),
-
                             TextFormField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               style: const TextStyle(color: Colors.white),
                               decoration: _buildInputDecoration('Email', Icons.email_outlined),
-                              validator: (val) {
-                                final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-                                if (val == null || !emailRegex.hasMatch(val)) {
-                                  return 'Enter a valid email address.';
-                                }
-                                return null;
-                              },
+                              validator: (val) => val != null && val.contains('@') ? null : 'Enter a valid email address.',
                             ),
                             const SizedBox(height: 16),
-
                             TextFormField(
                               controller: _passwordController,
                               obscureText: _obscurePassword,
@@ -246,18 +212,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 'Password',
                                 Icons.lock_outline,
                                 suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                    color: Colors.white70,
-                                  ),
+                                  icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.white70),
                                   onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                 ),
                               ),
-                              validator: (val) =>
-                                  val != null && val.length >= 6 ? null : 'Password must be at least 6 characters.',
+                              validator: (val) => val != null && val.length >= 6 ? null : 'Password must be at least 6 characters.',
                             ),
                             const SizedBox(height: 16),
-
                             TextFormField(
                               controller: _confirmPasswordController,
                               obscureText: _obscureConfirmPassword,
@@ -266,25 +227,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 'Confirm Password',
                                 Icons.lock_outline,
                                 suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                                    color: Colors.white70,
-                                  ),
+                                  icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility, color: Colors.white70),
                                   onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                                 ),
                               ),
-                              validator: (val) {
-                                if (val == null || val.isEmpty) {
-                                  return 'Please confirm your password.';
-                                }
-                                if (val != _passwordController.text) {
-                                  return 'Passwords do not match.';
-                                }
-                                return null;
-                              },
+                              validator: (val) => val == _passwordController.text ? null : 'Passwords do not match.',
                             ),
                             const SizedBox(height: 24),
-
+                            // ADD THE V2 CHECKBOX WIDGET HERE
+                            const RecaptchaV2Widget(),
+                            const SizedBox(height: 24),
                             _isLoading
                                 ? const Center(child: CircularProgressIndicator())
                                 : ElevatedButton(
@@ -295,14 +247,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       padding: const EdgeInsets.symmetric(vertical: 16),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
-                                    child: const Text(
-                                      'Create Account',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
+                                    child: const Text('Create Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                   ),
-
                             const SizedBox(height: 20),
-
                             Center(
                               child: RichText(
                                 text: TextSpan(
@@ -311,10 +258,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   children: [
                                     TextSpan(
                                       text: 'Sign In',
-                                      style: TextStyle(
-                                        color: Colors.amber[400],
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.bold),
                                       recognizer: TapGestureRecognizer()
                                         ..onTap = () {
                                           if (!_isLoading) {
@@ -340,4 +284,3 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 }
-

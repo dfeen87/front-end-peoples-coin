@@ -1,12 +1,12 @@
-import 'dart:convert'; // For jsonEncode
+import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http; // For http requests
-import 'dart:ui';
 
-import '../recaptcha_helper.dart'; // Adjust path if needed
+import '../recaptcha_helper.dart'; // For v3 helper
 import '../widgets/dynamic_nebula_background.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../state/user_provider.dart';
@@ -26,6 +26,7 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _isLoading = false;
   String? _error;
 
+  // UPDATED _signIn function for reCAPTCHA v3
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -35,32 +36,25 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      // Step 1: Get reCAPTCHA token from frontend helper
-      final siteKey = '6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs'; // Your site key here
-      final recaptchaToken = await getRecaptchaToken(siteKey, 'login');
+      // Step 1: Get the invisible v3 token.
+      final recaptchaToken = await getRecaptchaV3Token('6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F', 'login'); // ⚠️ Update with your v3 Site Key
 
-      // Step 2: Send token to backend API for verification
+      // Step 2: Send token to your backend. Your backend MUST check the score.
       final response = await http.post(
-        Uri.parse('https://your-backend-domain.com/api/verify_login'), // Update with your backend URL
+        Uri.parse('https://peoples-coin-service-105378934751.us-central1.run.app/api/verify_login'), // ⚠️ Update with your backend URL
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'token': recaptchaToken}),
       );
 
       if (response.statusCode != 200) {
-        setState(() {
-          _error = 'reCAPTCHA verification failed. Please try again.';
-          _isLoading = false;
-        });
-        return;
+        throw Exception('reCAPTCHA verification failed.');
       }
 
-      // Step 3: Proceed with Firebase Authentication if reCAPTCHA passed
-      print("Attempting to sign in with Firebase Auth...");
+      // Step 3: Proceed with Firebase sign-in.
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      print("Firebase Auth sign-in successful.");
 
       if (!mounted) return;
 
@@ -74,20 +68,11 @@ class _SignInScreenState extends State<SignInScreen> {
         throw Exception("Failed to update auth state after sign-in.");
       }
     } on FirebaseAuthException catch (e) {
-      print('FirebaseAuthException caught: ${e.code} - ${e.message}');
-      if (e.code == 'user-not-found' ||
-          e.code == 'invalid-credential' ||
-          e.code == 'wrong-password') {
-        _error = 'Incorrect email or password.';
-      } else {
-        _error = 'An error occurred during sign-in. Please try again.';
-      }
+      _error = 'Incorrect email or password.';
       if (mounted) setState(() {});
     } catch (e) {
-      print('Unexpected error during sign-in: $e');
-      if (mounted) {
-        setState(() => _error = 'An unexpected error occurred. Please check your connection.');
-      }
+      _error = e.toString().replaceFirst('Exception: ', '');
+      if (mounted) setState(() {});
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -202,6 +187,7 @@ class _SignInScreenState extends State<SignInScreen> {
                               ),
                             TextFormField(
                               controller: _emailController,
+                              style: const TextStyle(color: Colors.white),
                               decoration: _buildInputDecoration('Email', Icons.email_outlined),
                               keyboardType: TextInputType.emailAddress,
                               validator: (val) =>
@@ -210,6 +196,7 @@ class _SignInScreenState extends State<SignInScreen> {
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: _passwordController,
+                              style: const TextStyle(color: Colors.white),
                               decoration: _buildInputDecoration('Password', Icons.lock_outline),
                               obscureText: true,
                               validator: (val) => val != null && val.isNotEmpty ? null : 'Please enter your password',
@@ -250,4 +237,3 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 }
-
