@@ -1,16 +1,16 @@
 import 'dart:async';
-import 'dart:ui';
+import 'dart:ui'; // For ImageFilter.blur
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Corrected import
+import 'package:firebase_app_check/firebase_app_check.dart'; // Primary App Check import
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, defaultTargetPlatform; // defaultTargetPlatform is in foundation.dart
 
-// Import your files
+// Import your project-specific files
 import 'models/user_account.dart';
 import 'service/api_client.dart';
 import 'state/user_provider.dart';
@@ -35,9 +35,84 @@ import 'state/auth_provider.dart' as MyAppAuthProvider;
 import 'firebase_options.dart';
 import 'widgets/dynamic_nebula_background.dart';
 import 'utils/app_constants.dart';
-import 'widgets/navigation_card.dart'; // Corrected import
+import 'widgets/navigation_card.dart';
 import 'widgets/matrix_text.dart';
 import 'widgets/animated_digit_widget.dart';
+
+// --- Global Constants & Definitions ---
+
+const String _reCaptchaSiteKeyProd = String.fromEnvironment(
+  'RECAPTCHA_SITE_KEY_PROD',
+  defaultValue: '',
+);
+
+// --- MAIN ENTRY POINT ---
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  await dotenv.load(fileName: ".env");
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // --- Firebase App Check Activation ---
+  if (kIsWeb) {
+    if (kDebugMode) {
+      await FirebaseAppCheck.instance.activate(
+      webProvider: ReCaptchaV3Provider('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs'),
+      );
+      print('[App Check] Using DebugProvider for Web (Debug Mode).');
+      FirebaseAppCheck.instance.getToken(true).then((String? token) { // Corrected: Expect String? token
+        if (token != null && token.isNotEmpty) {
+          print('------------------------------------------------------------');
+          print('App Check Debug Token: $token'); // Corrected: Directly use 'token'
+          print('-> Register this token in Firebase Console -> App Check -> Apps -> Your Web App -> Debug tokens.');
+          print('------------------------------------------------------------');
+        }
+      });
+    } else {
+      if (_reCaptchaSiteKeyProd.isEmpty) {
+        print('[App Check] CRITICAL: RECAPTCHA_SITE_KEY_PROD was NOT defined during build. App Check will NOT activate!');
+      } else {
+        await FirebaseAppCheck.instance.activate(
+          webProvider: ReCaptchaV3Provider(_reCaptchaSiteKeyProd),
+        );
+        print('[App Check] Activated for Web (Release Mode) using injected reCAPTCHA key.');
+      }
+    }
+  } else {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+      appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.appAttest,
+    );
+    // defaultTargetPlatform is now correctly imported from flutter/foundation.dart
+    print('[App Check] Activated for ${defaultTargetPlatform.name} (DebugMode: $kDebugMode).');
+  }
+
+  await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+
+  final apiClient = PeoplesCoinApiClient();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        Provider<PeoplesCoinApiClient>.value(value: apiClient),
+        ChangeNotifierProvider(create: (context) => MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>())),
+        ChangeNotifierProvider(create: (context) => UserProvider(context.read<PeoplesCoinApiClient>())),
+        ChangeNotifierProvider(create: (context) => ProposalProvider(context.read<PeoplesCoinApiClient>())),
+        ChangeNotifierProvider(create: (context) => GoodwillProcessingProvider(context.read<PeoplesCoinApiClient>())),
+        ChangeNotifierProvider(create: (context) => LedgerProvider(context.read<PeoplesCoinApiClient>())),
+      ],
+      child: const BrightActsApp(),
+    ),
+  );
+}
 
 // --- Theme Definition ---
 class AppTheme {
@@ -74,62 +149,6 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       ),
-    ), // <<<--- ADDED MISSING PARENTHESIS HERE
-  );
-} // <<<--- REMOVED EXTRA '}' FROM HERE
-
-// --- MAIN ENTRY POINT ---
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
-  // Load environment variables before Firebase initialization
-  await dotenv.load(fileName: ".env"); // Corrected usage
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Get the reCAPTCHA site key from environment variables
-  final reCaptchaSiteKey = dotenv.env['RECAPTCHA_SITE_KEY']; // Corrected usage
-
-  // --- Firebase App Check Activation ---
-  if (kIsWeb) {
-    if (reCaptchaSiteKey == null) {
-      print('Warning: RECAPTCHA_SITE_KEY is not defined in .env for web App Check. App Check will not be activated.');
-      // You might want to throw an error or show a critical message here in a production app.
-    } else {
-      await FirebaseAppCheck.instance.activate(
-        webProvider: ReCaptchaV3Provider(reCaptchaSiteKey),
-      );
-    }
-  } else {
-    // For Android and Apple platforms, use the appropriate providers
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
-      appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.appAttest,
-    );
-  }
-
-  // Set token auto-refresh AFTER activation, using the separate method
-  await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
-
-  runApp(
-    MultiProvider(
-      providers: [
-        Provider<PeoplesCoinApiClient>(create: (_) => PeoplesCoinApiClient()),
-
-        ChangeNotifierProvider(create: (context) => MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>())),
-        ChangeNotifierProvider(create: (context) => UserProvider(context.read<PeoplesCoinApiClient>())),
-        ChangeNotifierProvider(create: (context) => ProposalProvider(context.read<PeoplesCoinApiClient>())),
-        ChangeNotifierProvider(create: (context) => GoodwillProcessingProvider(context.read<PeoplesCoinApiClient>())),
-        ChangeNotifierProvider(create: (context) => LedgerProvider(context.read<PeoplesCoinApiClient>())),
-      ],
-      child: const BrightActsApp(),
     ),
   );
 }
@@ -162,7 +181,7 @@ final _router = GoRouter(
   ],
 );
 
-// --- APP SHELL, ROOT APP, and STARTUP CONTROLLER WIDGETS (Unchanged) ---
+// --- APP SHELL, ROOT APP, and STARTUP CONTROLLER WIDGETS ---
 class AppShell extends StatelessWidget {
   final Widget child;
   const AppShell({required this.child, super.key});
@@ -235,7 +254,6 @@ class _AppStartupControllerState extends State<AppStartupController> {
   }
 }
 
-
 // --- HOME PAGE WIDGET ---
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -256,7 +274,6 @@ class _HomePageState extends State<HomePage> {
     _pages = _buildPages();
   }
 
-  // --- Descriptions Updated ---
   List<Widget> _buildPages() {
     return [
       _buildNavigationPage(
@@ -561,9 +578,11 @@ class SettingsBottomSheet extends StatelessWidget {
     try {
       await url_launcher.launchUrl(emailLaunchUri);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not launch email app. Please contact support@brightacts.com directly.')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch email app. Please contact support@brightacts.com directly.')),
+        );
+      }
     }
   }
 
@@ -643,7 +662,9 @@ class SettingsBottomSheet extends StatelessWidget {
                 HapticFeedback.heavyImpact();
                 Navigator.of(context).pop();
                 await context.read<MyAppAuthProvider.AuthProvider>().signOut();
-                context.go('/welcome');
+                if (context.mounted) {
+                  context.go('/welcome');
+                }
               },
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom),
@@ -677,9 +698,11 @@ class SettingsBottomSheet extends StatelessWidget {
           try {
             await url_launcher.launchUrl(uri, mode: url_launcher.LaunchMode.externalApplication);
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Could not launch $url')),
-            );
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Could not launch $url')),
+              );
+            }
           }
         }
       }) : null,
