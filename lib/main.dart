@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:ui'; // For ImageFilter.blur
 import 'package:flutter/material.dart';
@@ -8,7 +9,7 @@ import 'package:firebase_app_check/firebase_app_check.dart'; // Primary App Chec
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, defaultTargetPlatform; // defaultTargetPlatform is in foundation.dart
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, defaultTargetPlatform; // defaultTargetPlatform imported here
 
 // Import your project-specific files
 import 'models/user_account.dart';
@@ -41,9 +42,11 @@ import 'widgets/animated_digit_widget.dart';
 
 // --- Global Constants & Definitions ---
 
+// Define the reCAPTCHA site key for PRODUCTION web builds
+// This value MUST be passed using --dart-define=RECAPTCHA_SITE_KEY_PROD=YOUR_SITE_KEY during flutter build web --release
 const String _reCaptchaSiteKeyProd = String.fromEnvironment(
-  'RECAPTCHA_SITE_KEY_PROD',
-  defaultValue: '',
+  'RECAPTCHA_SITE_KEY_PROD', // This is the variable name that --dart-define will set
+  defaultValue: '', // Default to empty string if not provided (e.g., in debug mode)
 );
 
 // --- MAIN ENTRY POINT ---
@@ -55,47 +58,41 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  await dotenv.load(fileName: ".env");
+  await dotenv.load(fileName: ".env"); // Load .env for other local env vars
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
   // --- Firebase App Check Activation ---
-  if (kIsWeb) {
-    if (kDebugMode) {
-      await FirebaseAppCheck.instance.activate(
-      webProvider: ReCaptchaV3Provider('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccs'),
-      );
-      print('[App Check] Using DebugProvider for Web (Debug Mode).');
-      FirebaseAppCheck.instance.getToken(true).then((String? token) { // Corrected: Expect String? token
-        if (token != null && token.isNotEmpty) {
-          print('------------------------------------------------------------');
-          print('App Check Debug Token: $token'); // Corrected: Directly use 'token'
-          print('-> Register this token in Firebase Console -> App Check -> Apps -> Your Web App -> Debug tokens.');
-          print('------------------------------------------------------------');
-        }
-      });
-    } else {
-      if (_reCaptchaSiteKeyProd.isEmpty) {
+  // Activate App Check with different providers based on platform and build mode
+  await FirebaseAppCheck.instance.activate(
+    // Web Provider: Debug for local development, reCAPTCHA v3 for production
+    webProvider: ReCaptchaV3Provider('6LcwyYUrAAAAAE2Bv6bXHjq23zTBE49ABYmi4ccsd'), // For flutter build web --release
+  );
+
+  // Consolidated print statements for App Check activation status
+  if (kIsWeb && kDebugMode) {
+    print('[App Check] Using DebugProvider for Web (Debug Mode).');
+    // For DebugAppCheckProvider, we can directly get the token
+    FirebaseAppCheck.instance.getToken(true).then((String? token) {
+      if (token != null && token.isNotEmpty) {
+        print('------------------------------------------------------------');
+        print('App Check Debug Token: $token');
+        print('-> Register this token in Firebase Console -> App Check -> Apps -> Your Web App -> Debug tokens.');
+        print('------------------------------------------------------------');
+      }
+    });
+  } else if (!kIsWeb) {
+    // For Android/iOS, defaultTargetPlatform is available via flutter/foundation.dart
+    print('[App Check] Activated for ${defaultTargetPlatform.name} (DebugMode: $kDebugMode).');
+  } else if (kIsWeb && !kDebugMode) { // Web Release Mode
+     if (_reCaptchaSiteKeyProd.isEmpty) {
         print('[App Check] CRITICAL: RECAPTCHA_SITE_KEY_PROD was NOT defined during build. App Check will NOT activate!');
       } else {
-        await FirebaseAppCheck.instance.activate(
-          webProvider: ReCaptchaV3Provider(_reCaptchaSiteKeyProd),
-        );
         print('[App Check] Activated for Web (Release Mode) using injected reCAPTCHA key.');
       }
-    }
-  } else {
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
-      appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.appAttest,
-    );
-    // defaultTargetPlatform is now correctly imported from flutter/foundation.dart
-    print('[App Check] Activated for ${defaultTargetPlatform.name} (DebugMode: $kDebugMode).');
   }
-
-  await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
 
   final apiClient = PeoplesCoinApiClient();
 
