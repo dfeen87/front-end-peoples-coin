@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:js' as js;
+
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart'; // Navigation
+import 'package:go_router/go_router.dart';
 import '../widgets/dynamic_nebula_background.dart';
 
+/// A screen for developers to enter an access code with reCAPTCHA v3 validation.
 class DevAccessScreen extends StatefulWidget {
   const DevAccessScreen({Key? key}) : super(key: key);
 
@@ -11,9 +15,10 @@ class DevAccessScreen extends StatefulWidget {
 
 class _DevAccessScreenState extends State<DevAccessScreen> {
   final TextEditingController _codeController = TextEditingController();
-  final String _devAccessCode = 'letmein123'; // Change this to your secure code
+  final String _devAccessCode = 'letmein123';
 
   String? _errorText;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -27,14 +32,82 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
     });
   }
 
-  void _validateAccess() {
+  /// Executes reCAPTCHA v3 and returns the token.
+  Future<String?> _executeRecaptcha() async {
+    final grecaptcha = js.context['grecaptcha'];
+    if (grecaptcha == null) {
+      print('grecaptcha not loaded');
+      return null;
+    }
+
+    final siteKey = '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F';
+
+    final completer = Completer<String?>();
+
+    try {
+      grecaptcha.callMethod('execute', [
+        siteKey,
+        js.JsObject.jsify({'action': 'access'})
+      ]).callMethod('then', [
+        (token) {
+          completer.complete(token as String);
+        },
+        (error) {
+          print('Recaptcha execute error: $error');
+          completer.complete(null);
+        }
+      ]);
+    } catch (e) {
+      print('Exception running recaptcha execute: $e');
+      completer.complete(null);
+    }
+
+    return completer.future;
+  }
+
+  /// Validates the entered access code with reCAPTCHA token check.
+  Future<void> _validateAccess() async {
     final input = _codeController.text.trim();
+    if (input.isEmpty) {
+      setState(() {
+        _errorText = 'Please enter the access code.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+    });
+
+    final token = await _executeRecaptcha();
+
+    if (token == null || token.isEmpty) {
+      setState(() {
+        _errorText = 'reCAPTCHA verification failed. Please try again.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    print('Recaptcha token: $token');
+
+    // TODO: Optionally send token to your backend to verify.
+
+    // Simulate a short delay like real check
+    await Future.delayed(const Duration(milliseconds: 500));
+
     if (input == _devAccessCode) {
-      // Navigate to sign-up screen
-      context.go('/sign_up');
+      if (mounted) context.go('/welcome');
     } else {
       setState(() {
         _errorText = 'Invalid access code. Please try again.';
+      });
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -48,7 +121,7 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // Transparent for nebula background
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const DynamicNebulaBackground(),
@@ -101,19 +174,21 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        onPressed: _validateAccess,
-                        icon: const Icon(Icons.lock_open),
-                        label: const Text('Enter'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 48),
-                          backgroundColor: Colors.amber[800],
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                      _isLoading
+                          ? const CircularProgressIndicator()
+                          : ElevatedButton.icon(
+                              onPressed: _validateAccess,
+                              icon: const Icon(Icons.lock_open),
+                              label: const Text('Enter'),
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 48),
+                                backgroundColor: Colors.amber[800],
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
                     ],
                   ),
                 ),
