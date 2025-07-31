@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart'; // Primary App Check import
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, defaultTargetPlatform;
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, kReleaseMode;
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'firebase_options.dart';
 
@@ -49,10 +48,8 @@ const String reCaptchaSiteKeyProd = String.fromEnvironment(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Add diagnostic prints for Flutter and Dart versions
   print('Flutter Version: ${const String.fromEnvironment('FLUTTER_VERSION')}');
   print('Dart Version: ${const String.fromEnvironment('DART_VERSION')}');
-
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -65,33 +62,39 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // --- Firebase App Check Activation ---
-  // await FirebaseAppCheck.instance.activate(
-  // webProvider: ReCaptchaV3Provider(reCaptchaSiteKeyProd),
-  // );
+  // --- CORRECTED Firebase App Check Activation ---
+  // This logic correctly handles debug vs. release mode for web.
+  if (kIsWeb) {
+    if (kReleaseMode) {
+      // Activate with reCAPTCHA v3 provider for release mode
+      if (reCaptchaSiteKeyProd.isNotEmpty) {
+        await FirebaseAppCheck.instance.activate(
+          webProvider: ReCaptchaV3Provider(reCaptchaSiteKeyProd),
+        );
+        print('[App Check] Activated for Web (Release Mode).');
+      } else {
+        print('[App Check] CRITICAL: reCAPTCHA key not provided for release build.');
+      }
+    } else {
+      // In debug mode, don't activate with a key. Just print the debug token.
+      print('[App Check] In Web Debug Mode. Get token below.');
+    }
+  }
 
-  // await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+  await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
 
-  // --- Console Logging for App Check Activation Status ---
-  if (kIsWeb && kDebugMode) {
-    print('[App Check] Using DebugProvider for Web (Debug Mode).');
+  // Get and print the debug token if in debug mode
+  if (kDebugMode) {
     FirebaseAppCheck.instance.getToken(true).then((String? token) {
-      if (token != null && token.isNotEmpty) {
+      if (token != null) {
         print('------------------------------------------------------------');
         print('App Check Debug Token: $token');
-        print('-> Register this token in Firebase Console -> App Check -> Apps -> Your Web App -> Debug tokens.');
+        print('-> Add this to the Firebase Console (App Check -> Your App -> Manage debug tokens)');
         print('------------------------------------------------------------');
       }
     });
-  } else if (!kIsWeb) {
-    print('[App Check] Activated for ${defaultTargetPlatform.name} (DebugMode: $kDebugMode).');
-  } else if (kIsWeb && !kDebugMode) { // Web Release Mode
-    if (reCaptchaSiteKeyProd.isEmpty) {
-      print('[App Check] CRITICAL: RECAPTCHA_SITE_KEY_PROD was NOT defined during build. App Check will NOT activate!');
-    } else {
-      print('[App Check] Activated for Web (Release Mode) using injected reCAPTCHA key.');
-    }
   }
+
 
   final apiClient = PeoplesCoinApiClient();
 
@@ -151,14 +154,12 @@ class AppTheme {
 
 // --- ROUTER CONFIGURATION ---
 final _router = GoRouter(
-  // CHANGED: The initial location is now '/', which loads the AppStartupController.
   initialLocation: '/',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const AppStartupController()),
     GoRoute(path: '/welcome', builder: (context, state) => const WelcomeScreen()),
     GoRoute(path: '/sign_in', builder: (context, state) => const sign_in.SignInScreen()),
     GoRoute(path: '/sign_up', builder: (context, state) => const sign_up.SignUpScreen()),
-    // CHANGED: This is no longer the initial route. It's just a regular page.
     GoRoute(
       path: '/code-viewer',
       builder: (context, state) {
@@ -650,32 +651,7 @@ class SettingsBottomSheet extends StatelessWidget {
               onPressed: () => _launchSupportEmail(context),
             ),
             const SizedBox(height: 10),
-
-            // ADDED: Conditional button for developer access
-            Consumer<UserProvider>(
-              builder: (context, userProvider, child) {
-                // Check if the user is logged in and has the 'developer' role
-                if (userProvider.currentUser?.role == 'developer') {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10.0),
-                    child: _buildLinkButton(
-                      context: context,
-                      text: 'Developer Access',
-                      icon: Icons.code_off,
-                      color: Colors.greenAccent[400],
-                      onPressed: () {
-                        Navigator.of(context).pop(); // Close the bottom sheet first
-                        context.go('/dev-access');
-                      },
-                    ),
-                  );
-                } else {
-                  // If not a developer, return an empty widget
-                  return const SizedBox.shrink();
-                }
-              },
-            ),
-
+            
             Divider(color: Colors.white.withOpacity(0.3)),
             const SizedBox(height: 10),
             TextButton.icon(
