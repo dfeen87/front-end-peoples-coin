@@ -10,7 +10,8 @@ class UserAccount {
   final String profileImageUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final String walletId; // <-- CRUCIAL: Must be present here
+  final String walletId;
+  final String role; // ADDED: The new role field
 
   UserAccount({
     required this.id,
@@ -22,7 +23,8 @@ class UserAccount {
     required this.profileImageUrl,
     required this.createdAt,
     required this.updatedAt,
-    required this.walletId, // <-- Must be initialized
+    required this.walletId,
+    required this.role, // ADDED: To the constructor
   });
 
   factory UserAccount.fromJson(Map<String, dynamic> json) {
@@ -36,7 +38,9 @@ class UserAccount {
       profileImageUrl: json['profile_image_url'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      walletId: json['wallet_id'] as String, // <-- Ensure your backend provides this key
+      walletId: json['wallet_id'] as String,
+      // ADDED: Reads the 'role' field, defaults to 'user' if it doesn't exist
+      role: json['role'] as String? ?? 'user',
     );
   }
 
@@ -52,6 +56,7 @@ class UserAccount {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'wallet_id': walletId,
+      'role': role, // ADDED: To the JSON output
     };
   }
 }

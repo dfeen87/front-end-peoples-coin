@@ -6,10 +6,10 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart'; // Primary App Check import
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, defaultTargetPlatform;
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'firebase_options.dart';
 
 // Import your project-specific files
@@ -31,10 +31,7 @@ import 'screens/code_display_page.dart';
 import 'screens/sign_up_screen.dart' as sign_up;
 import 'screens/sign_in_screen.dart' as sign_in;
 
-import 'pages/dev_access_screen.dart';
-
 import 'state/auth_provider.dart' as MyAppAuthProvider;
-import 'firebase_options.dart';
 import 'widgets/dynamic_nebula_background.dart';
 import 'utils/app_constants.dart';
 import 'widgets/navigation_card.dart';
@@ -89,11 +86,11 @@ Future<void> main() async {
   } else if (!kIsWeb) {
     print('[App Check] Activated for ${defaultTargetPlatform.name} (DebugMode: $kDebugMode).');
   } else if (kIsWeb && !kDebugMode) { // Web Release Mode
-     if (reCaptchaSiteKeyProd.isEmpty) {
-        print('[App Check] CRITICAL: RECAPTCHA_SITE_KEY_PROD was NOT defined during build. App Check will NOT activate!');
-      } else {
-        print('[App Check] Activated for Web (Release Mode) using injected reCAPTCHA key.');
-      }
+    if (reCaptchaSiteKeyProd.isEmpty) {
+      print('[App Check] CRITICAL: RECAPTCHA_SITE_KEY_PROD was NOT defined during build. App Check will NOT activate!');
+    } else {
+      print('[App Check] Activated for Web (Release Mode) using injected reCAPTCHA key.');
+    }
   }
 
   final apiClient = PeoplesCoinApiClient();
@@ -135,7 +132,7 @@ class AppTheme {
       bodyLarge: TextStyle(color: Colors.white70),
       bodyMedium: TextStyle(color: Colors.white70),
       headlineMedium: TextStyle(color: Colors.white),
-      headlineSmall: TextStyle(color: Colors.white), // Corrected: Typo was 'gHeadlineSmall'
+      headlineSmall: TextStyle(color: Colors.white),
       titleLarge: TextStyle(color: Colors.white70),
     ),
     popupMenuTheme: PopupMenuThemeData(
@@ -154,13 +151,14 @@ class AppTheme {
 
 // --- ROUTER CONFIGURATION ---
 final _router = GoRouter(
-  initialLocation: '/dev-sign-in',
+  // CHANGED: The initial location is now '/', which loads the AppStartupController.
+  initialLocation: '/',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const AppStartupController()),
     GoRoute(path: '/welcome', builder: (context, state) => const WelcomeScreen()),
     GoRoute(path: '/sign_in', builder: (context, state) => const sign_in.SignInScreen()),
     GoRoute(path: '/sign_up', builder: (context, state) => const sign_up.SignUpScreen()),
-    GoRoute(path: '/dev-sign-in', builder: (context, state) => const DevAccessScreen()),
+    // CHANGED: This is no longer the initial route. It's just a regular page.
     GoRoute(
       path: '/code-viewer',
       builder: (context, state) {
@@ -610,7 +608,7 @@ class SettingsBottomSheet extends StatelessWidget {
             const SizedBox(height: 20),
             const Text('Settings & Info', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-            
+
             _buildLinkButton(
               context: context,
               text: 'Donate to Bright Acts',
@@ -651,7 +649,33 @@ class SettingsBottomSheet extends StatelessWidget {
               icon: Icons.support_agent,
               onPressed: () => _launchSupportEmail(context),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+
+            // ADDED: Conditional button for developer access
+            Consumer<UserProvider>(
+              builder: (context, userProvider, child) {
+                // Check if the user is logged in and has the 'developer' role
+                if (userProvider.currentUser?.role == 'developer') {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10.0),
+                    child: _buildLinkButton(
+                      context: context,
+                      text: 'Developer Access',
+                      icon: Icons.code_off,
+                      color: Colors.greenAccent[400],
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close the bottom sheet first
+                        context.go('/dev-access');
+                      },
+                    ),
+                  );
+                } else {
+                  // If not a developer, return an empty widget
+                  return const SizedBox.shrink();
+                }
+              },
+            ),
+
             Divider(color: Colors.white.withOpacity(0.3)),
             const SizedBox(height: 10),
             TextButton.icon(
