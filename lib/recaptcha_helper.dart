@@ -1,27 +1,27 @@
 // lib/recaptcha_helper.dart
-
 import 'dart:async';
 import 'dart:js' as js;
 import 'dart:js_util' show promiseToFuture;
-import 'package:js/js.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:js/js.dart';
+
+@JS('grecaptcha.ready')
+external void _grecaptchaReady(Function callback);
 
 @JS('grecaptcha.execute')
-external Object _jsExecute(String siteKey, js.JsObject options);
+external Object _grecaptchaExecute(String siteKey, Object options);
 
 final Completer<void> _recaptchaLoadedCompleter = Completer<void>();
 
+/// Call this ONCE in your app startup before using getRecaptchaToken()
 void initializeRecaptchaV3() {
   if (!kIsWeb) {
-    // Complete immediately if not running on web
     if (!_recaptchaLoadedCompleter.isCompleted) {
       _recaptchaLoadedCompleter.complete();
     }
     return;
   }
 
-  // If grecaptcha already loaded, complete immediately
   if (js.context.hasProperty('grecaptcha')) {
     if (!_recaptchaLoadedCompleter.isCompleted) {
       _recaptchaLoadedCompleter.complete();
@@ -29,32 +29,41 @@ void initializeRecaptchaV3() {
     return;
   }
 
-  // Set the global callback to complete the completer once API loads
+  // When API loads
   js.context['recaptchaOnLoad'] = () {
     if (!_recaptchaLoadedCompleter.isCompleted) {
       _recaptchaLoadedCompleter.complete();
-      debugPrint('reCAPTCHA v3 API loaded and ready.');
+      debugPrint('✅ reCAPTCHA v3 API loaded and ready.');
     }
   };
 }
 
+/// Get a reCAPTCHA token for a given action
 Future<String> getRecaptchaToken(String siteKey, String action) async {
   if (!kIsWeb) return '';
 
-  // Wait for grecaptcha to be ready
   if (!_recaptchaLoadedCompleter.isCompleted) {
-    debugPrint('Waiting for reCAPTCHA v3 API to load before getting token...');
+    debugPrint('⏳ Waiting for reCAPTCHA script to load...');
     await _recaptchaLoadedCompleter.future;
   }
 
+  final completer = Completer<String>();
+
   try {
-    final js.JsObject options = js.JsObject.jsify({'action': action});
-    final Object promise = _jsExecute(siteKey, options);
-    final String token = await promiseToFuture<String>(promise);
-    return token;
+    _grecaptchaReady(allowInterop(() {
+      final options = js.JsObject.jsify({'action': action});
+      final Object promise = _grecaptchaExecute(siteKey, options);
+      promiseToFuture<String>(promise).then((token) {
+        completer.complete(token);
+      }).catchError((error) {
+        debugPrint('❌ Error generating token: $error');
+        completer.completeError(error);
+      });
+    }));
   } catch (e) {
-    debugPrint('Error executing reCAPTCHA: $e');
-    throw Exception('reCAPTCHA token generation failed: $e');
+    completer.completeError('reCAPTCHA token generation failed: $e');
   }
+
+  return completer.future;
 }
 
