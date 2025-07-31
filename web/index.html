@@ -4,7 +4,7 @@
   <base href="$FLUTTER_BASE_HREF" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
+
   <title>Bright Acts</title>
   <meta name="description" content="Bright Acts empowers people to do good through technology and action." />
 
@@ -12,14 +12,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#000000" />
-  
+
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/Icon-192.png" />
   <link rel="icon" href="icons/favicon.png" type="image/png" />
-
-  <!-- Google reCAPTCHA v3 -->
-  <script src="https://www.google.com/recaptcha/api.js?render=6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F&onload=recaptchaOnLoad" async defer></script>
-
 
   <style>
     html, body {
@@ -32,16 +28,5 @@
 </head>
 <body>
   <script src="flutter_bootstrap.js" defer></script>
-
-  <script>
-    window.addEventListener('load', function () {
-      _flutter.loader.load().then(function (engineInitializer) {
-        engineInitializer.initializeEngine().then(function (appRunner) {
-          appRunner.run();
-        });
-      });
-    });
-  </script>
 </body>
 </html>
-
