@@ -70,7 +70,7 @@ Future<void> main() async {
   // webProvider: ReCaptchaV3Provider(reCaptchaSiteKeyProd),
   // );
 
-  await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+  // await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
 
   // --- Console Logging for App Check Activation Status ---
   if (kIsWeb && kDebugMode) {
