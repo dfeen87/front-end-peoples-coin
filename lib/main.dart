@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, defaultTargetPlatform;
 import 'package:flutter/foundation.dart';
+import 'firebase_options.dart';
 
 // Import your project-specific files
 import 'models/user_account.dart';
