@@ -1,0 +1,39 @@
+name: Build and Deploy to Firebase
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: echo "${{ secrets.DOT_ENV }}" > .env
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify that the .env file was created
+        run: ls -la
+
+      - name: Build Flutter web release with reCAPTCHA site key
+        run: flutter build web --release --dart-define=RECAPTCHA_SITE_KEY_PROD=6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: brightacts-frontend-50f58
+
