@@ -69,9 +69,9 @@ Future<void> main() async {
   );
 
   // --- Firebase App Check Activation ---
-  await FirebaseAppCheck.instance.activate(
-    webProvider: ReCaptchaV3Provider(reCaptchaSiteKeyProd),
-  );
+  // await FirebaseAppCheck.instance.activate(
+  // webProvider: ReCaptchaV3Provider(reCaptchaSiteKeyProd),
+  // );
 
   await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
 
