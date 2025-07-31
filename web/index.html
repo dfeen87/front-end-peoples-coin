@@ -8,7 +8,6 @@
   <title>❤️ Bright Acts</title>
   <meta name="description" content="Bright Acts empowers people to do good through technology and action." />
 
-  <!-- Web App Settings -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -19,20 +18,19 @@
   <link rel="icon" href="icons/favicon.png" type="image/png" />
 
   <!-- Google reCAPTCHA v3 -->
-  <script src="https://www.google.com/recaptcha/api.js?render=6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F&onload=recaptchaOnLoad" async defer></script>
+  <script src="https://www.google.com/recaptcha/api.js" defer></script>
 
   <style>
-    /* Black background, no visible content during load */
-    body {
+    html, body {
       margin: 0;
+      height: 100%;
       background-color: #000000;
-      height: 100vh;
       overflow: hidden;
     }
   </style>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async defer></script>
+  <script src="flutter_bootstrap.js" defer></script>
 
   <script>
     window.addEventListener('load', function () {
