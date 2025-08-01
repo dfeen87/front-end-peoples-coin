@@ -62,26 +62,41 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // --- CORRECTED Firebase App Check Activation ---
-  // This logic correctly handles debug vs. release mode for web.
-  if (kIsWeb) {
-    if (kReleaseMode) {
-      // Activate with reCAPTCHA v3 provider for release mode
-      if (reCaptchaSiteKeyProd.isNotEmpty) {
-        await FirebaseAppCheck.instance.activate(
-          webProvider: ReCaptchaV3Provider(reCaptchaSiteKeyProd),
-        );
-        print('[App Check] Activated for Web (Release Mode).');
-      } else {
-        print('[App Check] CRITICAL: reCAPTCHA key not provided for release build.');
-      }
+// --- CORRECTED Firebase App Check Activation (Temporarily Disabled) ---
+/*
+if (kIsWeb) {
+  if (kReleaseMode) {
+    // Activate with reCAPTCHA v3 provider for release mode
+    if (reCaptchaSiteKeyProd.isNotEmpty) {
+      await FirebaseAppCheck.instance.activate(
+        webProvider: ReCaptchaVV3Provider(reCaptchaSiteKeyProd),
+      );
+      print('[App Check] Activated for Web (Release Mode).');
     } else {
-      // In debug mode, don't activate with a key. Just print the debug token.
-      print('[App Check] In Web Debug Mode. Get token below.');
+      print('[App Check] CRITICAL: reCAPTCHA key not provided for release build.');
     }
+  } else {
+    // In debug mode, don't activate with a key. Just print the debug token.
+    print('[App Check] In Web Debug Mode. Get token below.');
   }
+}
+*/
 
-  await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+// Make sure this line also remains commented out for now
+// await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+
+// You can leave the debug token logic active, it is harmless.
+if (kDebugMode) {
+  FirebaseAppCheck.instance.getToken(true).then((String? token) {
+    if (token != null) {
+      print('------------------------------------------------------------');
+      print('App Check Debug Token: $token');
+      print('-> Add this to the Firebase Console (App Check -> Your App -> Manage debug tokens)');
+      print('------------------------------------------------------------');
+    }
+  });
+}
+  // await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
 
   // Get and print the debug token if in debug mode
   if (kDebugMode) {

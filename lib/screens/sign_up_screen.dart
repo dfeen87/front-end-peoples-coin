@@ -5,10 +5,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http; // For making API calls
+// import 'package:http/http.dart' as http; // No longer needed for now
 
 // Import your project-specific files
-import '../recaptcha_helper.dart'; // Import the updated v3 helper
+// import '../recaptcha_helper.dart'; // Temporarily disabled
 import '../widgets/dynamic_nebula_background.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -31,15 +31,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
   String? _error;
 
-  // Define your reCAPTCHA v3 site key here for consistency
-  // Make sure this matches the key in web/index.html and your build command
-  static const String recaptchaV3SiteKey = '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F'; // <--- Your chosen V3 Public Site Key
+  // Temporarily disabled reCAPTCHA site key
+  // static const String recaptchaV3SiteKey = '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F';
 
   @override
   void initState() {
     super.initState();
-    // Initialize reCAPTCHA v3 when the screen loads
-    initializeRecaptchaV3(); // Call the initialization function
+    // Temporarily disabled reCAPTCHA initialization
+    // initializeRecaptchaV3(); 
 
     _usernameController.addListener(_clearError);
     _emailController.addListener(_clearError);
@@ -64,7 +63,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  // UPDATED _signUp function for reCAPTCHA v3
+  // --- REWRITTEN _signUp function to bypass custom backend and reCAPTCHA ---
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -83,45 +82,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      // Step 1: Get the reCAPTCHA v3 token.
-      // The 'signup' action helps Google analyze user behavior specifically for signup.
-      final String recaptchaToken = await getRecaptchaToken(recaptchaV3SiteKey, 'signup');
-      print('reCAPTCHA v3 token: $recaptchaToken');
-
-
-      // Step 2: Send user details and token to your backend.
-      // The backend will verify reCAPTCHA and then create the user.
-      final response = await http.post(
-        Uri.parse('https://peoples-coin-service-105378934751.us-central1.run.app/api/signup'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'username': _usernameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'password': _passwordController.text,
-          'token': recaptchaToken, // Send the v3 token
-        }),
+      // Directly create the user with Firebase Authentication
+      final UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
       );
 
-      if (response.statusCode == 200) {
-        // Backend confirmed success. The user is created.
-        // Now, sign in the user on the client to update the app state.
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
-        
-        if (mounted) {
-          context.go('/home');
-        }
-      } else {
-        // Handle error from the backend
-        final responseBody = jsonDecode(response.body);
-        throw Exception(responseBody['error'] ?? 'An unknown error occurred during sign-up.');
-      }
+      // After creation, you can update the user's profile with the username
+      await userCredential.user?.updateDisplayName(_usernameController.text.trim());
 
+      if (mounted) {
+        context.go('/home');
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        // Provide user-friendly error messages for common issues
+        if (e.code == 'weak-password') {
+          _error = 'The password provided is too weak.';
+        } else if (e.code == 'email-already-in-use') {
+          _error = 'An account already exists for that email.';
+        } else {
+          _error = 'An error occurred. Please try again.';
+        }
+        print('Firebase Auth Error: ${e.message}');
+      });
     } catch (e) {
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = 'An unexpected error occurred.';
+        print('Generic Error: $e');
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
