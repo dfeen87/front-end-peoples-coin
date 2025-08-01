@@ -1,4 +1,3 @@
-// lib/service/api_client.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -19,9 +18,10 @@ class PeoplesCoinApiClient {
   PeoplesCoinApiClient({String? baseUrl})
       : baseUrl = baseUrl ?? dotenv.env['API_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
 
+  Map<String, String> get _jsonHeaders => {'Content-Type': 'application/json'};
+
   // === User ===
 
-  // --- NEW: Method to create a user record in your database ---
   Future<void> createUserAccount({
     required String firebaseUid,
     required String email,
@@ -35,11 +35,7 @@ class PeoplesCoinApiClient {
     });
 
     try {
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
+      final response = await http.post(uri, headers: _jsonHeaders, body: body).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 201) {
         throw Exception('Failed to create user account in database. Status: ${response.statusCode}, Body: ${response.body}');
@@ -53,7 +49,7 @@ class PeoplesCoinApiClient {
   Future<UserAccount> getUserById(String userId) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/$userId');
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         return UserAccount.fromJson(json.decode(response.body));
       } else {
@@ -68,7 +64,7 @@ class PeoplesCoinApiClient {
   Future<bool> checkUsernameAvailability(String username) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/username-check/$username');
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return data['available'] == true;
@@ -93,11 +89,7 @@ class PeoplesCoinApiClient {
     });
 
     try {
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
+      final response = await http.post(uri, headers: _jsonHeaders, body: body).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 201) {
         throw Exception('Failed to create user wallet. Status: ${response.statusCode}, Body: ${response.body}');
@@ -109,10 +101,11 @@ class PeoplesCoinApiClient {
   }
 
   // === Goodwill Actions ===
+
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
     final uri = Uri.parse('$baseUrl/api/v1/users/$userId/goodwill-actions');
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((item) => GoodwillAction.fromJson(item)).toList();
@@ -130,9 +123,10 @@ class PeoplesCoinApiClient {
     try {
       final response = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: _jsonHeaders,
         body: json.encode(actionToSend.toJson()),
-      );
+      ).timeout(const Duration(seconds: 10));
+
       if (response.statusCode == 201) {
         return json.decode(response.body);
       } else {
@@ -145,6 +139,7 @@ class PeoplesCoinApiClient {
   }
 
   // === Proposals ===
+
   Future<List<Proposal>> listProposals({String? status}) async {
     var url = '$baseUrl/api/v1/governance/proposals';
     if (status != null && status.isNotEmpty) {
@@ -152,7 +147,7 @@ class PeoplesCoinApiClient {
     }
     final uri = Uri.parse(url);
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((item) => Proposal.fromJson(item)).toList();
@@ -168,7 +163,7 @@ class PeoplesCoinApiClient {
   Future<Proposal> getProposalDetails(String proposalId) async {
     final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/$proposalId');
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         return Proposal.fromJson(json.decode(response.body));
       } else {
@@ -185,9 +180,10 @@ class PeoplesCoinApiClient {
     try {
       final response = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: _jsonHeaders,
         body: json.encode(proposalToSend.toJson()),
-      );
+      ).timeout(const Duration(seconds: 10));
+
       if (response.statusCode == 201) {
         return json.decode(response.body);
       } else {
@@ -200,14 +196,16 @@ class PeoplesCoinApiClient {
   }
 
   // === Votes ===
+
   Future<Map<String, dynamic>> submitVote(VoteToSend voteToSend) async {
     final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/${voteToSend.proposalId}/vote');
     try {
       final response = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: _jsonHeaders,
         body: json.encode(voteToSend.toJson()),
-      );
+      ).timeout(const Duration(seconds: 10));
+
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
@@ -220,10 +218,11 @@ class PeoplesCoinApiClient {
   }
 
   // === Ledger ===
+
   Future<List<PublicLedgerEntry>> getLedgerEntries({int page = 1}) async {
     final uri = Uri.parse('$baseUrl/api/v1/ledger/public?page=$page');
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
@@ -239,7 +238,7 @@ class PeoplesCoinApiClient {
   Future<List<PublicLedgerEntry>> searchLedger({required String query}) async {
     final uri = Uri.parse('$baseUrl/api/v1/ledger/search?q=${Uri.encodeComponent(query)}');
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
@@ -267,11 +266,7 @@ class PeoplesCoinApiClient {
     });
 
     try {
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
+      final response = await http.post(uri, headers: _jsonHeaders, body: body).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body);
@@ -285,10 +280,11 @@ class PeoplesCoinApiClient {
   }
 
   // === Metabolic status check ===
+
   Future<String> checkMetabolicStatus() async {
     final uri = Uri.parse('$baseUrl/metabolic/status');
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         return response.body;
       } else {
@@ -300,3 +296,4 @@ class PeoplesCoinApiClient {
     }
   }
 }
+

@@ -5,6 +5,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart'; // <<< ADDED THIS LINE
+
 // import 'package:http/http.dart' as http; // No longer needed for now
 
 // Import your project-specific files
@@ -104,12 +106,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         } else {
           _error = 'An error occurred. Please try again.';
         }
-        print('Firebase Auth Error: ${e.message}');
+        if (kDebugMode) print('Firebase Auth Error: ${e.message}');
       });
     } catch (e) {
       setState(() {
         _error = 'An unexpected error occurred.';
-        print('Generic Error: $e');
+        if (kDebugMode) print('Generic Error: $e');
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);

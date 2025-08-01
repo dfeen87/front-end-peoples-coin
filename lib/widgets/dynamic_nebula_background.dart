@@ -4,7 +4,6 @@ import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 class DynamicNebulaBackground extends StatefulWidget {
   final double speed;
@@ -24,116 +23,87 @@ class _DynamicNebulaBackgroundState extends State<DynamicNebulaBackground>
     with TickerProviderStateMixin {
   final Random _random = Random();
   
-  // --- Animation Controllers ---
-  late Ticker _movementTicker;
+  late AnimationController _positionController;
   late AnimationController _colorController;
-
-  // --- Layer Properties (Position & Velocity) ---
-  late Offset _position1, _position2, _position3;
-  late Offset _velocity1, _velocity2, _velocity3;
+  
+  // --- Layer Properties (Initial Offset & Amplitude for motion) ---
+  late Offset _initialPosition1, _initialPosition2, _initialPosition3;
+  late double _amplitude1, _amplitude2, _amplitude3;
+  late double _phaseShift1, _phaseShift2, _phaseShift3;
 
   @override
   void initState() {
     super.initState();
     _initializeLayers();
 
-    // Ticker for physical movement of layers
-    _movementTicker = createTicker(_updateMovement)..start();
+    // Controller for the smooth, orbital movement of layers
+    _positionController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 40), // Slower movement for a lava lamp feel
+    )..repeat(reverse: true); // Repeat with a reverse to keep it smooth
 
     // Controller for the perpetual color evolution
     _colorController = AnimationController(
       vsync: this,
-      duration: const Duration(minutes: 5), // Very slow evolution
+      duration: const Duration(seconds: 30), // Very slow evolution
     )..repeat();
   }
   
-  /// Sets the initial random positions and velocities for the three layers.
   void _initializeLayers() {
-    _position1 = _getRandomOffset();
-    _position2 = _getRandomOffset();
-    _position3 = _getRandomOffset();
+    _initialPosition1 = _getRandomOffset();
+    _initialPosition2 = _getRandomOffset();
+    _initialPosition3 = _getRandomOffset();
 
-    _velocity1 = _getRandomVelocity();
-    _velocity2 = _getRandomVelocity();
-    _velocity3 = _getRandomVelocity();
+    _amplitude1 = 0.1 + _random.nextDouble() * 0.1;
+    _amplitude2 = 0.1 + _random.nextDouble() * 0.1;
+    _amplitude3 = 0.1 + _random.nextDouble() * 0.1;
+    
+    _phaseShift1 = _random.nextDouble() * 2 * pi;
+    _phaseShift2 = _random.nextDouble() * 2 * pi;
+    _phaseShift3 = _random.nextDouble() * 2 * pi;
   }
 
   /// Generates a random Offset within the screen bounds (0.0 to 1.0).
-  Offset _getRandomOffset() => Offset(_random.nextDouble(), _random.nextDouble());
-
-  /// Generates a random velocity vector.
-  Offset _getRandomVelocity() => Offset(
-      (_random.nextDouble() - 0.5) * 0.01, (_random.nextDouble() - 0.5) * 0.01);
-
-  /// This is the corrected movement logic.
-  /// It now updates the velocity of each layer when a bounce occurs.
-  void _updateMovement(Duration elapsed) {
-    setState(() {
-      // Calculate and update state for layer 1
-      final state1 = _calculateNextState(_position1, _velocity1);
-      _position1 = state1.position;
-      _velocity1 = state1.velocity;
-
-      // Calculate and update state for layer 2
-      final state2 = _calculateNextState(_position2, _velocity2);
-      _position2 = state2.position;
-      _velocity2 = state2.velocity;
-
-      // Calculate and update state for layer 3
-      final state3 = _calculateNextState(_position3, _velocity3);
-      _position3 = state3.position;
-      _velocity3 = state3.velocity;
-    });
-  }
-  
-  /// Calculates the next position and velocity, handling wall bounces.
-  /// Returns a record containing the new position and new velocity.
-  ({Offset position, Offset velocity}) _calculateNextState(
-      Offset position, Offset velocity) {
-    var newPosition = position + (velocity * widget.speed);
-    var newVelocity = velocity;
-
-    // Check for bounce on X-axis
-    if (newPosition.dx < 0 || newPosition.dx > 1) {
-      newVelocity = Offset(-newVelocity.dx, newVelocity.dy);
-    }
-
-    // Check for bounce on Y-axis
-    if (newPosition.dy < 0 || newPosition.dy > 1) {
-      newVelocity = Offset(newVelocity.dx, -newVelocity.dy);
-    }
-    
-    // Clamp position to ensure it stays within the screen bounds.
-    newPosition = Offset(
-      newPosition.dx.clamp(0.0, 1.0),
-      newPosition.dy.clamp(0.0, 1.0),
-    );
-
-    return (position: newPosition, velocity: newVelocity);
-  }
+  Offset _getRandomOffset() => Offset(
+      _random.nextDouble() * 0.8 + 0.1, // Ensure blobs start in a central area
+      _random.nextDouble() * 0.8 + 0.1);
 
   @override
   void dispose() {
-    _movementTicker.dispose();
+    _positionController.dispose();
     _colorController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Using AnimatedBuilder is more efficient than calling setState in the controller listener.
     return AnimatedBuilder(
-      animation: _colorController,
+      animation: Listenable.merge([_positionController, _colorController]),
       builder: (context, child) {
+        final double time = _positionController.value * 2 * pi;
+
+        // Calculate new positions based on a smooth, non-linear function
+        final newPosition1 = _calculateNewPosition(_initialPosition1, _amplitude1, _phaseShift1, time);
+        final newPosition2 = _calculateNewPosition(_initialPosition2, _amplitude2, _phaseShift2, time);
+        final newPosition3 = _calculateNewPosition(_initialPosition3, _amplitude3, _phaseShift3, time);
+
         return CustomPaint(
           painter: NebulaBackgroundPainter(
-            positions: [_position1, _position2, _position3],
+            positions: [newPosition1, newPosition2, newPosition3],
             colors: _getEvolvingColors(),
             blurSigma: widget.blurSigma,
           ),
           child: Container(),
         );
       },
+    );
+  }
+
+  /// Calculates the next position using sine and cosine for a smooth, orbital path.
+  Offset _calculateNewPosition(Offset initial, double amplitude, double phaseShift, double time) {
+    return Offset(
+      initial.dx + amplitude * sin(time + phaseShift),
+      initial.dy + amplitude * cos(time + phaseShift),
     );
   }
 
@@ -182,7 +152,7 @@ class NebulaBackgroundPainter extends CustomPainter {
       [colors[2], colors[3]],
       size.shortestSide * 0.7,
       blurFilter,
-      blendMode: BlendMode.plus, // CORRECTED from .add
+      blendMode: BlendMode.plus,
     );
 
     // Layer 3: Core Layer (Smallest)
@@ -193,19 +163,19 @@ class NebulaBackgroundPainter extends CustomPainter {
       [colors[4], colors[5]],
       size.shortestSide * 0.5,
       blurFilter,
-      blendMode: BlendMode.plus, // CORRECTED from .add
+      blendMode: BlendMode.plus,
     );
   }
 
   void _paintLayer(
-    Canvas canvas,
-    Size size,
-    Offset position,
-    List<Color> layerColors,
-    double radius,
-    MaskFilter maskFilter, {
-    BlendMode? blendMode,
-  }) {
+      Canvas canvas,
+      Size size,
+      Offset position,
+      List<Color> layerColors,
+      double radius,
+      MaskFilter maskFilter, {
+        BlendMode? blendMode,
+      }) {
     final paint = Paint()..maskFilter = maskFilter;
 
     if (blendMode != null) {

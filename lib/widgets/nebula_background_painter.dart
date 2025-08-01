@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'; // <<< ADDED THIS IMPORT
 
 class NebulaBackgroundPainter extends CustomPainter {
   final Offset center;  // Normalized 0.0 – 1.0
@@ -54,4 +54,3 @@ class NebulaBackgroundPainter extends CustomPainter {
         oldDelegate.noiseIntensity != noiseIntensity;
   }
 }
-

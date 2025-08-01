@@ -3,10 +3,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-// import 'package:http/http.dart' as http; // No longer needed for now
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart'; // <<< ADDED THIS LINE
 
-// import '../recaptcha_helper.dart'; // Temporarily disabled
 import '../widgets/dynamic_nebula_background.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../state/user_provider.dart';
@@ -26,15 +25,9 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _isLoading = false;
   String? _error;
 
-  // Temporarily disabled reCAPTCHA site key
-  // static const String recaptchaV3SiteKey = '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F';
-
   @override
   void initState() {
     super.initState();
-    // Temporarily disabled reCAPTCHA initialization
-    // initializeRecaptchaV3(); 
-
     _emailController.addListener(_clearError);
     _passwordController.addListener(_clearError);
   }
@@ -54,7 +47,6 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
-  // --- REWRITTEN _signIn function to bypass custom backend and reCAPTCHA ---
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -64,38 +56,50 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      // Directly sign in the user with Firebase Authentication
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // After successful sign-in, update providers and navigate
       if (!mounted) return;
-      
+
       final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-      await authProvider.checkCurrentUser(); // Refresh the auth state
+      await authProvider.checkCurrentUser();
 
       if (authProvider.user != null) {
-        await context.read<UserProvider>().fetchUser(authProvider.user!.uid);
-        context.go('/home');
+        final userId = authProvider.user!.uid;
+        if (kDebugMode) print('[SignInScreen] Firebase UID to fetch user: $userId');
+
+        try {
+          await context.read<UserProvider>().fetchUser(userId);
+          context.go('/home');
+        } catch (e) {
+          if (e.toString().contains('404')) {
+            setState(() {
+              _error = 'User profile not found. Please register or contact support.';
+            });
+          } else {
+            setState(() {
+              _error = 'Failed to fetch user profile: $e';
+            });
+          }
+        }
       } else {
-        throw Exception("Sign-in successful, but failed to retrieve user data.");
+        throw Exception("Sign-in succeeded but user data is missing.");
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        // Provide a user-friendly error message for common login failures
         if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
           _error = 'Incorrect email or password. Please try again.';
         } else {
           _error = 'An error occurred during sign-in.';
         }
-        print('Firebase Auth Error: ${e.message}');
+        if (kDebugMode) print('Firebase Auth Error: ${e.message}');
       });
     } catch (e) {
       setState(() {
-         _error = e.toString().replaceFirst('Exception: ', '');
-         print('Generic Error: $e');
+        _error = e.toString().replaceFirst('Exception: ', '');
+        if (kDebugMode) print('Generic Error: $e');
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
