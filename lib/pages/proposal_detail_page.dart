@@ -73,7 +73,6 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
                   voterUserId: userId,
                   voteValue: voteValue,
                 );
-                // --- FIX: Correctly check the Map result from the provider ---
                 final result = await context.read<ProposalProvider>().submitVote(vote);
                 if (result['success'] == true && mounted) {
                   _showVoteSuccessDialog();
@@ -100,7 +99,6 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          const DynamicNebulaBackground(),
           Consumer<ProposalProvider>(
             builder: (context, provider, child) {
               if (provider.isFetchingDetails || provider.selectedProposal == null) {
@@ -118,9 +116,9 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
   }
 
   Widget _buildContent(Proposal proposal) {
-    // --- FIX: Vote counts are not on the Proposal model. ---
-    // They should come from the provider. For now, we use mock data so the UI works.
-    // In the future, you'll get these from your provider, e.g., `provider.forVotes`.
+    // FIX: Reverted to hardcoded values.
+    // The error log indicates that forVotesCount and againstVotesCount do not exist on the Proposal model.
+    // This is a placeholder for when your model is updated to include them.
     const int forVotes = 620;
     const int againstVotes = 210;
 
@@ -223,11 +221,10 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
   }
 
   Widget _buildStatusHeader(Proposal proposal) {
-    // --- FIX: Using the correct enum members from your proposal.dart model ---
     final Map<ProposalStatus, (IconData, Color, String)> statusInfo = {
       ProposalStatus.active: (Icons.hourglass_bottom_rounded, Colors.blueAccent, 'Active'),
-      ProposalStatus.closed: (Icons.check_circle_rounded, Colors.green, 'Passed'), // Changed from 'passed'
-      ProposalStatus.rejected: (Icons.cancel_rounded, Colors.redAccent, 'Failed'), // Changed from 'failed'
+      ProposalStatus.closed: (Icons.check_circle_rounded, Colors.green, 'Passed'),
+      ProposalStatus.rejected: (Icons.cancel_rounded, Colors.redAccent, 'Failed'),
       ProposalStatus.draft: (Icons.edit_note_rounded, Colors.grey, 'Draft'),
       ProposalStatus.unknown: (Icons.question_mark_rounded, Colors.grey, 'Unknown'),
     };
@@ -255,19 +252,19 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
 
   Widget _buildLoadingShimmer() {
     return Shimmer.fromColors(
-      baseColor: Colors.grey[850]!,
-      highlightColor: Colors.grey[800]!,
+      baseColor: Colors.white.withOpacity(0.05),
+      highlightColor: Colors.white.withOpacity(0.1),
       child: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
           SizedBox(height: kToolbarHeight),
-          Container(height: 80, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
+          Container(height: 80, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16))),
           const SizedBox(height: 16),
-          Container(height: 200, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
+          Container(height: 200, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16))),
           const SizedBox(height: 24),
-          Container(height: 30, width: 150, color: Colors.white),
+          Container(height: 30, width: 150, color: Colors.white.withOpacity(0.05)),
           const SizedBox(height: 16),
-          Container(height: 50, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
+          Container(height: 50, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(8))),
         ],
       ),
     );
@@ -328,4 +325,3 @@ class _VoteSuccessDialogState extends State<_VoteSuccessDialog> with SingleTicke
     );
   }
 }
-

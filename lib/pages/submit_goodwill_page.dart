@@ -1,10 +1,13 @@
+// lib/pages/submit_goodwill_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:math';
 import 'dart:ui';
+import 'package:flutter/services.dart';
 
 import '../state/goodwill_processing_provider.dart';
 import '../state/user_provider.dart';
+import '../models/goodwill_action_to_send.dart';
 
 // --- Predefined act types with icons for UI clarity ---
 const Map<String, IconData> _actTypes = {
@@ -106,13 +109,12 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
             return const Center(child: Text("User not logged in or data not loaded.", style: TextStyle(color: Colors.white70)));
           }
 
-          // --- ADDED: Custom Stepper Theme ---
           return Theme(
             data: Theme.of(context).copyWith(
-              canvasColor: Colors.black.withOpacity(0.3), // Background of the stepper
+              canvasColor: Colors.black.withOpacity(0.3),
               colorScheme: ColorScheme.dark(
-                primary: Colors.amber[700]!, // Active step color
-                onPrimary: Colors.black, // Text/icon color on active step
+                primary: Colors.amber[700]!,
+                onPrimary: Colors.black,
               ),
             ),
             child: Stepper(
@@ -133,7 +135,6 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     );
   }
 
-  // --- ADDED: Centralized validation logic ---
   bool _validateAndSaveStep(int step) {
     switch (step) {
       case 0:
@@ -148,7 +149,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
       case 1:
         if (!(_formKey.currentState?.validate() ?? false)) return false;
         _formKey.currentState!.save();
-        _updateLovesScore(); // Update score after description is saved
+        _updateLovesScore();
         return true;
       case 3:
         if (_durationMinutes <= 0) {
@@ -164,7 +165,6 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     }
   }
 
-  // --- REFINED: Step continuation logic ---
   VoidCallback _handleStepContinue(GoodwillProcessingProvider provider, String userId) {
     return () {
       final isStepValid = _validateAndSaveStep(_currentStep);
@@ -240,7 +240,6 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     ];
   }
 
-  // --- Step builder methods remain the same ---
   Widget _buildStep1ChooseAct() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,12 +287,12 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
           TextFormField(
             initialValue: _description,
             maxLines: 5,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Describe the act of goodwill...',
-              hintStyle: TextStyle(color: Colors.white54),
+              hintStyle: const TextStyle(color: Colors.white54),
               filled: true,
-              fillColor: Colors.white10,
-              border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide.none),
+              fillColor: Colors.white.withOpacity(0.1),
+              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide.none),
             ),
             style: const TextStyle(color: Colors.white),
             validator: (val) => val == null || val.trim().isEmpty ? 'Please describe the act.' : null,
@@ -356,12 +355,12 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
         TextFormField(
           key: const ValueKey('duration'),
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Duration (minutes)',
             hintText: 'How long did this act last?',
             filled: true,
-            fillColor: Colors.white10,
-            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+            fillColor: Colors.white.withOpacity(0.1),
+            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
           ),
           style: const TextStyle(color: Colors.white),
           onChanged: (val) {
@@ -379,11 +378,11 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
         ),
         const SizedBox(height: 24),
         DropdownButtonFormField<String>(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Impact Level',
             filled: true,
-            fillColor: Colors.white10,
-            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+            fillColor: Colors.white.withOpacity(0.1),
+            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
           ),
           value: _impactLevel,
           dropdownColor: Colors.grey[900],
@@ -447,21 +446,28 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     );
   }
 
-  // --- REFINED: Final submission logic ---
   Future<void> _submitForm(GoodwillProcessingProvider provider, String userId) async {
-    // All validation has already passed in the previous steps.
-    // We can now directly submit the data.
     final contextualData = {
       'duration_minutes': _durationMinutes,
       'impact_level': _impactLevel,
     };
 
-    final success = await provider.submitGoodwill(
+    final actionToSend = GoodwillActionToSend(
       performerUserId: userId,
       actionType: _actionType,
       description: _description.trim(),
       lovesValue: _lovesValue,
       contextualData: contextualData,
+      timestamp: DateTime.now(),
+    );
+    
+    final success = await provider.submitGoodwill(
+      performerUserId: actionToSend.performerUserId,
+      actionType: actionToSend.actionType,
+      description: actionToSend.description,
+      lovesValue: actionToSend.lovesValue,
+      contextualData: actionToSend.contextualData,
+      timestamp: actionToSend.timestamp,
     );
 
     if (success && mounted) {
@@ -476,10 +482,9 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
 }
 
 // --- Confetti Overlay for celebration effect ---
-// This widget remains unchanged.
 class ConfettiOverlay extends StatefulWidget {
   final AnimationController controller;
-  const ConfettiOverlay({required this.controller, super.key});
+  const ConfettiOverlay({super.key, required this.controller});
 
   @override
   State<ConfettiOverlay> createState() => _ConfettiOverlayState();

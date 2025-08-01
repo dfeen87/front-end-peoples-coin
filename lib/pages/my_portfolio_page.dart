@@ -51,7 +51,8 @@ class _MyPortfolioPageState extends State<MyPortfolioPage> with TickerProviderSt
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          const DynamicNebulaBackground(),
+          // FIX: Removed the redundant background widget.
+          // The AppShell now provides a single, continuous background for the entire app.
           Consumer<UserProvider>(
             builder: (context, userProvider, child) {
               if (userProvider.isFetchingActions && userProvider.userActions.isEmpty) {
@@ -76,19 +77,19 @@ class _MyPortfolioPageState extends State<MyPortfolioPage> with TickerProviderSt
 
   Widget _buildLoadingSkeleton() {
     return Shimmer.fromColors(
-      baseColor: Colors.grey[850]!,
-      highlightColor: Colors.grey[800]!,
+      baseColor: Colors.white.withOpacity(0.05), // FIX: Made shimmer translucent
+      highlightColor: Colors.white.withOpacity(0.1), // FIX: Made shimmer translucent
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         children: [
           SizedBox(height: MediaQuery.of(context).padding.top + 20),
-          Container(height: 120, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
+          Container(height: 120, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16))), // FIX: Made container translucent
           const SizedBox(height: 24),
-          Container(height: 100, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+          Container(height: 100, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12))), // FIX: Made container translucent
           const SizedBox(height: 16),
-          Container(height: 100, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+          Container(height: 100, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12))), // FIX: Made container translucent
           const SizedBox(height: 16),
-          Container(height: 100, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+          Container(height: 100, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12))), // FIX: Made container translucent
         ],
       ),
     );
@@ -174,7 +175,6 @@ class _MyPortfolioPageState extends State<MyPortfolioPage> with TickerProviderSt
           children: [
             if (isLoves) const Text('❤️ ', style: TextStyle(fontSize: 28)),
             AnimatedDigitWidget(
-              // --- THIS IS THE FIX ---
               // The AnimatedDigitWidget expects a double, so we convert the int.
               value: value.toDouble(),
               textStyle: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
@@ -311,4 +311,3 @@ class _EmptyPortfolioState extends StatelessWidget {
     );
   }
 }
-

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart'; // <<< ADDED THIS LINE
+import 'package:flutter/foundation.dart';
 
 import '../widgets/dynamic_nebula_background.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
@@ -124,6 +124,13 @@ class _SignInScreenState extends State<SignInScreen> {
         const SnackBar(
           content: Text('Password reset link sent to your email.'),
           backgroundColor: Colors.green,
+        ),
+      );
+    } on FirebaseAuthException catch (e) { // FIX: Added specific error handling
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send reset link: ${e.message}'),
+          backgroundColor: Colors.redAccent,
         ),
       );
     } catch (e) {

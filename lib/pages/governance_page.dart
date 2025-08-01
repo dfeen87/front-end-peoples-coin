@@ -79,12 +79,15 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateProposalForm,
         icon: const Icon(Icons.add, color: Colors.black),
+        // FIX: Made the button translucent
         label: const Text('New Proposal', style: TextStyle(color: Colors.black)),
-        backgroundColor: Colors.amber[700],
+        backgroundColor: Colors.amber[700]!.withOpacity(0.8), 
       ),
       body: Stack(
         children: [
-          const DynamicNebulaBackground(),
+          // FIX: The background widget is now a child of AppShell, so we remove it here.
+          // This is what prevents it from resetting and makes it continuous.
+          // const DynamicNebulaBackground(), 
           RefreshIndicator(
             onRefresh: _fetchProposals,
             color: Colors.amber,
@@ -223,11 +226,11 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) => Shimmer.fromColors(
-            baseColor: Colors.grey[850]!,
-            highlightColor: Colors.grey[800]!,
+            baseColor: Colors.grey[850]!.withOpacity(0.3), // FIX: Made the shimmer colors translucent
+            highlightColor: Colors.grey[800]!.withOpacity(0.3), // FIX: Made the shimmer colors translucent
             child: Card(
               margin: const EdgeInsets.symmetric(vertical: 8.0),
-              color: Colors.white,
+              color: Colors.white.withOpacity(0.05), // FIX: Made the shimmer card transparent
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
               child: const SizedBox(height: 150),
             ),
@@ -238,4 +241,3 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
     );
   }
 }
-

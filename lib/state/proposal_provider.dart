@@ -1,62 +1,66 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/proposal.dart';
-import '../models/vote_to_send.dart';
 import '../models/proposal_to_send.dart';
-import '../service/api_client.dart';
+import '../models/vote_to_send.dart';
+import '../services/api_client.dart';
 
 class ProposalProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
 
-  // --- State Variables for Proposal List ---
+  // --- State for the proposals list ---
   List<Proposal> _proposals = [];
   bool _isFetchingProposals = false;
-  String? _listError;
+  String? _proposalsError;
 
-  // --- State Variables for Selected Proposal Details ---
+  // --- State for a single selected proposal's details ---
   Proposal? _selectedProposal;
   bool _isFetchingDetails = false;
   String? _detailsError;
 
-  // --- State Variables for Actions ---
-  bool _isSubmittingProposal = false;
+  // --- State for creating and submitting actions ---
+  bool _isCreatingProposal = false;
   bool _isSubmittingVote = false;
 
-  // --- GETTERS ---
+  // --- Getters for Proposals List ---
   List<Proposal> get proposals => _proposals;
   bool get isFetchingProposals => _isFetchingProposals;
-  bool get hasListError => _listError != null;
-  String? get listError => _listError;
+  bool get hasProposalsError => _proposalsError != null;
+  String? get proposalsError => _proposalsError;
 
+  // --- Getters for Selected Proposal Details ---
   Proposal? get selectedProposal => _selectedProposal;
   bool get isFetchingDetails => _isFetchingDetails;
   bool get hasDetailsError => _detailsError != null;
   String? get detailsError => _detailsError;
 
-  bool get isSubmittingProposal => _isSubmittingProposal;
+  // --- Getters for Submission Status ---
+  bool get isCreatingProposal => _isCreatingProposal;
   bool get isSubmittingVote => _isSubmittingVote;
 
-  // --- CONSTRUCTOR ---
   ProposalProvider(this._apiClient);
 
-  // --- METHODS ---
-
+  /// Fetches a list of proposals, optionally filtered by status.
   Future<void> fetchProposals({String? status}) async {
     _isFetchingProposals = true;
-    _listError = null;
+    _proposalsError = null;
     notifyListeners();
 
     try {
-      final fetchedProposals = await _apiClient.listProposals(status: status);
-      _proposals = fetchedProposals;
+      // FIX: Call the listProposals method with the status argument
+      _proposals = await _apiClient.listProposals(status: status);
+      if (kDebugMode) print('[ProposalProvider] Fetched ${_proposals.length} proposals.');
     } catch (e) {
-      _listError = 'Failed to load proposals: ${e.toString()}';
-      print('Error fetching proposals: $_listError');
+      _proposalsError = 'Failed to fetch proposals: $e';
+      if (kDebugMode) print('[ProposalProvider] Error fetching proposals: $e');
+      _proposals = []; // Clear old data on error
     } finally {
       _isFetchingProposals = false;
       notifyListeners();
     }
   }
 
+  /// Fetches a single proposal's details by its ID.
   Future<void> fetchProposalDetails(String proposalId) async {
     _isFetchingDetails = true;
     _detailsError = null;
@@ -64,76 +68,55 @@ class ProposalProvider with ChangeNotifier {
 
     try {
       _selectedProposal = await _apiClient.getProposalDetails(proposalId);
-      if (_selectedProposal == null) {
-        _detailsError = 'Proposal not found.';
-      }
+      if (kDebugMode) print('[ProposalProvider] Fetched details for proposal: ${proposalId}.');
     } catch (e) {
-      _detailsError = 'Failed to load proposal details: ${e.toString()}';
-      print('Error fetching proposal details: $_detailsError');
+      _detailsError = 'Failed to fetch proposal details: $e';
+      if (kDebugMode) print('[ProposalProvider] Error fetching details: $e');
+      _selectedProposal = null; // Clear old data on error
     } finally {
       _isFetchingDetails = false;
       notifyListeners();
     }
   }
 
+  /// Submits a new proposal to the backend.
   Future<Map<String, dynamic>> createProposal(ProposalToSend proposal) async {
-    _isSubmittingProposal = true;
-    _detailsError = null;
+    _isCreatingProposal = true;
     notifyListeners();
-
+    
     try {
-      final result = await _apiClient.createProposal(proposal);
-      if (result['success'] == true) {
-        print('Proposal created successfully!');
-        await fetchProposals(status: 'ACTIVE');
-        return {'success': true};
-      } else {
-        final errorMessage = result['error'] ?? 'Unknown error creating proposal.';
-        _detailsError = errorMessage;
-        print('API Error creating proposal: $_detailsError');
-        return {'success': false, 'error': errorMessage};
-      }
+      final response = await _apiClient.createProposal(proposal);
+      if (kDebugMode) print('[ProposalProvider] Proposal created successfully.');
+      return {'success': true, 'data': response};
     } catch (e) {
-      final errorMessage = 'An unexpected error occurred: ${e.toString()}';
-      _detailsError = errorMessage;
-      print('Caught Error creating proposal: $_detailsError');
-      return {'success': false, 'error': errorMessage};
+      if (kDebugMode) print('[ProposalProvider] Failed to create proposal: $e');
+      return {'success': false, 'error': e.toString()};
     } finally {
-      _isSubmittingProposal = false;
+      _isCreatingProposal = false;
       notifyListeners();
     }
   }
 
+  /// Submits a vote for a proposal.
   Future<Map<String, dynamic>> submitVote(VoteToSend vote) async {
     _isSubmittingVote = true;
-    _detailsError = null;
     notifyListeners();
 
     try {
-      final result = await _apiClient.submitVote(vote);
-      if (result['success'] == true) {
-        print('Vote submitted successfully!');
-        if (_selectedProposal != null) {
-          await fetchProposalDetails(_selectedProposal!.id);
-        } else {
-          await fetchProposals(status: 'ACTIVE');
-        }
-        return {'success': true};
-      } else {
-        final errorMessage = result['error'] ?? 'Unknown error submitting vote.';
-        _detailsError = errorMessage;
-        print('API Error submitting vote: $_detailsError');
-        return {'success': false, 'error': errorMessage};
+      final response = await _apiClient.submitVote(vote);
+      if (kDebugMode) print('[ProposalProvider] Vote submitted successfully.');
+
+      // Refresh the proposal details to show the updated vote counts
+      if (_selectedProposal != null) {
+        await fetchProposalDetails(_selectedProposal!.id);
       }
+      return {'success': true, 'data': response};
     } catch (e) {
-      final errorMessage = 'An unexpected error occurred: ${e.toString()}';
-      _detailsError = errorMessage;
-      print('Caught Error submitting vote: $_detailsError');
-      return {'success': false, 'error': errorMessage};
+      if (kDebugMode) print('[ProposalProvider] Failed to submit vote: $e');
+      return {'success': false, 'error': e.toString()};
     } finally {
       _isSubmittingVote = false;
       notifyListeners();
     }
   }
 }
-

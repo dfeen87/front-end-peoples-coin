@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import 'dart:async';
 
 import '../state/ledger_provider.dart';
 import '../state/user_provider.dart';
@@ -18,8 +19,9 @@ class PublicLedgerPage extends StatefulWidget {
 
 class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProviderStateMixin {
   late final AnimationController _listAnimationController;
-  // --- ENHANCEMENT 1: For Pagination ---
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -29,7 +31,6 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
       duration: const Duration(milliseconds: 1000),
     );
 
-    // --- ENHANCEMENT 1: Add listener for infinite scrolling ---
     _scrollController.addListener(_onScroll);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -38,10 +39,8 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
   }
 
   void _fetchInitialData() {
-    // Fetch initial data and reset animations
     _listAnimationController.reset();
     final provider = Provider.of<LedgerProvider>(context, listen: false);
-    // Assumes provider is updated for pagination
     provider.fetchPublicLedgerEntries(isRefresh: true).then((_) {
       if (mounted) {
         _listAnimationController.forward();
@@ -49,19 +48,27 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
     });
   }
 
-  // --- ENHANCEMENT 1: Scroll listener logic ---
   void _onScroll() {
-    // If the user scrolls to the near bottom of the list, fetch more data.
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
-      // Assumes provider has logic to prevent multiple fetches
       context.read<LedgerProvider>().fetchPublicLedgerEntries();
     }
+  }
+  
+  void _onSearchChanged(String query) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      // The `search` method does not exist on your LedgerProvider.
+      // This is a placeholder for future implementation.
+      // context.read<LedgerProvider>().search(query);
+    });
   }
 
   @override
   void dispose() {
     _listAnimationController.dispose();
-    _scrollController.dispose(); // Dispose the scroll controller
+    _scrollController.dispose();
+    _searchController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -78,7 +85,6 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
         title: const Text('Public Ledger'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // --- ENHANCEMENT 2: Add actions for filtering ---
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -91,24 +97,18 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
           ),
         ],
       ),
-      body: Stack(
+      body: Column(
         children: [
-          const DynamicNebulaBackground(),
-          Column(
-            children: [
-              // --- ENHANCEMENT 2: UI for Search ---
-              _buildSearchHeader(),
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () async {
-                    _fetchInitialData();
-                  },
-                  color: Colors.amber,
-                  backgroundColor: Colors.grey[800],
-                  child: _buildBody(ledgerProvider, currentUserWalletId),
-                ),
-              ),
-            ],
+          _buildSearchHeader(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                _fetchInitialData();
+              },
+              color: Colors.amber,
+              backgroundColor: Colors.grey[800],
+              child: _buildBody(ledgerProvider, currentUserWalletId),
+            ),
           ),
         ],
       ),
@@ -119,6 +119,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
     return Padding(
       padding: EdgeInsets.only(top: kToolbarHeight + MediaQuery.of(context).padding.top, left: 16, right: 16, bottom: 8),
       child: TextField(
+        controller: _searchController,
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           hintText: 'Search by Wallet ID or Title...',
@@ -131,16 +132,13 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
             borderSide: BorderSide.none,
           ),
         ),
-        onChanged: (query) {
-          // TODO: Implement search logic with debouncing
-          // context.read<LedgerProvider>().search(query);
-        },
+        onChanged: _onSearchChanged,
       ),
     );
   }
 
   Widget _buildBody(LedgerProvider ledgerProvider, String? currentUserWalletId) {
-  if (ledgerProvider.isInitialLoading && ledgerProvider.publicLedgerEntries.isEmpty) {
+    if (ledgerProvider.isInitialLoading && ledgerProvider.publicLedgerEntries.isEmpty) {
       return _buildLoadingShimmer();
     }
 
@@ -152,7 +150,6 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
       return const Center(child: Text('No public ledger entries found.', style: TextStyle(color: Colors.white70)));
     }
 
-    // --- ENHANCEMENT 1: Update itemCount for loading indicator ---
     final itemCount = ledgerProvider.publicLedgerEntries.length + (ledgerProvider.isFetchingMore ? 1 : 0);
 
     return ListView.builder(
@@ -160,7 +157,6 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
       padding: const EdgeInsets.only(left: 12, right: 12, bottom: 20),
       itemCount: itemCount,
       itemBuilder: (context, index) {
-        // --- ENHANCEMENT 1: Show loading indicator at the end of the list ---
         if (index >= ledgerProvider.publicLedgerEntries.length) {
           return const Center(
             child: Padding(
@@ -171,10 +167,12 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
         }
 
         final entry = ledgerProvider.publicLedgerEntries[index];
+        final entryCount = ledgerProvider.publicLedgerEntries.length;
+        
         final animation = Tween(begin: 0.0, end: 1.0).animate(
           CurvedAnimation(
             parent: _listAnimationController,
-            curve: Interval((1 / (ledgerProvider.publicLedgerEntries.length)) * index, 1.0, curve: Curves.easeOut),
+            curve: Interval(entryCount > 0 ? (1 / entryCount) * index : 0.0, 1.0, curve: Curves.easeOut),
           ),
         );
 
@@ -205,14 +203,14 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
 
   Widget _buildLoadingShimmer() {
     return Shimmer.fromColors(
-      baseColor: Colors.grey[850]!,
-      highlightColor: Colors.grey[800]!,
+      baseColor: Colors.white.withOpacity(0.05),
+      highlightColor: Colors.white.withOpacity(0.1),
       child: ListView.builder(
         padding: const EdgeInsets.only(left: 12, right: 12, bottom: 20, top: 20),
         itemCount: 5,
         itemBuilder: (_, __) => Card(
           margin: const EdgeInsets.symmetric(vertical: 8.0),
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withOpacity(0.05),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
           child: const SizedBox(height: 150),
         ),
@@ -223,7 +221,6 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
 
 typedef OnSendLovesCallback = Future<void> Function(String recipientWalletId, int amount, String? memo);
 
-// --- ENHANCEMENT 3: Added TickerProviderStateMixin ---
 class PublicActionCard extends StatefulWidget {
   final PublicLedgerEntry entry;
   final OnSendLovesCallback? onSendLoves;
@@ -241,7 +238,6 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
   final _memoController = TextEditingController();
   bool _isSending = false;
 
-  // --- ENHANCEMENT 3: Animation controller for form fade-in ---
   late final AnimationController _formAnimationController;
 
   @override
@@ -257,7 +253,7 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
   void dispose() {
     _amountController.dispose();
     _memoController.dispose();
-    _formAnimationController.dispose(); // Dispose the controller
+    _formAnimationController.dispose();
     super.dispose();
   }
 
@@ -316,7 +312,6 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
             AnimatedSize(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
-              // --- ENHANCEMENT 3: Wrap form in FadeTransition ---
               child: _isExpanded
                   ? FadeTransition(
                       opacity: _formAnimationController,
@@ -354,7 +349,7 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
                 onTap: () => _copyWallet(context, widget.entry.walletId),
                 child: Text(
                   _abbreviateWallet(widget.entry.walletId),
-                  style: TextStyle(color: Colors.white54, fontSize: 12, fontFamily: 'monospace'),
+                  style: const TextStyle(color: Colors.white54, fontSize: 12, fontFamily: 'monospace'),
                 ),
               ),
             ],
@@ -379,7 +374,6 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
         TextButton.icon(
           onPressed: () {
             setState(() => _isExpanded = !_isExpanded);
-            // --- ENHANCEMENT 3: Control the form animation ---
             if (_isExpanded) {
               _formAnimationController.forward();
             } else {
@@ -397,7 +391,6 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
     );
   }
   
-  // The expansion form and input decoration methods remain the same...
   Widget _buildExpansionForm() {
     return Padding(
       padding: const EdgeInsets.only(top: 16),

@@ -5,13 +5,13 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart'; // <<< ADDED THIS LINE
-
-// import 'package:http/http.dart' as http; // No longer needed for now
+import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart'; // Added for Provider
 
 // Import your project-specific files
-// import '../recaptcha_helper.dart'; // Temporarily disabled
 import '../widgets/dynamic_nebula_background.dart';
+import '../service/api_client.dart'; // Added for API client
+import '../state/user_provider.dart'; // Assuming this is needed for state management
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -32,16 +32,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   String? _error;
-
-  // Temporarily disabled reCAPTCHA site key
-  // static const String recaptchaV3SiteKey = '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F';
+  
+  // New state variables for username availability check
+  Timer? _debounceTimer;
+  bool _isCheckingUsername = false;
+  String? _usernameAvailabilityError;
 
   @override
   void initState() {
     super.initState();
-    // Temporarily disabled reCAPTCHA initialization
-    // initializeRecaptchaV3(); 
-
     _usernameController.addListener(_clearError);
     _emailController.addListener(_clearError);
     _passwordController.addListener(_clearError);
@@ -58,15 +57,64 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
+  
+  // New function for debounced username availability check
+  void _checkUsernameAvailability(String username) {
+    if (username.isEmpty || username.length < 3) {
+      // Don't check until the username meets the minimum length
+      setState(() {
+        _usernameAvailabilityError = null;
+      });
+      return;
+    }
+    
+    // Cancel the old timer to reset the debounce period
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      setState(() {
+        _isCheckingUsername = true;
+      });
+      
+      final apiClient = Provider.of<PeoplesCoinApiClient>(context, listen: false);
+      try {
+        final isAvailable = await apiClient.checkUsernameAvailability(username);
+        if (!mounted) return;
+        
+        setState(() {
+          if (isAvailable) {
+            _usernameAvailabilityError = null;
+          } else {
+            _usernameAvailabilityError = 'Username is already taken.';
+          }
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _usernameAvailabilityError = 'Could not check username. Please try again.';
+          if (kDebugMode) print('Username check error: $e');
+        });
+      } finally {
+        if (!mounted) return;
+        setState(() {
+          _isCheckingUsername = false;
+        });
+      }
+    });
+  }
 
-  // --- REWRITTEN _signUp function to bypass custom backend and reCAPTCHA ---
   Future<void> _signUp() async {
+    if (_isCheckingUsername || _usernameAvailabilityError != null) {
+      // Don't allow signup while checking or if there's an error
+      return;
+    }
+    
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -84,13 +132,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      // Directly create the user with Firebase Authentication
       final UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      // After creation, you can update the user's profile with the username
       await userCredential.user?.updateDisplayName(_usernameController.text.trim());
 
       if (mounted) {
@@ -98,7 +144,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        // Provide user-friendly error messages for common issues
         if (e.code == 'weak-password') {
           _error = 'The password provided is too weak.';
         } else if (e.code == 'email-already-in-use') {
@@ -202,8 +247,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             TextFormField(
                               controller: _usernameController,
                               style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration('Username', Icons.person_outline),
-                              validator: (val) => val != null && val.trim().length >= 3 ? null : 'Username must be at least 3 characters.',
+                              decoration: _buildInputDecoration(
+                                'Username', 
+                                Icons.person_outline,
+                                // Add a suffix icon for the availability check
+                                suffixIcon: _isCheckingUsername 
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : _usernameAvailabilityError != null
+                                    ? const Icon(Icons.error, color: Colors.red)
+                                    : _usernameController.text.length >= 3 
+                                      ? const Icon(Icons.check_circle, color: Colors.green)
+                                      : null,
+                              ),
+                              // Call the debounce function on every change
+                              onChanged: _checkUsernameAvailability,
+                              validator: (val) {
+                                if (val == null || val.trim().length < 3) {
+                                  return 'Username must be at least 3 characters.';
+                                }
+                                if (_usernameAvailabilityError != null) {
+                                  return _usernameAvailabilityError;
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 16),
                             TextFormField(

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'dart:ui';
 
 import '../state/user_provider.dart';
+import '../state/auth_provider.dart' as MyAppAuthProvider;
 import './views/receive_loves_view.dart';
 import './views/send_loves_view.dart';
 import '../widgets/dynamic_nebula_background.dart';
@@ -23,6 +24,15 @@ class _MyWalletPageState extends State<MyWalletPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    
+    // Check if user data is already loaded, if not, fetch it
+    final userProvider = context.read<UserProvider>();
+    if (userProvider.currentUser == null) {
+      final userId = context.read<MyAppAuthProvider.AuthProvider>().user?.uid;
+      if (userId != null) {
+        userProvider.fetchUser(userId);
+      }
+    }
   }
 
   @override
@@ -42,22 +52,42 @@ class _MyWalletPageState extends State<MyWalletPage>
       ),
       body: Stack(
         children: [
-          const DynamicNebulaBackground(),
+          // FIX: Removed redundant DynamicNebulaBackground.
+          // The AppShell now provides a single, continuous background.
           SafeArea(
-            child: Column(
-              children: [
-                _BalanceCard(),
-                _CustomTabSwitcher(tabController: _tabController),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: const [
-                      ReceiveLovesView(),
-                      SendLovesView(),
-                    ],
-                  ),
-                ),
-              ],
+            child: Consumer<UserProvider>(
+              builder: (context, userProvider, child) {
+                // FIX: Added a loading state
+                if (userProvider.isLoading) {
+                  return const Center(child: CircularProgressIndicator(color: Colors.amber));
+                }
+
+                if (userProvider.hasError) {
+                  return Center(
+                    child: Text(
+                      userProvider.error ?? 'Failed to load wallet data.',
+                      style: const TextStyle(color: Colors.redAccent),
+                    ),
+                  );
+                }
+
+                // If user data is successfully loaded, show the content
+                return Column(
+                  children: [
+                    _BalanceCard(),
+                    _CustomTabSwitcher(tabController: _tabController),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: const [
+                          ReceiveLovesView(),
+                          SendLovesView(),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -154,4 +184,3 @@ class _CustomTabSwitcher extends StatelessWidget {
     );
   }
 }
-

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+kimport 'package:flutter/foundation.dart';
 import '../services/api_client.dart';
 
 class VotingProvider with ChangeNotifier {
@@ -33,4 +33,3 @@ class VotingProvider with ChangeNotifier {
     }
   }
 }
-

@@ -2,7 +2,7 @@
 
 import 'package:flutter/foundation.dart'; // For kDebugMode and ChangeNotifier
 import '../models/user_account.dart';    // Your UserAccount model
-import '../service/api_client.dart';      // Your ApiClient to fetch data
+import '../service/api_client.dart';       // Your ApiClient to fetch data
 import '../models/goodwill_action.dart'; // Your GoodwillAction model
 
 class UserProvider with ChangeNotifier {
@@ -55,12 +55,11 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Replace with your actual API call using _apiClient
-      // Example: Assuming your API client has a getUserById method
       _currentUser = await _apiClient.getUserById(userId);
       if (kDebugMode) print('[UserProvider] Fetched user: ${_currentUser?.username}');
     } catch (e) {
       _error = "Failed to fetch user data: $e";
+      _currentUser = null; // Clear the user if fetching fails
       if (kDebugMode) print('[UserProvider] Error fetching user: $e');
     } finally {
       _isLoading = false;

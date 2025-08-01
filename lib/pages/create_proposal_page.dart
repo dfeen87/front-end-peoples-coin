@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'; // <-- THE MAIN FIX IS HERE
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui';
@@ -109,7 +109,7 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black.withOpacity(0.8),
+      backgroundColor: Colors.transparent, // FIX: Made the Scaffold transparent
       appBar: AppBar(
         title: const Text('Create New Proposal'),
         backgroundColor: Colors.transparent,
@@ -358,4 +358,3 @@ class _SuccessDialogState extends State<_SuccessDialog> with SingleTickerProvide
     );
   }
 }
-
