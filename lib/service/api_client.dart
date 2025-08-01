@@ -1,315 +1,244 @@
 // lib/service/api_client.dart
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io'; // Required for SocketException
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 
+// Import your models
 import '../models/user_account.dart';
 import '../models/goodwill_action.dart';
 import '../models/goodwill_action_to_send.dart';
 import '../models/proposal.dart';
 import '../models/proposal_to_send.dart';
-import '../models/vote.dart';
 import '../models/vote_to_send.dart';
 import '../models/public_ledger_entry.dart';
 
+// ENHANCEMENT: Custom exceptions for better error handling in the UI
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+  final String? responseBody;
+  ApiException(this.message, {this.statusCode, this.responseBody});
+
+  @override
+  String toString() {
+    return 'ApiException: $message (Status: $statusCode)';
+  }
+}
+
+class NetworkException implements Exception {
+  final String message;
+  NetworkException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class PeoplesCoinApiClient {
   final String baseUrl;
+  final http.Client _httpClient;
 
-  PeoplesCoinApiClient({String? baseUrl})
-      : baseUrl = baseUrl ?? dotenv.env['API_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
+  // ENHANCEMENT: Inject http.Client for testability
+  PeoplesCoinApiClient({http.Client? httpClient, String? baseUrl})
+      : _httpClient = httpClient ?? http.Client(),
+        // The base URL is now just for other API calls, not the new Cloud Functions
+        baseUrl = baseUrl ?? dotenv.env['API_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
 
+  static const _timeout = Duration(seconds: 15);
   Map<String, String> get _jsonHeaders => {'Content-Type': 'application/json'};
+
+  // ENHANCEMENT: Centralized GET request handler
+  Future<dynamic> _get(String endpoint) async {
+    final uri = Uri.parse('$baseUrl/$endpoint');
+    try {
+      final response = await _httpClient.get(uri, headers: _jsonHeaders).timeout(_timeout);
+      return _handleResponse(response);
+    } on SocketException {
+      throw NetworkException('Please check your internet connection.');
+    } on TimeoutException {
+      throw NetworkException('The request timed out. Please try again.');
+    } catch (e) {
+      if (kDebugMode) print('Error in _get($endpoint): $e');
+      rethrow;
+    }
+  }
+
+  // ENHANCEMENT: Centralized POST request handler
+  Future<dynamic> _post(String endpoint, {required Map<String, dynamic> body}) async {
+    final uri = Uri.parse('$baseUrl/$endpoint');
+    try {
+      final response = await _httpClient.post(uri, headers: _jsonHeaders, body: json.encode(body)).timeout(_timeout);
+      return _handleResponse(response);
+    } on SocketException {
+      throw NetworkException('Please check your internet connection.');
+    } on TimeoutException {
+      throw NetworkException('The request timed out. Please try again.');
+    } catch (e) {
+      if (kDebugMode) print('Error in _post($endpoint): $e');
+      rethrow;
+    }
+  }
+
+  // ENHANCEMENT: Centralized response handler
+  dynamic _handleResponse(http.Response response) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.isEmpty) return null; // Handle empty success responses
+      return json.decode(response.body);
+    } else {
+      throw ApiException(
+        'Request failed',
+        statusCode: response.statusCode,
+        responseBody: response.body,
+      );
+    }
+  }
 
   // === User ===
 
-  Future<void> createUserAccount({
-    required String firebaseUid,
+  // THIS METHOD NOW CALLS THE UNIFIED SIGN-UP CLOUD FUNCTION
+  Future<void> unifiedSignUp({
     required String email,
+    required String password,
     required String username,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users');
-    final body = json.encode({
-      'firebase_uid': firebaseUid,
+    final url = Uri.parse('https://us-central1-brightacts-frontend-50f58.cloudfunctions.net/unifiedSignUp');
+    final body = {
       'email': email,
+      'password': password,
       'username': username,
-    });
-
+    };
     try {
-      final response = await http.post(uri, headers: _jsonHeaders, body: body).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode != 201) {
-        throw Exception('Failed to create user account in database. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in createUserAccount: $e');
-      rethrow;
+      final response = await _httpClient.post(url, headers: _jsonHeaders, body: json.encode(body)).timeout(_timeout);
+      _handleResponse(response);
+    } on SocketException {
+      throw NetworkException('Please check your internet connection.');
+    } on TimeoutException {
+      throw NetworkException('The request timed out. Please try again.');
     }
   }
 
   Future<UserAccount> getUserById(String userId) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users/$userId');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        return UserAccount.fromJson(json.decode(response.body));
-      } else {
-        throw Exception('Failed to fetch user account. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getUserById: $e');
-      rethrow;
-    }
+    final data = await _get('api/v1/users/$userId');
+    return UserAccount.fromJson(data);
   }
 
+  // THIS METHOD NOW CALLS THE USERNAME CHECK CLOUD FUNCTION
   Future<bool> checkUsernameAvailability(String username) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users/username-check/$username');
+    final url = Uri.parse('https://us-central1-brightacts-frontend-50f58.cloudfunctions.net/checkUsername');
+    final body = {'username': username};
     try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['available'] == true;
-      }
-      throw Exception('Failed to check username availability. Status: ${response.statusCode}, Body: ${response.body}');
-    } catch (e) {
-      if (kDebugMode) print('Error in checkUsernameAvailability: $e');
-      rethrow;
+      final response = await _httpClient.post(url, headers: _jsonHeaders, body: json.encode(body)).timeout(_timeout);
+      final data = _handleResponse(response);
+      return data['available'] == true;
+    } on SocketException {
+      throw NetworkException('Please check your internet connection.');
+    } on TimeoutException {
+      throw NetworkException('The request timed out. Please try again.');
     }
   }
-
+  
   Future<void> createUserWallet({
     required String username,
     required String publicKey,
     required String encryptedPrivateKey,
-  }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users/register-wallet');
-    final body = json.encode({
-      'username': username,
-      'public_key': publicKey,
-      'encrypted_private_key': encryptedPrivateKey,
-    });
-
-    try {
-      final response = await http.post(uri, headers: _jsonHeaders, body: body).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode != 201) {
-        throw Exception('Failed to create user wallet. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in createUserWallet: $e');
-      rethrow;
-    }
-  }
+  }) => _post('api/v1/users/register-wallet', body: {
+    'username': username,
+    'public_key': publicKey,
+    'encrypted_private_key': encryptedPrivateKey,
+  });
 
   // === Goodwill Actions ===
 
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users/$userId/goodwill-actions');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((item) => GoodwillAction.fromJson(item)).toList();
-      } else {
-        throw Exception('Failed to fetch goodwill actions. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getUserGoodwillActions: $e');
-      rethrow;
-    }
+    final List<dynamic> data = await _get('api/v1/users/$userId/goodwill-actions');
+    return data.map((item) => GoodwillAction.fromJson(item)).toList();
   }
 
+  // Corrected type safety issue
   Future<Map<String, dynamic>> submitGoodwill(GoodwillActionToSend actionToSend) async {
-    final uri = Uri.parse('$baseUrl/metabolic/submit_goodwill');
-    try {
-      final response = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: json.encode(actionToSend.toJson()),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 201) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to submit goodwill. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in submitGoodwill: $e');
-      rethrow;
-    }
+    return await _post('metabolic/submit_goodwill', body: actionToSend.toJson()) as Map<String, dynamic>;
   }
 
   // === Proposals ===
 
   Future<List<Proposal>> listProposals({String? status}) async {
-    var url = '$baseUrl/api/v1/governance/proposals';
+    var endpoint = 'api/v1/governance/proposals';
     if (status != null && status.isNotEmpty) {
-      url += '?status=$status';
+      endpoint += '?status=$status';
     }
-    final uri = Uri.parse(url);
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((item) => Proposal.fromJson(item)).toList();
-      } else {
-        throw Exception('Failed to fetch proposals. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in listProposals: $e');
-      rethrow;
-    }
+    final List<dynamic> data = await _get(endpoint);
+    return data.map((item) => Proposal.fromJson(item)).toList();
   }
 
   Future<Proposal> getProposalDetails(String proposalId) async {
-    final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/$proposalId');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        return Proposal.fromJson(json.decode(response.body));
-      } else {
-        throw Exception('Failed to fetch proposal details. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getProposalDetails: $e');
-      rethrow;
-    }
+    final data = await _get('api/v1/governance/proposals/$proposalId');
+    return Proposal.fromJson(data);
   }
 
+  // Corrected type safety issue
   Future<Map<String, dynamic>> createProposal(ProposalToSend proposalToSend) async {
-    final uri = Uri.parse('$baseUrl/api/v1/governance/proposals');
-    try {
-      final response = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: json.encode(proposalToSend.toJson()),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 201) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to create proposal. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in createProposal: $e');
-      rethrow;
-    }
+    return await _post('api/v1/governance/proposals', body: proposalToSend.toJson()) as Map<String, dynamic>;
   }
 
   // === Votes ===
 
+  // Corrected type safety issue
   Future<Map<String, dynamic>> submitVote(VoteToSend voteToSend) async {
-    final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/${voteToSend.proposalId}/vote');
-    try {
-      final response = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: json.encode(voteToSend.toJson()),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to submit vote. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in submitVote: $e');
-      rethrow;
-    }
+    return await _post('api/v1/governance/proposals/${voteToSend.proposalId}/vote', body: voteToSend.toJson()) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> getVotingResults(String proposalId) async {
-    final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/$proposalId/results');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {'forVotes': data['forVotes'], 'againstVotes': data['againstVotes']};
-      } else {
-        throw Exception('Failed to get voting results. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getVotingResults: $e');
-      rethrow;
-    }
+    final data = await _get('api/v1/governance/proposals/$proposalId/results');
+    return {'forVotes': data['forVotes'], 'againstVotes': data['againstVotes']};
   }
 
   // === Ledger ===
 
   Future<List<PublicLedgerEntry>> getLedgerEntries({int page = 1}) async {
-    final uri = Uri.parse('$baseUrl/api/v1/ledger/public?page=$page');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
-      } else {
-        throw Exception('Failed to fetch public ledger. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getLedgerEntries: $e');
-      rethrow;
-    }
+    final List<dynamic> data = await _get('api/v1/ledger/public?page=$page');
+    return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
   }
 
   Future<List<PublicLedgerEntry>> searchLedger({required String query}) async {
-    final uri = Uri.parse('$baseUrl/api/v1/ledger/search?q=${Uri.encodeComponent(query)}');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
-      } else {
-        throw Exception('Failed to search public ledger. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in searchLedger: $e');
-      rethrow;
-    }
+    final endpoint = 'api/v1/ledger/search?q=${Uri.encodeComponent(query)}';
+    final List<dynamic> data = await _get(endpoint);
+    return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
   }
 
+  // Corrected type safety issue
   Future<Map<String, dynamic>> sendLoves({
     required String senderWalletId,
     required String recipientWalletId,
     required int amount,
     String? memo,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/transactions/send');
-    final body = json.encode({
+    return await _post('api/v1/transactions/send', body: {
       'sender_id': senderWalletId,
       'recipient_id': recipientWalletId,
       'amount': amount,
       if (memo != null && memo.isNotEmpty) 'memo': memo,
-    });
-
-    try {
-      final response = await http.post(uri, headers: _jsonHeaders, body: body).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to send loves. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in sendLoves: $e');
-      rethrow;
-    }
+    }) as Map<String, dynamic>;
   }
 
   // === Metabolic status check ===
-
+  
   Future<String> checkMetabolicStatus() async {
     final uri = Uri.parse('$baseUrl/metabolic/status');
+    // This one is different as it returns plain text, so we handle it separately
     try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
+      final response = await _httpClient.get(uri, headers: _jsonHeaders).timeout(_timeout);
       if (response.statusCode == 200) {
         return response.body;
       } else {
-        throw Exception('Failed to check metabolic status. Status: ${response.statusCode}, Body: ${response.body}');
+        throw ApiException('Failed to check metabolic status', statusCode: response.statusCode);
       }
-    } catch (e) {
-      if (kDebugMode) print('Error in checkMetabolicStatus: $e');
-      rethrow;
+    } on SocketException {
+      throw NetworkException('Please check your internet connection.');
+    } on TimeoutException {
+      throw NetworkException('The request timed out. Please try again.');
     }
   }
 }
+

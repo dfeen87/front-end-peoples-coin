@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -46,7 +45,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _onUsernameChanged(String username) {
     if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
-    
+
     // Clear status if username becomes too short
     if (username.length < 3) {
       setState(() => _isUsernameAvailable = null);
@@ -58,15 +57,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
         _isCheckingUsername = true;
         _isUsernameAvailable = null;
       });
-      
+
       try {
         final apiClient = context.read<PeoplesCoinApiClient>();
+        // Use the new apiClient method which calls the Cloud Function
         final isAvailable = await apiClient.checkUsernameAvailability(username);
         if (!mounted) return;
         setState(() => _isUsernameAvailable = isAvailable);
       } catch (e) {
         if (!mounted) return;
-        setState(() => _isUsernameAvailable = false); // Treat error as unavailable
+        setState(() => _isUsernameAvailable = false); // Treat any error as unavailable
         if (kDebugMode) print('Username check error: $e');
       } finally {
         if (!mounted) return;
@@ -96,36 +96,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final apiClient = context.read<PeoplesCoinApiClient>();
+      
+      // Call the new unified sign-up method that uses the Cloud Function
+      await apiClient.unifiedSignUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        username: _usernameController.text.trim(),
       );
 
-      await userCredential.user?.updateDisplayName(_usernameController.text.trim());
-      
-      // TODO: Here you would also call your backend to create a user profile in your database
-      // with the UID and selected username.
-
+      // The sign-up was successful, now navigate to home
       if (mounted) context.go('/home');
 
-    } on FirebaseAuthException catch (e) {
-      String message;
-      switch (e.code) {
-        case 'weak-password':
-          message = 'The password provided is too weak.';
-          break;
-        case 'email-already-in-use':
-          message = 'An account already exists for that email.';
-          break;
-        case 'invalid-email':
-          message = 'The email address is not valid.';
-          break;
-        default:
-          message = 'An error occurred. Please try again.';
-      }
+    } on ApiException catch (e) {
+      // Handle API-specific errors from the Cloud Function response
+      String message = 'An error occurred during sign-up.';
+      // You can add more specific logic based on the error response from your function if needed
       setState(() => _error = message);
-      if (kDebugMode) print('Firebase Auth Error: ${e.message}');
+      if (kDebugMode) print('API Error: ${e.message}');
     } catch (e) {
+      // Catch any other unexpected errors
       setState(() => _error = 'An unexpected error occurred.');
       if (kDebugMode) print('Generic Error: $e');
     } finally {
@@ -216,12 +206,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 'Username',
                                 Icons.person_outline,
                                 suffixIcon: _isCheckingUsername
-                                  ? const Padding(padding: EdgeInsets.all(12.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
-                                  : _isUsernameAvailable == false
-                                    ? const Icon(Icons.error, color: Colors.red)
-                                    : _isUsernameAvailable == true
-                                      ? const Icon(Icons.check_circle, color: Colors.green)
-                                      : null,
+                                    ? const Padding(padding: EdgeInsets.all(12.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                                    : _isUsernameAvailable == false
+                                        ? const Icon(Icons.error, color: Colors.red)
+                                        : _isUsernameAvailable == true
+                                            ? const Icon(Icons.check_circle, color: Colors.green)
+                                            : null,
                               ),
                               onChanged: _onUsernameChanged,
                               validator: (val) {
@@ -337,3 +327,4 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 }
+

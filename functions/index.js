@@ -1,68 +1,90 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const cors = require("cors")({ origin: true });
+const axios = require("axios"); // We need axios to call your Python API
 
-// Initialize the Firebase Admin SDK
 admin.initializeApp();
 
-/**
- * This is your "wall" function. It password-protects your entire site.
- * It has been improved to only check the password, so any username will work.
- */
+// Your "wall" function remains the same
 exports.myAppGatekeeper = functions.https.onRequest((req, res) => {
-  // IMPORTANT: This password should be stored securely, e.g., using secrets.
   const requiredPassword = "bleigh1"; 
-  
   const authHeader = req.headers.authorization || '';
   const encodedCreds = authHeader.split(' ')[1] || '';
   const decodedCreds = Buffer.from(encodedCreds, 'base64').toString();
-  
   const [username, providedPassword] = decodedCreds.split(':');
 
-  // Check ONLY the password
   if (providedPassword === requiredPassword) {
-    // NOTE: This function currently shows a success message. To show your actual app,
-    // the logic needs to be integrated with Firebase Hosting's ability to serve files,
-    // which is a more advanced setup. For now, it works as a simple gate.
     res.status(200).send("<h1>Access Granted</h1><p>The Bright Acts app would load here.</p>");
   } else {
-    // If the password is wrong, demand authentication.
     res.setHeader("WWW-Authenticate", 'Basic realm="Protected Area"');
     res.status(401).send("<h1>Authentication Required.</h1>");
   }
 });
 
-
 /**
- * This is your sign-up function with the CORS fix.
- * Your frontend should make API calls to this endpoint.
+ * A single, robust function to handle the entire sign-up process.
  */
-exports.signUp = functions.https.onRequest((req, res) => {
-  // This `cors` wrapper automatically handles the CORS headers.
-  cors(req, res, () => {
-    // --- YOUR SIGN-UP LOGIC GOES HERE ---
-    // This is an example of how you might create a user.
-    // You'll need to adapt it to your app's specific needs.
+exports.unifiedSignUp = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    const { email, password, username } = req.body;
 
-    const email = req.body.email;
-    const password = req.body.password;
-
-    if (!email || !password) {
-      return res.status(400).send({ error: "Email and password are required." });
+    if (!email || !password || !username) {
+      return res.status(400).send({ error: "Email, password, and username are required." });
     }
 
-    admin.auth().createUser({
-      email: email,
-      password: password,
-    })
-    .then(userRecord => {
-      console.log("Successfully created new user:", userRecord.uid);
-      // You can add more logic here, like creating a user profile in Firestore.
+    try {
+      // Step 1: Create the user in Firebase Authentication
+      const userRecord = await admin.auth().createUser({
+        email: email,
+        password: password,
+        displayName: username,
+      });
+
+      console.log("Successfully created Firebase Auth user:", userRecord.uid);
+
+      // Step 2: Create the user profile in your Python backend database
+      const pythonApiUrl = "https://peoples-coin-service-105378934751.us-central1.run.app/api/v1/users";
+      await axios.post(pythonApiUrl, {
+        firebase_uid: userRecord.uid,
+        email: email,
+        username: username,
+      });
+
+      console.log("Successfully created user profile in Python backend for:", userRecord.uid);
+
+      // Step 3: Return a success message
       return res.status(200).send({ message: "User created successfully!", uid: userRecord.uid });
-    })
-    .catch(error => {
-      console.error("Error creating new user:", error);
-      return res.status(500).send({ error: "Failed to create user." });
-    });
+
+    } catch (error) {
+      console.error("Error during unified sign-up:", error);
+      
+      // Handle specific errors, like "email already exists"
+      if (error.code === 'auth/email-already-exists') {
+        return res.status(409).send({ error: "This email address is already in use." });
+      }
+      
+      return res.status(500).send({ error: "An unexpected error occurred during sign-up." });
+    }
+  });
+});
+
+/**
+ * A separate function just for checking username availability.
+ */
+exports.checkUsername = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    const { username } = req.body;
+    if (!username) {
+      return res.status(400).send({ error: "Username is required." });
+    }
+    try {
+      // This function calls your Python backend to check the username
+      const pythonApiUrl = `https://peoples-coin-service-105378934751.us-central1.run.app/api/v1/users/username-check/${username}`;
+      const response = await axios.get(pythonApiUrl);
+      return res.status(200).send(response.data);
+    } catch (error) {
+      console.error("Error checking username:", error);
+      return res.status(500).send({ error: "Failed to check username availability." });
+    }
   });
 });
