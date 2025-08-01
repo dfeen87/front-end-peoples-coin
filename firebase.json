@@ -4,14 +4,16 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**",
-      "build/**"
+      "**/node_modules/**"
     ],
     "rewrites": [
       {
         "source": "**",
-        "destination": "/index.html"
+        "function": "myAppGatekeeper"
       }
     ]
+  },
+  "functions": {
+    "source": "functions"
   }
 }

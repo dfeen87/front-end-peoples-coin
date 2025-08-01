@@ -1,17 +1,14 @@
 import 'dart:async';
-import 'dart:convert'; // For jsonEncode
-import 'dart:ui'; // For ImageFilter.blur
+import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
-import 'package:provider/provider.dart'; // Added for Provider
+import 'package:provider/provider.dart';
 
-// Import your project-specific files
 import '../widgets/dynamic_nebula_background.dart';
-import '../service/api_client.dart'; // Added for API client
-import '../state/user_provider.dart'; // Assuming this is needed for state management
+import '../service/api_client.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -23,37 +20,19 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   String? _error;
-  
-  // New state variables for username availability check
+
   Timer? _debounceTimer;
   bool _isCheckingUsername = false;
-  String? _usernameAvailabilityError;
-
-  @override
-  void initState() {
-    super.initState();
-    _usernameController.addListener(_clearError);
-    _emailController.addListener(_clearError);
-    _passwordController.addListener(_clearError);
-    _confirmPasswordController.addListener(_clearError);
-  }
-
-  void _clearError() {
-    if (_error != null) {
-      setState(() {
-        _error = null;
-      });
-    }
-  }
+  bool? _isUsernameAvailable;
 
   @override
   void dispose() {
@@ -64,65 +43,50 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _confirmPasswordController.dispose();
     super.dispose();
   }
-  
-  // New function for debounced username availability check
-  void _checkUsernameAvailability(String username) {
-    if (username.isEmpty || username.length < 3) {
-      // Don't check until the username meets the minimum length
-      setState(() {
-        _usernameAvailabilityError = null;
-      });
+
+  void _onUsernameChanged(String username) {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    
+    // Clear status if username becomes too short
+    if (username.length < 3) {
+      setState(() => _isUsernameAvailable = null);
       return;
     }
-    
-    // Cancel the old timer to reset the debounce period
-    _debounceTimer?.cancel();
+
     _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
       setState(() {
         _isCheckingUsername = true;
+        _isUsernameAvailable = null;
       });
       
-      final apiClient = Provider.of<PeoplesCoinApiClient>(context, listen: false);
       try {
+        final apiClient = context.read<PeoplesCoinApiClient>();
         final isAvailable = await apiClient.checkUsernameAvailability(username);
         if (!mounted) return;
-        
-        setState(() {
-          if (isAvailable) {
-            _usernameAvailabilityError = null;
-          } else {
-            _usernameAvailabilityError = 'Username is already taken.';
-          }
-        });
+        setState(() => _isUsernameAvailable = isAvailable);
       } catch (e) {
         if (!mounted) return;
-        setState(() {
-          _usernameAvailabilityError = 'Could not check username. Please try again.';
-          if (kDebugMode) print('Username check error: $e');
-        });
+        setState(() => _isUsernameAvailable = false); // Treat error as unavailable
+        if (kDebugMode) print('Username check error: $e');
       } finally {
         if (!mounted) return;
-        setState(() {
-          _isCheckingUsername = false;
-        });
+        setState(() => _isCheckingUsername = false);
       }
     });
   }
 
   Future<void> _signUp() async {
-    if (_isCheckingUsername || _usernameAvailabilityError != null) {
-      // Don't allow signup while checking or if there's an error
-      return;
-    }
-    
-    if (!_formKey.currentState!.validate()) {
+    // Hide keyboard
+    FocusScope.of(context).unfocus();
+
+    // Prevent submission if username is known to be unavailable
+    if (_isUsernameAvailable == false) {
+      _formKey.currentState?.validate(); // Re-run validation to show error
       return;
     }
 
-    if (_passwordController.text != _confirmPasswordController.text) {
-      setState(() {
-        _error = 'Passwords do not match.';
-      });
+    // Validate the form
+    if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
 
@@ -132,32 +96,38 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      final UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
       await userCredential.user?.updateDisplayName(_usernameController.text.trim());
+      
+      // TODO: Here you would also call your backend to create a user profile in your database
+      // with the UID and selected username.
 
-      if (mounted) {
-        context.go('/home');
-      }
+      if (mounted) context.go('/home');
+
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        if (e.code == 'weak-password') {
-          _error = 'The password provided is too weak.';
-        } else if (e.code == 'email-already-in-use') {
-          _error = 'An account already exists for that email.';
-        } else {
-          _error = 'An error occurred. Please try again.';
-        }
-        if (kDebugMode) print('Firebase Auth Error: ${e.message}');
-      });
+      String message;
+      switch (e.code) {
+        case 'weak-password':
+          message = 'The password provided is too weak.';
+          break;
+        case 'email-already-in-use':
+          message = 'An account already exists for that email.';
+          break;
+        case 'invalid-email':
+          message = 'The email address is not valid.';
+          break;
+        default:
+          message = 'An error occurred. Please try again.';
+      }
+      setState(() => _error = message);
+      if (kDebugMode) print('Firebase Auth Error: ${e.message}');
     } catch (e) {
-      setState(() {
-        _error = 'An unexpected error occurred.';
-        if (kDebugMode) print('Generic Error: $e');
-      });
+      setState(() => _error = 'An unexpected error occurred.');
+      if (kDebugMode) print('Generic Error: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -183,8 +153,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Widget _buildErrorWidget() {
-    if (_error == null || _error!.isEmpty) return const SizedBox.shrink();
-
+    if (_error == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Container(
@@ -236,11 +205,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             const Text(
                               'Create Account',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                             const SizedBox(height: 24),
                             _buildErrorWidget(),
@@ -248,25 +213,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               controller: _usernameController,
                               style: const TextStyle(color: Colors.white),
                               decoration: _buildInputDecoration(
-                                'Username', 
+                                'Username',
                                 Icons.person_outline,
-                                // Add a suffix icon for the availability check
-                                suffixIcon: _isCheckingUsername 
-                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                                  : _usernameAvailabilityError != null
+                                suffixIcon: _isCheckingUsername
+                                  ? const Padding(padding: EdgeInsets.all(12.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                                  : _isUsernameAvailable == false
                                     ? const Icon(Icons.error, color: Colors.red)
-                                    : _usernameController.text.length >= 3 
+                                    : _isUsernameAvailable == true
                                       ? const Icon(Icons.check_circle, color: Colors.green)
                                       : null,
                               ),
-                              // Call the debounce function on every change
-                              onChanged: _checkUsernameAvailability,
+                              onChanged: _onUsernameChanged,
                               validator: (val) {
                                 if (val == null || val.trim().length < 3) {
                                   return 'Username must be at least 3 characters.';
                                 }
-                                if (_usernameAvailabilityError != null) {
-                                  return _usernameAvailabilityError;
+                                if (_isUsernameAvailable == false) {
+                                  return 'Username is already taken.';
                                 }
                                 return null;
                               },
@@ -277,7 +240,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               keyboardType: TextInputType.emailAddress,
                               style: const TextStyle(color: Colors.white),
                               decoration: _buildInputDecoration('Email', Icons.email_outlined),
-                              validator: (val) => val != null && val.contains('@') ? null : 'Enter a valid email address.',
+                              validator: (val) {
+                                final emailRegex = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
+                                if (val == null || !emailRegex.hasMatch(val)) {
+                                  return 'Please enter a valid email address.';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
@@ -292,7 +261,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                 ),
                               ),
-                              validator: (val) => val != null && val.length >= 6 ? null : 'Password must be at least 6 characters.',
+                              validator: (val) {
+                                if (val == null || val.length < 6) {
+                                  return 'Password must be at least 6 characters.';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
@@ -307,11 +281,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                                 ),
                               ),
-                              validator: (val) => val == _passwordController.text ? null : 'Passwords do not match.',
+                              validator: (val) {
+                                if (val == null || val.isEmpty) {
+                                  return 'Please confirm your password.';
+                                }
+                                if (val != _passwordController.text) {
+                                  return 'Passwords do not match.';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 24),
-                            // Removed RecaptchaV2Widget
-                            const SizedBox(height: 24), // Keep spacing consistent
                             _isLoading
                                 ? const Center(child: CircularProgressIndicator())
                                 : ElevatedButton(
@@ -336,9 +316,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.bold),
                                       recognizer: TapGestureRecognizer()
                                         ..onTap = () {
-                                          if (!_isLoading) {
-                                            context.go('/sign_in');
-                                          }
+                                          if (!_isLoading) context.go('/sign_in');
                                         },
                                     ),
                                   ],
