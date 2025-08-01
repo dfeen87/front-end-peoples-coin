@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart'; // For kDebugMode and ChangeNotifier
 import '../models/user_account.dart';
-import '../services/api_client.dart';
+import '../service/api_client.dart';
 
 class UserProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;

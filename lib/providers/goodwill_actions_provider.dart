@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'; // Needed for ChangeNotifier
 import '../models/goodwill_action.dart';
-import '../services/api_client.dart';
+import '../service/api_client.dart';
 
 class GoodwillActionsProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;

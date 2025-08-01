@@ -1,5 +1,5 @@
 kimport 'package:flutter/foundation.dart';
-import '../services/api_client.dart';
+import '../service/api_client.dart';
 
 class VotingProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;

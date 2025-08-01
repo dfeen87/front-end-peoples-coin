@@ -467,7 +467,6 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
       description: actionToSend.description,
       lovesValue: actionToSend.lovesValue,
       contextualData: actionToSend.contextualData,
-      timestamp: actionToSend.timestamp,
     );
 
     if (success && mounted) {

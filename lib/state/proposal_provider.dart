@@ -1,9 +1,11 @@
+// lib/state/proposal_provider.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/proposal.dart';
 import '../models/proposal_to_send.dart';
 import '../models/vote_to_send.dart';
-import '../services/api_client.dart';
+import '../service/api_client.dart';
 
 class ProposalProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
@@ -47,7 +49,6 @@ class ProposalProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // FIX: Call the listProposals method with the status argument
       _proposals = await _apiClient.listProposals(status: status);
       if (kDebugMode) print('[ProposalProvider] Fetched ${_proposals.length} proposals.');
     } catch (e) {

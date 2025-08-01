@@ -1,0 +1,255 @@
+import 'dart:async';
+import 'dart:math';
+import 'dart:ui'; // For ImageFilter.blur
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
+import 'package:simple_animations/simple_animations.dart';
+
+import 'firebase_options.dart';
+import 'models/user_account.dart';
+import 'service/api_client.dart'; // ✅ fixed path & only import PeoplesCoinApiClient from here
+import 'state/user_provider.dart';
+import 'state/proposal_provider.dart';
+import 'state/goodwill_processing_provider.dart';
+import 'state/ledger_provider.dart';
+import 'pages/submit_goodwill_page.dart';
+import 'pages/my_portfolio_page.dart';
+import 'pages/governance_page.dart';
+import 'pages/my_wallet_page.dart';
+import 'pages/public_ledger_page.dart';
+import 'screens/welcome_screen.dart';
+import 'models/tech_system.dart';
+import 'screens/code_display_page.dart';
+import 'screens/sign_up_screen.dart' as sign_up;
+import 'screens/sign_in_screen.dart' as sign_in;
+import 'state/auth_provider.dart' as MyAppAuthProvider;
+import 'widgets/navigation_card.dart';
+import 'widgets/dynamic_nebula_background.dart';
+import 'app_state_providers.dart';
+
+// --- Global Constants & Definitions ---
+const String reCaptchaSiteKeyProd = String.fromEnvironment(
+  'RECAPTCHA_SITE_KEY_PROD',
+  defaultValue: '',
+);
+
+// --- MAIN ENTRY POINT ---
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await _bootstrapApp();
+}
+
+Future<void> _bootstrapApp() async {
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+
+    await dotenv.load(fileName: ".env");
+
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    if (kDebugMode && !kIsWeb) {
+      FirebaseAppCheck.instance.getToken(true).then((String? token) {
+        if (token != null) {
+          debugPrint('------------------------------------------------------------');
+          debugPrint('Firebase App Check DEBUG TOKEN: $token');
+          debugPrint('------------------------------------------------------------');
+        }
+      });
+    }
+
+    final apiClient = PeoplesCoinApiClient();
+    runApp(AppStateProviders(
+      apiClient: apiClient,
+      child: const BrightActsApp(),
+    ));
+  } catch (e, stack) {
+    debugPrint("❌ FATAL ERROR during app bootstrap: $e");
+    debugPrint(stack.toString());
+    runApp(MaterialApp(
+      home: Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            'App failed to start.\n$e',
+            style: const TextStyle(color: Colors.redAccent),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    ));
+  }
+}
+
+// --- Theme Definition ---
+class AppTheme {
+  static ThemeData darkTheme = ThemeData(
+    brightness: Brightness.dark,
+    fontFamily: 'Roboto',
+    primarySwatch: Colors.blue,
+    scaffoldBackgroundColor: Colors.transparent,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: Colors.white,
+    ),
+    textTheme: const TextTheme(
+      bodyLarge: TextStyle(color: Colors.white70),
+      bodyMedium: TextStyle(color: Colors.white70),
+      headlineMedium: TextStyle(color: Colors.white),
+      headlineSmall: TextStyle(color: Colors.white),
+      titleLarge: TextStyle(color: Colors.white70),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: Colors.black.withOpacity(0.5),
+      textStyle: const TextStyle(color: Colors.white),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      ),
+    ),
+  );
+}
+
+// --- Helper Constants ---
+class AppDurations {
+  static const fast = Duration(milliseconds: 300);
+  static const medium = Duration(milliseconds: 400);
+}
+
+class AppColors {
+  static const governance = Color(0xFF8A2BE2);
+  static const portfolio = Color(0xFFCC6699);
+  static const recordAct = Color(0xFFDA70D6);
+  static const ledger = Color(0xFF00BFFF);
+  static const wallet = Color(0xFF6A5ACD);
+  static final buttonPrimary = Colors.amber[800];
+  static final translucentGovernance = AppColors.governance.withOpacity(0.2);
+  static final translucentPortfolio = AppColors.portfolio.withOpacity(0.2);
+  static final translucentRecordAct = AppColors.recordAct.withOpacity(0.2);
+  static final translucentLedger = AppColors.ledger.withOpacity(0.2);
+  static final translucentWallet = AppColors.wallet.withOpacity(0.2);
+}
+
+class AppBreakpoints {
+  static const double tablet = 768;
+  static const double desktop = 1200;
+}
+
+// --- Router ---
+final _router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    GoRoute(path: '/', builder: (context, state) => const AppStartupController()),
+    ShellRoute(
+      builder: (context, state, child) => AppShell(child: child),
+      routes: [
+        GoRoute(path: '/welcome', builder: (context, state) => const WelcomeScreen()),
+        GoRoute(path: '/sign_in', builder: (context, state) => const sign_in.SignInScreen()),
+        GoRoute(path: '/sign_up', builder: (context, state) => const sign_up.SignUpScreen()),
+        GoRoute(path: '/home', builder: (context, state) => const HomePage()),
+        GoRoute(
+          path: '/code-viewer',
+          builder: (context, state) {
+            final system = state.extra as TechSystem?;
+            if (system != null) {
+              return CodeDisplayPage(title: 'Code Viewer', system: system);
+            }
+            return const Scaffold(
+              body: Center(child: Text('Error: No system data provided.')),
+            );
+          },
+        ),
+      ],
+    ),
+  ],
+);
+
+// --- APP SHELL, ROOT APP, and STARTUP CONTROLLER ---
+class AppShell extends StatelessWidget {
+  final Widget child;
+  const AppShell({required this.child, super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        const Positioned.fill(child: DynamicNebulaBackground()),
+        child,
+      ],
+    );
+  }
+}
+
+class BrightActsApp extends StatelessWidget {
+  const BrightActsApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.black.withOpacity(0.5),
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+    );
+    return MaterialApp.router(
+      title: 'BrightActs',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.darkTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark,
+      routerConfig: _router,
+    );
+  }
+}
+
+class AppStartupController extends StatefulWidget {
+  const AppStartupController({super.key});
+  @override
+  State<AppStartupController> createState() => _AppStartupControllerState();
+}
+
+class _AppStartupControllerState extends State<AppStartupController> {
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    await WidgetsBinding.instance.endOfFrame;
+    final authProvider = Provider.of<MyAppAuthProvider.AuthProvider>(context, listen: false);
+    await authProvider.checkCurrentUser();
+    if (!mounted) return;
+    if (authProvider.user == null) {
+      context.go('/welcome');
+    } else {
+      context.read<UserProvider>().fetchUser(authProvider.user!.uid);
+      context.go('/home');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: CircularProgressIndicator(color: Colors.deepPurple),
+      ),
+    );
+  }
+}
+

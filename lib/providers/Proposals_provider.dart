@@ -3,7 +3,7 @@ import 'package:flutter/material.dart'; // Needed for ChangeNotifier
 import '../models/proposal.dart';
 import '../models/proposal_to_send.dart';
 import '../models/vote_to_send.dart';
-import '../services/api_client.dart';
+import '../service/api_client.dart';
 
 class ProposalProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;

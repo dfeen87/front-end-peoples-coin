@@ -179,46 +179,65 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
     );
   }
 
-  Widget _buildProposalList() {
-    return Consumer<ProposalProvider>(
-      builder: (context, proposalProvider, child) {
-        if (proposalProvider.isFetchingProposals && proposalProvider.proposals.isEmpty) {
-          return _buildLoadingShimmer();
-        }
-        if (proposalProvider.hasListError) {
-          return SliverFillRemaining(child: Center(child: Text(proposalProvider.listError ?? 'Failed to load proposals.')));
-        }
-        if (proposalProvider.proposals.isEmpty) {
-          return const SliverFillRemaining(child: Center(child: Text("No proposals found for this status.")));
-        }
+Widget _buildProposalList() {
+  return Consumer<ProposalProvider>(
+    builder: (context, proposalProvider, child) {
+      // Show a loading shimmer ONLY if the list is empty and we are fetching.
+      // This prevents the screen from flashing when refreshing the list.
+      if (proposalProvider.isFetchingProposals && proposalProvider.proposals.isEmpty) {
+        return _buildLoadingShimmer();
+      }
 
-        return SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0).copyWith(bottom: 100),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final proposal = proposalProvider.proposals[index];
-                final animation = Tween(begin: 0.0, end: 1.0).animate(
-                  CurvedAnimation(
-                    parent: _listAnimationController,
-                    curve: Interval((1 / proposalProvider.proposals.length) * index, 1.0, curve: Curves.easeOut),
-                  ),
-                );
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(animation),
-                    child: ProposalCard(proposal: proposal),
-                  ),
-                );
-              },
-              childCount: proposalProvider.proposals.length,
-            ),
+      // Use the CORRECT getter 'hasProposalsError'
+      if (proposalProvider.hasProposalsError) {
+        return SliverFillRemaining(
+          child: Center(
+            child: Text(proposalProvider.proposalsError ?? 'Failed to load proposals.'),
           ),
         );
-      },
-    );
-  }
+      }
+
+      // Handle the case where there are no proposals after loading.
+      if (proposalProvider.proposals.isEmpty) {
+        return const SliverFillRemaining(
+          child: Center(
+            child: Text("No proposals found for this status."),
+          ),
+        );
+      }
+
+      // If we have proposals, display them in a list.
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0).copyWith(bottom: 100),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final proposal = proposalProvider.proposals[index];
+              final animation = Tween(begin: 0.0, end: 1.0).animate(
+                CurvedAnimation(
+                  parent: _listAnimationController,
+                  curve: Interval(
+                    (1 / proposalProvider.proposals.length) * index,
+                    1.0,
+                    curve: Curves.easeOut
+                  ),
+                ),
+              );
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(animation),
+                  child: ProposalCard(proposal: proposal),
+                ),
+              );
+            },
+            childCount: proposalProvider.proposals.length,
+          ),
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildLoadingShimmer() {
     return SliverPadding(

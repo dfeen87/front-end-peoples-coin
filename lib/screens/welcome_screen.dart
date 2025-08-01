@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,108 +10,99 @@ import 'package:flutter_syntax_view/flutter_syntax_view.dart';
 import '../widgets/dynamic_nebula_background.dart';
 import 'package:brightacts_frontend_app/models/tech_system.dart';
 
-// --- UPDATED: More detailed code examples for each card ---
+// ENHANCEMENT: App-specific card content
 final List<TechSystem> backendSystems = [
   const TechSystem(
-    icon: Icons.cloud_queue,
-    title: 'Cloud Infrastructure',
-    description: 'Manages scalable cloud resources and services.',
-    color: Colors.blueAccent,
+    icon: Icons.edit_document,
+    title: 'Act Submission',
+    description: 'Captures and validates user-submitted acts of goodwill.',
+    color: Color(0xFFDA70D6), // Matches "Record Act" color
     code: r'''
-# Manages scalable cloud resources via IaC.
-class CloudManager:
-    def __init__(self, provider='gcp'):
-        self.provider = provider
-        self.services = []
-        print(f"Cloud Manager on {provider.upper()} ready.")
-
-    def provision_server(self, region, spec):
-        server_id = f"server-{random.randint(1000, 9999)}"
-        self.services.append(server_id)
-        print(f"Provisioning {spec} server in {region}...")
-        return server_id
-
-    def deploy_app(self, server_id, app_name):
-        if server_id in self.services:
-            print(f"Deploying {app_name} to {server_id}.")
-            return {"status": "deployed", "app": app_name}
-        return {"status": "error", "reason": "Server not found"}
+// Validates and prepares a new "Bright Act" for the network.
+class ActValidator {
+  bool validate(ActSubmission submission) {
+    if (submission.description.isEmpty) {
+      return false; // Act must have a description.
+    }
+    if (submission.evidence.isNotProvided) {
+      return false; // Evidence is required for verification.
+    }
+    // Additional validation logic...
+    print("Act validated successfully.");
+    return true;
+  }
+}
 ''',
   ),
   const TechSystem(
-    icon: Icons.security,
-    title: 'Security Protocol',
-    description: 'Ensures data integrity and user authentication.',
-    color: Colors.redAccent,
+    icon: Icons.gavel,
+    title: 'Governance Protocol',
+    description: 'Manages community proposals and on-chain voting.',
+    color: Color(0xFF8A2BE2), // Matches "Governance" color
     code: r'''
-# Handles JWT-based user authentication.
-import jwt
+// A smart contract to handle community voting.
+contract Governance {
+  mapping(uint => Proposal) public proposals;
+  mapping(address => bool) public hasVoted;
 
-class SecurityModule:
-    def __init__(self, secret_key):
-        self.secret = secret_key
-
-    def create_token(self, user_id):
-        payload = {'user_id': user_id, 'exp': time.time() + 3600}
-        token = jwt.encode(payload, self.secret, algorithm='HS256')
-        return token
-
-    def verify_token(self, token):
-        try:
-            jwt.decode(token, self.secret, algorithms=['HS256'])
-            return True
-        except jwt.ExpiredSignatureError:
-            return False
+  function vote(uint proposalId, bool supports) public {
+    require(!hasVoted[msg.sender], "Already voted.");
+    
+    if (supports) {
+      proposals[proposalId].yesVotes++;
+    } else {
+      proposals[proposalId].noVotes++;
+    }
+    hasVoted[msg.sender] = true;
+  }
+}
 ''',
   ),
   const TechSystem(
-    icon: Icons.analytics,
-    title: 'Data Analytics',
-    description: 'Processes and visualizes community impact data.',
-    color: Colors.purpleAccent,
+    icon: Icons.public,
+    title: 'Immutable Ledger',
+    description: 'Records all verified acts on a transparent, public chain.',
+    color: Color(0xFF00BFFF), // Matches "Ledger" color
     code: r'''
-# Processes raw data streams for insights.
-import pandas as pd
+// Records a transaction on the distributed ledger.
+class Ledger {
+  List<Transaction> chain = [];
 
-class AnalyticsEngine:
-    def process_acts(self, act_data):
-        df = pd.DataFrame(act_data)
-        total_acts = len(df)
-        avg_loves = df['loves'].mean()
-        print(f"Analyzed {total_acts} acts.")
-        return {
-            "total_acts": total_acts,
-            "average_loves": avg_loves
-        }
+  void addTransaction(Act act, User user) {
+    final newTx = Transaction(
+      actId: act.id,
+      userId: user.id,
+      timestamp: DateTime.now(),
+    );
+    // Hashing and linking to the previous block...
+    chain.add(newTx);
+    print("New act recorded on the ledger.");
+  }
+}
 ''',
   ),
   const TechSystem(
-    icon: Icons.storage,
-    title: 'Blockchain Ledger',
-    description: 'Records acts of goodwill on an immutable ledger.',
-    color: Colors.greenAccent,
+    icon: Icons.wallet,
+    title: 'Tokenomics Engine',
+    description: 'Mints and distributes "Loves" tokens as rewards.',
+    color: Color(0xFF6A5ACD), // Matches "Wallet" color
     code: r'''
-# Simplified blockchain logic for transactions.
-import hashlib
+// Mints new tokens as a reward for a verified act.
+class TokenMinter {
+  final int REWARD_AMOUNT = 10; // Loves per act
 
-class Blockchain:
-    def __init__(self):
-        self.chain = []
-        self.create_block(proof=1, prev_hash='0')
-
-    def create_block(self, proof, prev_hash):
-        block = {
-            'index': len(self.chain) + 1,
-            'proof': proof,
-            'previous_hash': prev_hash
-        }
-        self.chain.append(block)
-        return block
+  void issueReward(User user, Act verifiedAct) {
+    user.wallet.balance += REWARD_AMOUNT;
+    print(
+      "$REWARD_AMOUNT Loves minted for ${user.id}."
+    );
+    // Logic to update total supply...
+  }
+}
 ''',
   ),
 ];
 
-// A key to manage the state of the card group
 final GlobalKey<FlippableCardGroupState> cardGroupKey = GlobalKey();
 
 class WelcomeScreen extends StatelessWidget {
@@ -186,7 +178,7 @@ class WelcomeScreen extends StatelessWidget {
             foregroundColor: Colors.black,
             text: 'Join the Movement',
           ).animate(onPlay: (controller) => controller.repeat())
-             .shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
+              .shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -196,10 +188,10 @@ class WelcomeScreen extends StatelessWidget {
             foregroundColor: Colors.black,
             text: 'Sign In',
           ).animate(onPlay: (controller) => controller.repeat())
-             .shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
+              .shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
         ),
       ],
-    ).animate().fade(delay: 400.ms, duration: 900.ms).slideY(begin: 0.3);
+    ).animate().fade(delay: 200.ms, duration: 800.ms).slideY(begin: 0.3);
   }
 
   Widget _buildTechShowcase(BuildContext context) {
@@ -217,7 +209,7 @@ class WelcomeScreen extends StatelessWidget {
           systems: backendSystems,
         ),
       ],
-    );
+    ).animate().fade(delay: 400.ms, duration: 800.ms);
   }
 
   Widget _buildFooterLinks() {
@@ -225,13 +217,18 @@ class WelcomeScreen extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _FooterLink(
+          url: 'https://www.linkedin.com/company/the-people-s-coin/',
+          text: 'Follow Us',
+        ),
+        StrokedText(text: '  |  ', fontSize: 14),
+        _FooterLink(
           url: 'https://github.com/DonMichaelFeeney/Brightacts',
           text: 'View Full Codebase',
         ),
         StrokedText(text: '  |  ', fontSize: 14),
         _FooterLink(
-          url: 'https://www.linkedin.com/company/the-people-s-coin/',
-          text: 'Follow Us',
+          url: 'mailto:support@brightacts.com?subject=Bright Acts Support Request',
+          text: 'Support',
         ),
       ],
     );
@@ -265,20 +262,41 @@ class FlippableCardGroupState extends State<FlippableCardGroup> {
     });
   }
 
+  Widget _buildCard(int index) {
+    if (index >= widget.systems.length) {
+      return const SizedBox.shrink();
+    }
+    final system = widget.systems[index];
+    return Flexible(
+      child: FlippableTechCard(
+        system: system,
+        isFlipped: _currentlyFlippedIndex == index,
+        onTap: () => flipCard(index),
+      ).animate().fade(delay: (800 + (200 * index)).ms).slideX(begin: 0.5),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: widget.systems.map((system) {
-        final index = widget.systems.indexOf(system);
-        return Flexible(
-          child: FlippableTechCard(
-            system: system,
-            isFlipped: _currentlyFlippedIndex == index,
-            onTap: () => flipCard(index),
-          ).animate().fade(delay: (800 + (200 * index)).ms).slideX(begin: 0.5),
-        );
-      }).toList(),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildCard(0),
+            _buildCard(1),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildCard(2),
+            _buildCard(3),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -334,28 +352,34 @@ class _FlippableTechCardState extends State<FlippableTechCard>
   Widget build(BuildContext context) {
     final animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
 
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, child) {
-          final isFront = animation.value < 0.5;
-          final transform = Matrix4.identity()
-            ..setEntry(3, 2, 0.001)
-            ..rotateY(pi * animation.value);
-
-          return Transform(
-            transform: transform,
-            alignment: Alignment.center,
-            child: isFront
-                ? _buildCardFace()
-                : Transform(
-                    transform: Matrix4.identity()..rotateY(pi),
-                    alignment: Alignment.center,
-                    child: _buildCardBack(),
-                  ),
-          );
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          widget.onTap();
         },
+        child: AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) {
+            final isFront = animation.value < 0.5;
+            final transform = Matrix4.identity()
+              ..setEntry(3, 2, 0.001)
+              ..rotateY(pi * animation.value);
+
+            return Transform(
+              transform: transform,
+              alignment: Alignment.center,
+              child: isFront
+                  ? _buildCardFace()
+                  : Transform(
+                      transform: Matrix4.identity()..rotateY(pi),
+                      alignment: Alignment.center,
+                      child: _buildCardBack(),
+                    ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -526,19 +550,23 @@ class _FooterLink extends StatelessWidget {
   const _FooterLink({required this.url, required this.text});
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () async {
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
-        }
-      },
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: StrokedText(
-          text: text,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
+    return Semantics(
+      label: "Link to $text",
+      link: true,
+      child: InkWell(
+        onTap: () async {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri);
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: StrokedText(
+            text: text,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
