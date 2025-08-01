@@ -43,13 +43,12 @@ class PeoplesCoinApiClient {
   // ENHANCEMENT: Inject http.Client for testability
   PeoplesCoinApiClient({http.Client? httpClient, String? baseUrl})
       : _httpClient = httpClient ?? http.Client(),
-        // The base URL is now just for other API calls, not the new Cloud Functions
         baseUrl = baseUrl ?? dotenv.env['API_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
 
   static const _timeout = Duration(seconds: 15);
   Map<String, String> get _jsonHeaders => {'Content-Type': 'application/json'};
 
-  // ENHANCEMENT: Centralized GET request handler
+  // --- Centralized GET ---
   Future<dynamic> _get(String endpoint) async {
     final uri = Uri.parse('$baseUrl/$endpoint');
     try {
@@ -65,7 +64,7 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // ENHANCEMENT: Centralized POST request handler
+  // --- Centralized POST ---
   Future<dynamic> _post(String endpoint, {required Map<String, dynamic> body}) async {
     final uri = Uri.parse('$baseUrl/$endpoint');
     try {
@@ -81,10 +80,10 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // ENHANCEMENT: Centralized response handler
+  // --- Response handler ---
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) return null; // Handle empty success responses
+      if (response.body.isEmpty) return null;
       return json.decode(response.body);
     } else {
       throw ApiException(
@@ -97,7 +96,6 @@ class PeoplesCoinApiClient {
 
   // === User ===
 
-  // THIS METHOD NOW CALLS THE UNIFIED SIGN-UP CLOUD FUNCTION
   Future<void> unifiedSignUp({
     required String email,
     required String password,
@@ -124,21 +122,27 @@ class PeoplesCoinApiClient {
     return UserAccount.fromJson(data);
   }
 
-  // THIS METHOD NOW CALLS THE USERNAME CHECK CLOUD FUNCTION
+  // === Updated username check ===
   Future<bool> checkUsernameAvailability(String username) async {
-    final url = Uri.parse('https://us-central1-brightacts-frontend-50f58.cloudfunctions.net/checkUsername');
-    final body = {'username': username};
+    // Direct call to backend GET route
+    final url = Uri.parse(
+      '$baseUrl/users/username-check/${Uri.encodeComponent(username)}',
+    );
+
     try {
-      final response = await _httpClient.post(url, headers: _jsonHeaders, body: json.encode(body)).timeout(_timeout);
+      final response = await _httpClient.get(url, headers: _jsonHeaders).timeout(_timeout);
       final data = _handleResponse(response);
       return data['available'] == true;
     } on SocketException {
       throw NetworkException('Please check your internet connection.');
     } on TimeoutException {
       throw NetworkException('The request timed out. Please try again.');
+    } catch (e) {
+      if (kDebugMode) print('Error checking username: $e');
+      rethrow;
     }
   }
-  
+
   Future<void> createUserWallet({
     required String username,
     required String publicKey,
@@ -156,7 +160,6 @@ class PeoplesCoinApiClient {
     return data.map((item) => GoodwillAction.fromJson(item)).toList();
   }
 
-  // Corrected type safety issue
   Future<Map<String, dynamic>> submitGoodwill(GoodwillActionToSend actionToSend) async {
     return await _post('metabolic/submit_goodwill', body: actionToSend.toJson()) as Map<String, dynamic>;
   }
@@ -177,14 +180,12 @@ class PeoplesCoinApiClient {
     return Proposal.fromJson(data);
   }
 
-  // Corrected type safety issue
   Future<Map<String, dynamic>> createProposal(ProposalToSend proposalToSend) async {
     return await _post('api/v1/governance/proposals', body: proposalToSend.toJson()) as Map<String, dynamic>;
   }
 
   // === Votes ===
 
-  // Corrected type safety issue
   Future<Map<String, dynamic>> submitVote(VoteToSend voteToSend) async {
     return await _post('api/v1/governance/proposals/${voteToSend.proposalId}/vote', body: voteToSend.toJson()) as Map<String, dynamic>;
   }
@@ -207,7 +208,6 @@ class PeoplesCoinApiClient {
     return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
   }
 
-  // Corrected type safety issue
   Future<Map<String, dynamic>> sendLoves({
     required String senderWalletId,
     required String recipientWalletId,
@@ -223,10 +223,8 @@ class PeoplesCoinApiClient {
   }
 
   // === Metabolic status check ===
-  
   Future<String> checkMetabolicStatus() async {
     final uri = Uri.parse('$baseUrl/metabolic/status');
-    // This one is different as it returns plain text, so we handle it separately
     try {
       final response = await _httpClient.get(uri, headers: _jsonHeaders).timeout(_timeout);
       if (response.statusCode == 200) {

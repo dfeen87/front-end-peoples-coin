@@ -7,7 +7,7 @@ admin.initializeApp();
 
 // Your "wall" function remains the same
 exports.myAppGatekeeper = functions.https.onRequest((req, res) => {
-  const requiredPassword = "bleigh1"; 
+  const requiredPassword = "bleigh1";
   const authHeader = req.headers.authorization || '';
   const encodedCreds = authHeader.split(' ')[1] || '';
   const decodedCreds = Buffer.from(encodedCreds, 'base64').toString();
@@ -62,7 +62,12 @@ exports.unifiedSignUp = functions.https.onRequest((req, res) => {
       if (error.code === 'auth/email-already-exists') {
         return res.status(409).send({ error: "This email address is already in use." });
       }
-      
+
+      // Check for a 409 status from the Python API
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+          return res.status(409).send({ error: "Username is already taken." });
+      }
+
       return res.status(500).send({ error: "An unexpected error occurred during sign-up." });
     }
   });
@@ -78,13 +83,20 @@ exports.checkUsername = functions.https.onRequest((req, res) => {
       return res.status(400).send({ error: "Username is required." });
     }
     try {
-      // This function calls your Python backend to check the username
-      const pythonApiUrl = `https://peoples-coin-service-105378934751.us-central1.run.app/api/v1/users/username-check/${username}`;
-      const response = await axios.get(pythonApiUrl);
+      // This function calls your Python backend to check the username.
+      // Corrected to be a POST request to match the Flutter API client.
+      const pythonApiUrl = "https://peoples-coin-service-105378934751.us-central1.run.app/api/v1/users/username-check";
+      const response = await axios.post(pythonApiUrl, { username: username });
       return res.status(200).send(response.data);
     } catch (error) {
       console.error("Error checking username:", error);
+      // The Python backend is expected to return a specific error code if the username is taken
+      // Handle the case where the Python API returns a specific error for "username taken"
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        return res.status(200).send({ available: false });
+      }
       return res.status(500).send({ error: "Failed to check username availability." });
     }
   });
 });
+
