@@ -1,12 +1,12 @@
-name: Deploy to Firebase Hosting
+name: Build and Deploy to Firebase Hosting
 
 on:
   push:
     branches:
-      - main  # or your default branch
+      - main
 
 jobs:
-  build-and-deploy:
+  build_and_deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,19 +16,19 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.22.2  # or whatever you're using locally
+          flutter-version: '3.32.8'
 
-      - name: Install Flutter dependencies
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Flutter web with reCAPTCHA key
+      - name: Build Flutter web
         run: flutter build web --release --dart-define=RECAPTCHA_SITE_KEY_PROD=${{ secrets.RECAPTCHA_SITE_KEY_PROD }}
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           projectId: brightacts-frontend-50f58
           channelId: live
 
