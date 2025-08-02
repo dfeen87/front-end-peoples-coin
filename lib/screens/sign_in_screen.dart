@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -46,6 +45,12 @@ class _SignInScreenState extends State<SignInScreen> {
     _passwordController.dispose();
     super.dispose();
   }
+  
+  void _logError(dynamic e) {
+    if (kDebugMode) {
+      print('An error occurred: $e');
+    }
+  }
 
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
@@ -68,41 +73,35 @@ class _SignInScreenState extends State<SignInScreen> {
 
       if (authProvider.user != null) {
         final userId = authProvider.user!.uid;
-        if (kDebugMode) print('[SignInScreen] Firebase UID to fetch user: $userId');
 
         try {
           await context.read<UserProvider>().fetchUser(userId);
-          context.go('/home');
+          if (mounted) context.go('/home');
         } catch (e) {
           if (e.toString().contains('404')) {
-            setState(() {
-              _error = 'User profile not found. Please register or contact support.';
-            });
+            _error = 'User profile not found. Please register or contact support.';
           } else {
-            setState(() {
-              _error = 'Failed to fetch user profile: $e';
-            });
+            _error = 'Failed to fetch user profile: $e';
           }
+          _logError(e);
         }
       } else {
         throw Exception("Sign-in succeeded but user data is missing.");
       }
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
-          _error = 'Incorrect email or password. Please try again.';
-        } else {
-          _error = 'An error occurred during sign-in.';
-        }
-        if (kDebugMode) print('Firebase Auth Error: ${e.message}');
-      });
+      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        _error = 'Incorrect email or password. Please try again.';
+      } else {
+        _error = 'An error occurred during sign-in: ${e.message}';
+      }
+      _logError(e);
     } catch (e) {
-      setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
-        if (kDebugMode) print('Generic Error: $e');
-      });
+      _error = e.toString().replaceFirst('Exception: ', '');
+      _logError(e);
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -126,7 +125,7 @@ class _SignInScreenState extends State<SignInScreen> {
           backgroundColor: Colors.green,
         ),
       );
-    } on FirebaseAuthException catch (e) { // FIX: Added specific error handling
+    } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to send reset link: ${e.message}'),
