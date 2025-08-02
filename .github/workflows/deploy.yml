@@ -1,9 +1,9 @@
-name: Deploy to Firebase Hosting   
+name: Deploy to Firebase Hosting
 
 on:
   push:
     branches:
-      - main   # or your default branch
+      - main  # or your default branch
 
 jobs:
   build-and-deploy:
@@ -13,16 +13,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          node-version: '18'   # or latest LTS
+          flutter-version: 3.22.2  # or whatever you're using locally
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install Flutter dependencies
+        run: flutter pub get
 
-      - name: Build project
-        run: npm run build   # Adjust if your build command is different, e.g. flutter build web
+      - name: Build Flutter web with reCAPTCHA key
+        run: flutter build web --release --dart-define=RECAPTCHA_SITE_KEY_PROD=${{ secrets.RECAPTCHA_SITE_KEY_PROD }}
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
