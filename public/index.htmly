@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="$FLUTTER_BASE_HREF" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>❤️ Bright Acts</title>
+  <meta name="description" content="Bright Acts empowers people to do good through technology and action." />
+
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#000000" />
+  
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/Icon-192.png" />
+  <link rel="icon" href="icons/favicon.png" type="image/png" />
+
+  <script src="https://www.google.com/recaptcha/api.js" defer></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background-color: #000000;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" defer></script>
+
+  <script>
+    window.addEventListener('load', function () {
+      _flutter.loader.load().then(function (engineInitializer) {
+        engineInitializer.initializeEngine({
+          // This line is added for the renderer fallback.
+          // 'auto' tries CanvasKit first, then falls back to HTML.
+          // You could also use 'html' to force HTML, or 'canvaskit' to force CanvasKit.
+          renderer: 'auto', 
+        }).then(function (appRunner) {
+          appRunner.run();
+        });
+      });
+    });
+  </script>
+</body>
+</html>

@@ -7,8 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_syntax_view/flutter_syntax_view.dart';
 
-import '../widgets/dynamic_nebula_background.dart';
 import 'package:brightacts_frontend_app/models/tech_system.dart';
+import 'package:brightacts_frontend_app/widgets/dynamic_nebula_background.dart';
 
 // ENHANCEMENT: App-specific card content
 final List<TechSystem> backendSystems = [
@@ -119,24 +119,26 @@ class WelcomeScreen extends StatelessWidget {
             const DynamicNebulaBackground(),
             Center(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Spacer(flex: 2),
-                    _buildHeader(),
-                    const SizedBox(height: 24),
-                    _buildMissionStatement(),
-                    const SizedBox(height: 24),
-                    _buildActionButtons(context),
-                    const Spacer(flex: 3),
-                    _buildTechShowcase(context),
-                    const Spacer(flex: 1),
-                    _buildFooterLinks(),
-                    const Spacer(flex: 1),
-                  ],
-                ).animate().fadeIn(duration: 500.ms, curve: Curves.easeIn),
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 32),
+                      _buildHeader(),
+                      const SizedBox(height: 16),
+                      _buildMissionStatement(),
+                      const SizedBox(height: 24),
+                      _buildActionButtons(context),
+                      const SizedBox(height: 16),
+                      _buildTechShowcase(context),
+                      const SizedBox(height: 24),
+                      _buildFooterLinks(),
+                      const SizedBox(height: 24),
+                    ],
+                  ).animate().fadeIn(duration: 500.ms, curve: Curves.easeIn),
+                ),
               ),
             ),
           ],
@@ -148,23 +150,30 @@ class WelcomeScreen extends StatelessWidget {
   Widget _buildHeader() {
     return const Column(
       children: [
+        // CHANGED: The title is now just "Bright Acts"
         StrokedText(
-          text: 'Welcome to Bright Acts',
+          text: 'Bright Acts',
           fontSize: 36,
           fontWeight: FontWeight.w900,
         ),
         SizedBox(height: 8),
-        DynamicTagline(),
       ],
     );
   }
 
   Widget _buildMissionStatement() {
-    return const StrokedText(
-      text: 'A Web3 platform for recognizing and rewarding positive community impact through a transparent, decentralized public ledger.',
-      fontSize: 16,
-      fontWeight: FontWeight.w500,
-      textAlign: TextAlign.center,
+    return const Column(
+      children: [
+        // MOVED: The DynamicTagline is now part of the Mission Statement section
+        DynamicTagline(),
+        SizedBox(height: 8),
+        StrokedText(
+          text: 'A Web3 platform for recognizing and rewarding positive community impact through a transparent, decentralized public ledger.',
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 

@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "build/web",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -9,11 +9,9 @@
     "rewrites": [
       {
         "source": "**",
-        "function": "myAppGatekeeper"
+        "destination": "/index.html"
       }
     ]
-  },
-  "functions": {
-    "source": "functions"
   }
 }
+
