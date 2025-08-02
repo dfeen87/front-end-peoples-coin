@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../widgets/dynamic_nebula_background.dart';
 import '../service/api_client.dart';
@@ -33,6 +34,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isCheckingUsername = false;
   bool? _isUsernameAvailable;
 
+  void _logDebug(String message) {
+    if (kDebugMode) {
+      print("[SignUp DEBUG] $message");
+    }
+  }
+
   @override
   void dispose() {
     _debounceTimer?.cancel();
@@ -46,7 +53,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void _onUsernameChanged(String username) {
     if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
 
-    // Clear status if username becomes too short
     if (username.length < 3) {
       setState(() => _isUsernameAvailable = null);
       return;
@@ -60,14 +66,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       try {
         final apiClient = context.read<PeoplesCoinApiClient>();
-        // Use the new apiClient method which calls the Cloud Function
         final isAvailable = await apiClient.checkUsernameAvailability(username);
         if (!mounted) return;
         setState(() => _isUsernameAvailable = isAvailable);
       } catch (e) {
         if (!mounted) return;
-        setState(() => _isUsernameAvailable = false); // Treat any error as unavailable
-        if (kDebugMode) print('Username check error: $e');
+        setState(() => _isUsernameAvailable = false);
+        _logDebug("Username check error: $e");
       } finally {
         if (!mounted) return;
         setState(() => _isCheckingUsername = false);
@@ -76,16 +81,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _signUp() async {
-    // Hide keyboard
     FocusScope.of(context).unfocus();
 
-    // Prevent submission if username is known to be unavailable
     if (_isUsernameAvailable == false) {
-      _formKey.currentState?.validate(); // Re-run validation to show error
+      _formKey.currentState?.validate();
       return;
     }
 
-    // Validate the form
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
@@ -96,28 +98,51 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      final apiClient = context.read<PeoplesCoinApiClient>();
-      
-      // Call the new unified sign-up method that uses the Cloud Function
-      await apiClient.unifiedSignUp(
+      _logDebug("Creating Firebase user...");
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
-        password: _passwordController.text,
-        username: _usernameController.text.trim(),
+        password: _passwordController.text.trim(),
       );
+      _logDebug("Firebase user created: ${userCredential.user?.uid}");
 
-      // The sign-up was successful, now navigate to home
-      if (mounted) context.go('/home');
+      // Optional: Update displayName
+      await userCredential.user?.updateDisplayName(_usernameController.text.trim());
 
+      // Toggle to true if you want to test Firebase only
+      const skipApiCall = false;
+
+      if (!skipApiCall) {
+        _logDebug("Calling PeoplesCoin unifiedSignUp API...");
+        final apiClient = context.read<PeoplesCoinApiClient>();
+        await apiClient.unifiedSignUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          username: _usernameController.text.trim(),
+        );
+        _logDebug("API sign-up completed.");
+      }
+
+      if (mounted) {
+        _logDebug("Navigating to /home...");
+        context.go('/home');
+      }
+    } on FirebaseAuthException catch (e) {
+      _logDebug("FirebaseAuthException: ${e.code} - ${e.message}");
+      if (e.code == 'email-already-in-use') {
+        _error = 'This email is already in use. Try signing in.';
+      } else if (e.code == 'invalid-email') {
+        _error = 'The email address is not valid.';
+      } else if (e.code == 'weak-password') {
+        _error = 'Your password is too weak. Use at least 6 characters.';
+      } else {
+        _error = 'Sign-up failed: ${e.message}';
+      }
     } on ApiException catch (e) {
-      // Handle API-specific errors from the Cloud Function response
-      String message = 'An error occurred during sign-up.';
-      // You can add more specific logic based on the error response from your function if needed
-      setState(() => _error = message);
-      if (kDebugMode) print('API Error: ${e.message}');
+      _logDebug("API Exception: ${e.message}");
+      _error = 'Failed to complete profile setup.';
     } catch (e) {
-      // Catch any other unexpected errors
-      setState(() => _error = 'An unexpected error occurred.');
-      if (kDebugMode) print('Generic Error: $e');
+      _logDebug("General exception: $e");
+      _error = 'An unexpected error occurred.';
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -206,7 +231,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 'Username',
                                 Icons.person_outline,
                                 suffixIcon: _isCheckingUsername
-                                    ? const Padding(padding: EdgeInsets.all(12.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(12.0),
+                                        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                                      )
                                     : _isUsernameAvailable == false
                                         ? const Icon(Icons.error, color: Colors.red)
                                         : _isUsernameAvailable == true
@@ -231,7 +259,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               style: const TextStyle(color: Colors.white),
                               decoration: _buildInputDecoration('Email', Icons.email_outlined),
                               validator: (val) {
-                                final emailRegex = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
+                                final emailRegex = RegExp(r"^[^@]+@[^@]+\.[^@]+");
                                 if (val == null || !emailRegex.hasMatch(val)) {
                                   return 'Please enter a valid email address.';
                                 }

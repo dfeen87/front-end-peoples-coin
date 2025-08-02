@@ -33,9 +33,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
   void _clearError() {
     if (_error != null) {
-      setState(() {
-        _error = null;
-      });
+      setState(() => _error = null);
     }
   }
 
@@ -45,10 +43,10 @@ class _SignInScreenState extends State<SignInScreen> {
     _passwordController.dispose();
     super.dispose();
   }
-  
-  void _logError(dynamic e) {
+
+  void _logDebug(String message) {
     if (kDebugMode) {
-      print('An error occurred: $e');
+      print("[DEBUG] $message");
     }
   }
 
@@ -61,43 +59,66 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
+      _logDebug("Attempting Firebase sign-in...");
       final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
+      _logDebug("Firebase sign-in successful. UID: ${userCredential.user?.uid}");
+
       if (!mounted) return;
 
+      // Check AuthProvider state
       final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
       await authProvider.checkCurrentUser();
 
       if (authProvider.user != null) {
         final userId = authProvider.user!.uid;
 
-        try {
-          await context.read<UserProvider>().fetchUser(userId);
-          if (mounted) context.go('/home');
-        } catch (e) {
-          if (e.toString().contains('404')) {
-            _error = 'User profile not found. Please register or contact support.';
-          } else {
-            _error = 'Failed to fetch user profile: $e';
+        // Toggle this if you want to test login without profile fetch
+        const skipProfileFetch = false;
+
+        if (!skipProfileFetch) {
+          try {
+            _logDebug("Fetching user profile for UID: $userId");
+            await context.read<UserProvider>().fetchUser(userId);
+            _logDebug("User profile fetch successful.");
+            if (mounted) context.go('/home');
+          } catch (e) {
+            _logDebug("Profile fetch error: $e");
+            if (e.toString().contains('404')) {
+              _error = 'User profile not found. Please register or contact support.';
+            } else {
+              _error = 'Failed to fetch user profile: $e';
+            }
           }
-          _logError(e);
+        } else {
+          _logDebug("Skipping profile fetch. Navigating to /home.");
+          context.go('/home');
         }
       } else {
-        throw Exception("Sign-in succeeded but user data is missing.");
+        throw Exception("Sign-in succeeded but user data is missing in AuthProvider.");
       }
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
-        _error = 'Incorrect email or password. Please try again.';
+      _logDebug("FirebaseAuthException caught:");
+      _logDebug(" - Code: ${e.code}");
+      _logDebug(" - Message: ${e.message}");
+
+      if (e.code == 'user-not-found') {
+        _error = 'No account found for this email.';
+      } else if (e.code == 'wrong-password') {
+        _error = 'Incorrect password. Please try again.';
+      } else if (e.code == 'invalid-credential') {
+        _error = 'Invalid email or password. Please check and try again.';
+      } else if (e.code == 'invalid-email') {
+        _error = 'The email address is badly formatted.';
       } else {
-        _error = 'An error occurred during sign-in: ${e.message}';
+        _error = 'Sign-in error: ${e.message}';
       }
-      _logError(e);
     } catch (e) {
+      _logDebug("General exception during sign-in: $e");
       _error = e.toString().replaceFirst('Exception: ', '');
-      _logError(e);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -226,7 +247,8 @@ class _SignInScreenState extends State<SignInScreen> {
                               style: const TextStyle(color: Colors.white),
                               decoration: _buildInputDecoration('Password', Icons.lock_outline),
                               obscureText: true,
-                              validator: (val) => val != null && val.isNotEmpty ? null : 'Please enter your password',
+                              validator: (val) =>
+                                  val != null && val.isNotEmpty ? null : 'Please enter your password',
                             ),
                             Align(
                               alignment: Alignment.centerRight,
@@ -264,3 +286,4 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 }
+
