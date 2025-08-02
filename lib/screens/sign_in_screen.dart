@@ -5,13 +5,15 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import '../widgets/dynamic_nebula_background.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../state/user_provider.dart';
 import '../service/api_client.dart';
 import '../service/recaptcha_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+// This is the main widget class that was missing
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
 
@@ -58,7 +60,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
     try {
       final apiClient = context.read<PeoplesCoinApiClient>();
-      
+
       _logDebug("Requesting PoW challenge...");
       final challengeData = await apiClient.getPowChallenge();
       final challenge = challengeData['challenge'] as String;
@@ -76,10 +78,10 @@ class _SignInScreenState extends State<SignInScreen> {
 
       _logDebug("Verifying PoW with backend...");
       await apiClient.verifyPow(challenge: challenge, nonce: nonce);
-      
+
       _logDebug("Executing reCAPTCHA...");
       final recaptchaToken = await executeRecaptcha(dotenv.env['RECAPTCHA_SITE_KEY_PROD']!, 'signin');
-      if (recaptchaToken.isEmpty) throw Exception('Failed to get reCAPTCHA token.');
+      if (recaptchaToken.isEmpty && kReleaseMode) throw Exception('Failed to get reCAPTCHA token.');
 
       _logDebug("Validating reCAPTCHA token...");
       await apiClient.verifyRecaptchaToken(recaptchaToken);
@@ -191,105 +193,111 @@ class _SignInScreenState extends State<SignInScreen> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.black.withOpacity(0.5),
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Card(
-              color: Colors.blueGrey[900]?.withOpacity(0.6),
-              elevation: 8,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.blueGrey[800]!),
-              ),
+      body: Stack(
+        children: [
+          const DynamicNebulaBackground(),
+          Center(
+            child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'Welcome Back',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12.0),
-                          child: Text(
-                            _error!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                padding: const EdgeInsets.all(24.0),
+                child: Card(
+                  color: Colors.blueGrey[900]?.withOpacity(0.6),
+                  elevation: 8,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: Colors.blueGrey[800]!),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Welcome Back',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontFamily: 'monospace',
+                            ),
                           ),
-                        ),
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: _buildInputDecoration('Email', Icons.alternate_email),
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (val) =>
-                            (val?.contains('@') ?? false) ? null : 'Please enter a valid email',
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _isPasswordObscured,
-                        decoration: _buildInputDecoration(
-                          'Password',
-                          Icons.lock_outline,
-                          suffixIcon: passwordVisibilityToggle,
-                        ),
-                        validator: (val) =>
-                            (val?.isNotEmpty ?? false) ? null : 'Please enter your password',
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _forgotPassword,
-                          child: Text(
-                            'Forgot Password?',
-                            style: TextStyle(color: Colors.amber[600]),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_isLoading)
-                        const CircularProgressIndicator()
-                      else
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              backgroundColor: Colors.amber[800],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          const SizedBox(height: 24),
+                          if (_error != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.redAccent, fontSize: 14),
                               ),
                             ),
-                            onPressed: _signIn,
-                            child: const Text(
-                              'Sign In',
-                              style: TextStyle(fontSize: 16, color: Colors.white),
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: _buildInputDecoration('Email', Icons.alternate_email),
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (val) =>
+                                (val?.contains('@') ?? false) ? null : 'Please enter a valid email',
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _isPasswordObscured,
+                            decoration: _buildInputDecoration(
+                              'Password',
+                              Icons.lock_outline,
+                              suffixIcon: passwordVisibilityToggle,
+                            ),
+                            validator: (val) =>
+                                (val?.isNotEmpty ?? false) ? null : 'Please enter your password',
+                          ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _forgotPassword,
+                              child: Text(
+                                'Forgot Password?',
+                                style: TextStyle(color: Colors.amber[600]),
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                          const SizedBox(height: 12),
+                          if (_isLoading)
+                            const CircularProgressIndicator()
+                          else
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  backgroundColor: Colors.amber[800],
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: _signIn,
+                                child: const Text(
+                                  'Sign In',
+                                  style: TextStyle(fontSize: 16, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

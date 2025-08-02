@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../service/api_client.dart';
 import '../service/recaptcha_service.dart';
+import '../widgets/dynamic_nebula_background.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -21,13 +22,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  // New controller for the confirm password field
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   bool _isLoading = false;
   bool _usernameAvailable = false;
   bool _checkingUsername = false;
-  // New state variable to toggle password visibility
   bool _isPasswordObscured = true;
 
   static const String recaptchaSiteKey = String.fromEnvironment(
@@ -46,7 +46,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _usernameController.dispose();
-    _confirmPasswordController.dispose(); // Dispose the new controller
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -143,12 +143,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData icon, {Widget? suffixIcon}) {
+  InputDecoration _buildInputDecoration(String label, IconData icon,
+      {Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(color: Colors.blueGrey[200]),
       prefixIcon: Icon(icon, color: Colors.blueGrey[300], size: 20),
-      suffixIcon: suffixIcon, // Suffix icon for the visibility toggle
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: Colors.black.withOpacity(0.3),
       enabledBorder: OutlineInputBorder(
@@ -172,7 +173,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Defines the icon button for password visibility
     final passwordVisibilityToggle = IconButton(
       icon: Icon(
         _isPasswordObscured ? Icons.visibility_off : Icons.visibility,
@@ -186,119 +186,131 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.black.withOpacity(0.5),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Card(
-              color: Colors.blueGrey[900]?.withOpacity(0.6),
-              elevation: 8,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.blueGrey[800]!),
-              ),
+      backgroundColor: Colors.transparent,
+      // This tells the body to go behind the AppBar
+      extendBodyBehindAppBar: true, 
+      appBar: AppBar(
+        // The AppBar is now transparent to show the background
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Stack(
+        children: [
+          const DynamicNebulaBackground(),
+          // The Center widget is back, to center the card
+          Center(
+            child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white70),
-                          onPressed: () => context.pop(),
-                        ),
-                      ),
-                      const Text(
-                        'Create Account',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: _buildInputDecoration('Email', Icons.alternate_email),
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (val) =>
-                            (val?.contains('@') ?? false) ? null : 'Please enter a valid email',
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _usernameController,
-                        decoration: _buildInputDecoration('Username', Icons.person_outline),
-                        validator: (val) =>
-                            (val?.trim().isNotEmpty ?? false) ? null : 'Please enter a username',
-                      ),
-                      const SizedBox(height: 8),
-                      _buildUsernameAvailabilityIndicator(),
-                      const SizedBox(height: 8),
-                      // Password Field
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _isPasswordObscured, // Uses the state variable
-                        decoration: _buildInputDecoration(
-                          'Password',
-                          Icons.lock_outline,
-                          suffixIcon: passwordVisibilityToggle, // Adds the toggle button
-                        ),
-                        validator: (val) =>
-                            (val?.length ?? 0) >= 6 ? null : 'Password must be at least 6 characters',
-                      ),
-                      const SizedBox(height: 16),
-                      // New Confirm Password Field
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: _isPasswordObscured, // Also uses the state variable
-                        decoration: _buildInputDecoration(
-                          'Confirm Password',
-                          Icons.lock_person_outlined,
-                          suffixIcon: passwordVisibilityToggle, // Also has the toggle button
-                        ),
-                        validator: (val) {
-                          if (val == null || val.isEmpty) {
-                            return 'Please confirm your password';
-                          }
-                          if (val != _passwordController.text) {
-                            return 'Passwords do not match';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      if (_isLoading)
-                        const CircularProgressIndicator()
-                      else
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              backgroundColor: Colors.amber[800],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: _signUpWithEmail,
-                            child: const Text(
-                              'Sign Up',
-                              style: TextStyle(fontSize: 16, color: Colors.white),
+                padding: const EdgeInsets.all(24.0),
+                child: Card(
+                  color: Colors.blueGrey[900]?.withOpacity(0.6),
+                  elevation: 8,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: Colors.blueGrey[800]!),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Create Account',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontFamily: 'monospace',
                             ),
                           ),
-                        ),
-                    ],
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: _buildInputDecoration(
+                                'Email', Icons.alternate_email),
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (val) => (val?.contains('@') ?? false)
+                                ? null
+                                : 'Please enter a valid email',
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _usernameController,
+                            decoration: _buildInputDecoration(
+                                'Username', Icons.person_outline),
+                            validator: (val) =>
+                                (val?.trim().isNotEmpty ?? false)
+                                    ? null
+                                    : 'Please enter a username',
+                          ),
+                          const SizedBox(height: 8),
+                          _buildUsernameAvailabilityIndicator(),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _isPasswordObscured,
+                            decoration: _buildInputDecoration(
+                              'Password',
+                              Icons.lock_outline,
+                              suffixIcon: passwordVisibilityToggle,
+                            ),
+                            validator: (val) => (val?.length ?? 0) >= 6
+                                ? null
+                                : 'Password must be at least 6 characters',
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            obscureText: _isPasswordObscured,
+                            decoration: _buildInputDecoration(
+                              'Confirm Password',
+                              Icons.lock_person_outlined,
+                              suffixIcon: passwordVisibilityToggle,
+                            ),
+                            validator: (val) {
+                              if (val == null || val.isEmpty) {
+                                return 'Please confirm your password';
+                              }
+                              if (val != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          if (_isLoading)
+                            const CircularProgressIndicator()
+                          else
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 16),
+                                  backgroundColor: Colors.amber[800],
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: _signUpWithEmail,
+                                child: const Text(
+                                  'Sign Up',
+                                  style: TextStyle(
+                                      fontSize: 16, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -323,7 +335,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           Text(
             _usernameAvailable ? 'Username available' : 'Username not available',
             style: TextStyle(
-              color: _usernameAvailable ? Colors.greenAccent : Colors.redAccent,
+              color:
+                  _usernameAvailable ? Colors.greenAccent : Colors.redAccent,
               fontSize: 12,
             ),
           ),
