@@ -1,11 +1,11 @@
-// lib/screens/sign_up_screen.dart
-import 'package:flutter/gestures.dart';
+import 'package:flutter/gestures.dart';  
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_recaptcha_v3/flutter_recaptcha_v3.dart';
 
 import '../service/api_client.dart';
 
@@ -34,6 +34,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? _error;
   bool _usernameAvailable = false;
   bool _checkingUsername = false;
+  String? _recaptchaToken;
+
+  // IMPORTANT: Use your actual site key here or load from env
+  static const String recaptchaSiteKey = String.fromEnvironment(
+    'RECAPTCHA_SITE_KEY',
+    defaultValue: '',
+  );
 
   @override
   void initState() {
@@ -87,10 +94,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  Future<void> _onRecaptchaCompleted(String token) async {
+    if (kDebugMode) print('reCAPTCHA token: $token');
+    _recaptchaToken = token;
+  }
+
   Future<void> _signUpWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_usernameAvailable) {
       _showError('Username is not available.');
+      return;
+    }
+
+    // Run reCAPTCHA v3 verification first
+    if (recaptchaSiteKey.isEmpty) {
+      _showError('reCAPTCHA site key not configured.');
       return;
     }
 
@@ -100,6 +118,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
+      // Execute reCAPTCHA v3 with action 'signup'
+      await RecaptchaV3.execute(recaptchaSiteKey, 'signup', _onRecaptchaCompleted);
+
+      if (_recaptchaToken == null) {
+        throw Exception('Failed to get reCAPTCHA token.');
+      }
+
+      // Create Firebase user account
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -108,10 +134,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final user = userCredential.user;
       if (user != null) {
         final apiClient = context.read<PeoplesCoinApiClient>();
+
+        // Pass the recaptchaToken to your backend for validation
         await apiClient.createUserAccount(
           firebaseUid: user.uid,
           email: user.email ?? '',
           username: _usernameController.text.trim(),
+          recaptchaToken: _recaptchaToken!,
         );
       }
 
@@ -165,6 +194,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           firebaseUid: user.uid,
           email: user.email ?? '',
           username: '',
+          // You can also pass a recaptchaToken if you want to verify here too
         );
       }
 
