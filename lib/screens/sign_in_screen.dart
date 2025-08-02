@@ -92,7 +92,7 @@ class _SignInScreenState extends State<SignInScreen> {
       // Step 3: Execute reCAPTCHA v3 (JS bridge)
       _logDebug("Executing reCAPTCHA v3 for signin...");
       final recaptchaToken =
-        await executeRecaptcha(dotenv.env['RECAPTCHA_SITE_KEY']!, 'signin');
+        await executeRecaptcha(dotenv.env['RECAPTCHA_SITE_KEY_PROD']!, 'signin');
 
       if (recaptchaToken.isEmpty) {
         throw Exception('Failed to get reCAPTCHA token.');
