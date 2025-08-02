@@ -12,6 +12,8 @@ import '../widgets/dynamic_nebula_background.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../state/user_provider.dart';
 import '../service/api_client.dart';
+import '../service/recaptcha_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -87,10 +89,22 @@ class _SignInScreenState extends State<SignInScreen> {
       _logDebug("Verifying PoW with backend...");
       await apiClient.verifyPow(challenge: challenge, nonce: nonce);
 
-      // Step 3: Firebase Auth Sign-in
+      // Step 3: Execute reCAPTCHA v3 (JS bridge)
+      _logDebug("Executing reCAPTCHA v3 for signin...");
+      final recaptchaToken =
+        await executeRecaptcha(dotenv.env['RECAPTCHA_SITE_KEY']!, 'signin');
+
+      if (recaptchaToken.isEmpty) {
+        throw Exception('Failed to get reCAPTCHA token.');
+      }
+
+      // Optional: Verify with backend
+      _logDebug("Validating reCAPTCHA token with backend...");
+      await apiClient.verifyRecaptchaToken(recaptchaToken);
+
+      // Step 4: Firebase Auth Sign-in
       _logDebug("Signing in with Firebase...");
-      final userCredential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
@@ -100,7 +114,6 @@ class _SignInScreenState extends State<SignInScreen> {
 
       if (authProvider.user != null) {
         final userId = authProvider.user!.uid;
-
         _logDebug("Fetching user profile for UID: $userId");
         await context.read<UserProvider>().fetchUser(userId);
         _logDebug("User profile fetch successful.");

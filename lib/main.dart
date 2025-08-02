@@ -152,14 +152,16 @@ Future<void> main() async {
 
 Future<void> _bootstrapApp() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (!kIsWeb) {
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-  }
+
+  // 🔹 Load environment variables
   await dotenv.load(fileName: ".env");
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // 🔹 Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // 🔹 Firebase App Check Debug Token (only in debug mode)
   if (kDebugMode) {
     FirebaseAppCheck.instance.getToken(true).then((String? token) {
       if (token != null) {
@@ -170,8 +172,14 @@ Future<void> _bootstrapApp() async {
     });
     print("App bootstrapped successfully in debug mode.");
   }
-}
 
+  if (!kIsWeb) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
+}
 
 // --- PROVIDER & ERROR HANDLING WIDGETS ---
 class ErrorDisplayApp extends StatelessWidget {

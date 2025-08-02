@@ -93,18 +93,29 @@ class PeoplesCoinApiClient {
     }
   }
 
+  // === New: Verify reCAPTCHA token with backend ===
+  Future<bool> verifyRecaptchaToken(String token) async {
+    final response = await _post('api/v1/recaptcha/verify', body: {
+      'token': token,
+    });
+    // Assuming the backend returns { "success": true } on valid token
+    return response['success'] == true;
+  }
+
   // === User ===
 
   Future<void> unifiedSignUp({
     required String email,
     required String password,
     required String username,
+    String? recaptchaToken, // optionally accept recaptcha token
   }) async {
     final url = Uri.parse('https://us-central1-brightacts-frontend-50f58.cloudfunctions.net/unifiedSignUp');
     final body = {
       'email': email,
       'password': password,
       'username': username,
+      if (recaptchaToken != null) 'recaptchaToken': recaptchaToken,
     };
     try {
       final response = await _httpClient.post(url, headers: _jsonHeaders, body: json.encode(body)).timeout(_timeout);
@@ -121,7 +132,6 @@ class PeoplesCoinApiClient {
     return UserAccount.fromJson(data);
   }
 
-  // Updated method: check username availability
   Future<bool> checkUsernameAvailability(String username) async {
     final url = Uri.parse('$baseUrl/users/username-check/${Uri.encodeComponent(username)}');
     try {

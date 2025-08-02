@@ -12,7 +12,7 @@ dependencies:
   web3dart: ^3.0.1 
   webview_flutter: ^4.8.0
   g_recaptcha_v3: ^1.0.0  
-  
+ 
   # UI & Utilities
   cupertino_icons: ^1.0.8
   http: ^1.2.1

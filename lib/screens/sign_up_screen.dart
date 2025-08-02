@@ -5,9 +5,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_recaptcha_v3/flutter_recaptcha_v3.dart';
 
 import '../service/api_client.dart';
+import '../service/recaptcha_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -107,21 +107,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     // Run reCAPTCHA v3 verification first
+    final token = await executeRecaptcha(recaptchaSiteKey, 'signup');
+
     if (recaptchaSiteKey.isEmpty) {
       _showError('reCAPTCHA site key not configured.');
       return;
     }
-
+    
+    
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      // Execute reCAPTCHA v3 with action 'signup'
-      await RecaptchaV3.execute(recaptchaSiteKey, 'signup', _onRecaptchaCompleted);
+    // Get the reCAPTCHA token with your new async wrapper function
+    final token = await executeRecaptcha(recaptchaSiteKey, 'signup');
 
-      if (_recaptchaToken == null) {
+      if (token.isEmpty) {
         throw Exception('Failed to get reCAPTCHA token.');
       }
 
@@ -140,7 +143,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
           firebaseUid: user.uid,
           email: user.email ?? '',
           username: _usernameController.text.trim(),
-          recaptchaToken: _recaptchaToken!,
         );
       }
 
