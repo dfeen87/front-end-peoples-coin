@@ -1,13 +1,12 @@
-import 'dart:async';
-import 'dart:ui';
+// lib/screens/sign_up_screen.dart
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart';
-import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 
-import '../widgets/dynamic_nebula_background.dart';
 import '../service/api_client.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -18,77 +17,80 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: <String>[
+      'email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ],
+  );
+
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
 
-  final _usernameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   String? _error;
+  bool _usernameAvailable = false;
+  bool _checkingUsername = false;
 
-  Timer? _debounceTimer;
-  bool _isCheckingUsername = false;
-  bool? _isUsernameAvailable;
-
-  void _logDebug(String message) {
-    if (kDebugMode) {
-      print("[SignUp DEBUG] $message");
-    }
+  @override
+  void initState() {
+    super.initState();
+    _usernameController.addListener(_checkUsername);
   }
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
-    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
-  void _onUsernameChanged(String username) {
-    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
-
-    if (username.length < 3) {
-      setState(() => _isUsernameAvailable = null);
+  Future<void> _checkUsername() async {
+    final username = _usernameController.text.trim();
+    if (username.isEmpty) {
+      setState(() {
+        _usernameAvailable = false;
+        _checkingUsername = false;
+      });
       return;
     }
-
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
-      setState(() {
-        _isCheckingUsername = true;
-        _isUsernameAvailable = null;
-      });
-
-      try {
-        final apiClient = context.read<PeoplesCoinApiClient>();
-        final isAvailable = await apiClient.checkUsernameAvailability(username);
-        if (!mounted) return;
-        setState(() => _isUsernameAvailable = isAvailable);
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _isUsernameAvailable = false);
-        _logDebug("Username check error: $e");
-      } finally {
-        if (!mounted) return;
-        setState(() => _isCheckingUsername = false);
-      }
+    setState(() {
+      _checkingUsername = true;
     });
+    try {
+      final apiClient = context.read<PeoplesCoinApiClient>();
+      final available = await apiClient.checkUsernameAvailability(username);
+      if (mounted) {
+        setState(() {
+          _usernameAvailable = available;
+          _checkingUsername = false;
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) print('Username check error: $e');
+      if (mounted) {
+        setState(() {
+          _usernameAvailable = false;
+          _checkingUsername = false;
+        });
+      }
+    }
   }
 
-  Future<void> _signUp() async {
-    FocusScope.of(context).unfocus();
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+    );
+  }
 
-    if (_isUsernameAvailable == false) {
-      _formKey.currentState?.validate();
-      return;
-    }
-
-    if (!(_formKey.currentState?.validate() ?? false)) {
+  Future<void> _signUpWithEmail() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_usernameAvailable) {
+      _showError('Username is not available.');
       return;
     }
 
@@ -98,67 +100,92 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      _logDebug("Creating Firebase user...");
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final userCredential = await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      _logDebug("Firebase user created: ${userCredential.user?.uid}");
 
-      // Optional: Update displayName
-      await userCredential.user?.updateDisplayName(_usernameController.text.trim());
-
-      // Toggle to true if you want to test Firebase only
-      const skipApiCall = false;
-
-      if (!skipApiCall) {
-        _logDebug("Calling PeoplesCoin unifiedSignUp API...");
+      final user = userCredential.user;
+      if (user != null) {
         final apiClient = context.read<PeoplesCoinApiClient>();
-        await apiClient.unifiedSignUp(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
+        await apiClient.createUserAccount(
+          firebaseUid: user.uid,
+          email: user.email ?? '',
           username: _usernameController.text.trim(),
         );
-        _logDebug("API sign-up completed.");
       }
 
-      if (mounted) {
-        _logDebug("Navigating to /home...");
-        context.go('/home');
-      }
+      if (mounted) context.go('/home');
     } on FirebaseAuthException catch (e) {
-      _logDebug("FirebaseAuthException: ${e.code} - ${e.message}");
       if (e.code == 'email-already-in-use') {
-        _error = 'This email is already in use. Try signing in.';
-      } else if (e.code == 'invalid-email') {
-        _error = 'The email address is not valid.';
+        _showError('This email is already registered.');
       } else if (e.code == 'weak-password') {
-        _error = 'Your password is too weak. Use at least 6 characters.';
+        _showError('The password is too weak.');
+      } else if (e.code == 'invalid-email') {
+        _showError('Invalid email format.');
       } else {
-        _error = 'Sign-up failed: ${e.message}';
+        _showError('Sign-up error: ${e.message}');
       }
-    } on ApiException catch (e) {
-      _logDebug("API Exception: ${e.message}");
-      _error = 'Failed to complete profile setup.';
     } catch (e) {
-      _logDebug("General exception: $e");
-      _error = 'An unexpected error occurred.';
+      _showError(e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData icon, {Widget? suffixIcon}) {
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        _showError("Google sign-in aborted.");
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user != null) {
+        final apiClient = context.read<PeoplesCoinApiClient>();
+
+        // Create account if needed, username empty for now
+        await apiClient.createUserAccount(
+          firebaseUid: user.uid,
+          email: user.email ?? '',
+          username: '',
+        );
+      }
+
+      if (mounted) context.go('/home');
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  InputDecoration _buildInputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: Colors.white70),
-      suffixIcon: suffixIcon,
+      prefixIcon: Icon(icon, color: Colors.white70, size: 20),
       filled: true,
       fillColor: Colors.white.withOpacity(0.1),
-      border: OutlineInputBorder(
+      enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -167,24 +194,58 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  Widget _buildErrorWidget() {
-    if (_error == null) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+  Widget _buildGoogleSignInButton() {
+    return GestureDetector(
+      onTap: _signInWithGoogle,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.redAccent.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.redAccent),
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(6),
+          color: Colors.white,
         ),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
-            const SizedBox(width: 12),
-            Expanded(child: Text(_error!, style: const TextStyle(color: Colors.white))),
+            Image.network(
+              'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png',
+              height: 20,
+              width: 20,
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Sign up with Google',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.black87,
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildOrDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: Divider(color: Colors.grey.shade400, thickness: 1),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              'OR',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          Expanded(
+            child: Divider(color: Colors.grey.shade400, thickness: 1),
+          ),
+        ],
       ),
     );
   }
@@ -193,164 +254,82 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          const DynamicNebulaBackground(),
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(0.2)),
-                      ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Text(
-                              'Create Account',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-                            ),
-                            const SizedBox(height: 24),
-                            _buildErrorWidget(),
-                            TextFormField(
-                              controller: _usernameController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration(
-                                'Username',
-                                Icons.person_outline,
-                                suffixIcon: _isCheckingUsername
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(12.0),
-                                        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                                      )
-                                    : _isUsernameAvailable == false
-                                        ? const Icon(Icons.error, color: Colors.red)
-                                        : _isUsernameAvailable == true
-                                            ? const Icon(Icons.check_circle, color: Colors.green)
-                                            : null,
-                              ),
-                              onChanged: _onUsernameChanged,
-                              validator: (val) {
-                                if (val == null || val.trim().length < 3) {
-                                  return 'Username must be at least 3 characters.';
-                                }
-                                if (_isUsernameAvailable == false) {
-                                  return 'Username is already taken.';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration('Email', Icons.email_outlined),
-                              validator: (val) {
-                                final emailRegex = RegExp(r"^[^@]+@[^@]+\.[^@]+");
-                                if (val == null || !emailRegex.hasMatch(val)) {
-                                  return 'Please enter a valid email address.';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _passwordController,
-                              obscureText: _obscurePassword,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration(
-                                'Password',
-                                Icons.lock_outline,
-                                suffixIcon: IconButton(
-                                  icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.white70),
-                                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                                ),
-                              ),
-                              validator: (val) {
-                                if (val == null || val.length < 6) {
-                                  return 'Password must be at least 6 characters.';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _confirmPasswordController,
-                              obscureText: _obscureConfirmPassword,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration(
-                                'Confirm Password',
-                                Icons.lock_outline,
-                                suffixIcon: IconButton(
-                                  icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility, color: Colors.white70),
-                                  onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-                                ),
-                              ),
-                              validator: (val) {
-                                if (val == null || val.isEmpty) {
-                                  return 'Please confirm your password.';
-                                }
-                                if (val != _passwordController.text) {
-                                  return 'Passwords do not match.';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 24),
-                            _isLoading
-                                ? const Center(child: CircularProgressIndicator())
-                                : ElevatedButton(
-                                    onPressed: _signUp,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.amber[800],
-                                      foregroundColor: Colors.black,
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    ),
-                                    child: const Text('Create Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                  ),
-                            const SizedBox(height: 20),
-                            Center(
-                              child: RichText(
-                                text: TextSpan(
-                                  text: 'Already have an account? ',
-                                  style: const TextStyle(color: Colors.white70),
-                                  children: [
-                                    TextSpan(
-                                      text: 'Sign In',
-                                      style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.bold),
-                                      recognizer: TapGestureRecognizer()
-                                        ..onTap = () {
-                                          if (!_isLoading) context.go('/sign_in');
-                                        },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+      body: Center(
+        child: Card(
+          color: Colors.white.withOpacity(0.95),
+          elevation: 6,
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Sign Up', style: TextStyle(fontSize: 24)),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: _buildInputDecoration('Email', Icons.email_outlined),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (val) =>
+                          val != null && val.contains('@') ? null : 'Please enter a valid email',
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: _buildInputDecoration('Password', Icons.lock_outline),
+                      validator: (val) =>
+                          val != null && val.length >= 6 ? null : 'Password must be at least 6 characters',
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _usernameController,
+                      decoration: _buildInputDecoration('Username', Icons.person_outline),
+                      validator: (val) =>
+                          val != null && val.trim().isNotEmpty ? null : 'Please enter a username',
+                    ),
+                    const SizedBox(height: 4),
+                    if (_checkingUsername)
+                      const LinearProgressIndicator(minHeight: 4)
+                    else if (_usernameController.text.trim().isNotEmpty)
+                      Row(
+                        children: [
+                          Icon(
+                            _usernameAvailable ? Icons.check_circle : Icons.error,
+                            color: _usernameAvailable ? Colors.green : Colors.redAccent,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _usernameAvailable ? 'Username available' : 'Username not available',
+                            style: TextStyle(
+                              color: _usernameAvailable ? Colors.green : Colors.redAccent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 16),
+                    _isLoading
+                        ? const CircularProgressIndicator()
+                        : Column(
+                            children: [
+                              ElevatedButton(
+                                onPressed: _signUpWithEmail,
+                                child: const Text('Sign Up'),
+                              ),
+                              _buildOrDivider(),
+                              _buildGoogleSignInButton(),
+                            ],
+                          ),
+                  ],
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

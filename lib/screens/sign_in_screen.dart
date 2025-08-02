@@ -1,13 +1,17 @@
+// lib/screens/sign_in_screen.dart
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart';
 
 import '../widgets/dynamic_nebula_background.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../state/user_provider.dart';
+import '../service/api_client.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -58,59 +62,66 @@ class _SignInScreenState extends State<SignInScreen> {
       _error = null;
     });
 
+    final apiClient = context.read<PeoplesCoinApiClient>();
+
     try {
-      _logDebug("Attempting Firebase sign-in...");
-      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      // Step 1: Proof-of-Work Challenge
+      _logDebug("Requesting PoW challenge...");
+      final challengeData = await apiClient.getPowChallenge();
+      final challenge = challengeData['challenge'] as String;
+
+      // Simple PoW simulation
+      _logDebug("Solving PoW challenge...");
+      String nonce = '';
+      String hash = '';
+      for (int i = 0;; i++) {
+        final attempt = '$challenge$i';
+        hash = sha256.convert(utf8.encode(attempt)).toString();
+        if (hash.startsWith('0000')) {
+          nonce = i.toString();
+          break;
+        }
+      }
+
+      // Step 2: Verify PoW with backend
+      _logDebug("Verifying PoW with backend...");
+      await apiClient.verifyPow(challenge: challenge, nonce: nonce);
+
+      // Step 3: Firebase Auth Sign-in
+      _logDebug("Signing in with Firebase...");
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      _logDebug("Firebase sign-in successful. UID: ${userCredential.user?.uid}");
-
-      if (!mounted) return;
-
-      // Check AuthProvider state
       final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
       await authProvider.checkCurrentUser();
 
       if (authProvider.user != null) {
         final userId = authProvider.user!.uid;
 
-        // Toggle this if you want to test login without profile fetch
-        const skipProfileFetch = false;
+        _logDebug("Fetching user profile for UID: $userId");
+        await context.read<UserProvider>().fetchUser(userId);
+        _logDebug("User profile fetch successful.");
 
-        if (!skipProfileFetch) {
-          try {
-            _logDebug("Fetching user profile for UID: $userId");
-            await context.read<UserProvider>().fetchUser(userId);
-            _logDebug("User profile fetch successful.");
-            if (mounted) context.go('/home');
-          } catch (e) {
-            _logDebug("Profile fetch error: $e");
-            if (e.toString().contains('404')) {
-              _error = 'User profile not found. Please register or contact support.';
-            } else {
-              _error = 'Failed to fetch user profile: $e';
-            }
-          }
-        } else {
-          _logDebug("Skipping profile fetch. Navigating to /home.");
-          context.go('/home');
-        }
+        if (mounted) context.go('/home');
       } else {
-        throw Exception("Sign-in succeeded but user data is missing in AuthProvider.");
+        throw Exception(
+            "Sign-in succeeded but user data is missing in AuthProvider.");
       }
+    } on ApiException catch (e) {
+      _logDebug("ApiException: $e");
+      setState(() => _error = e.message);
+    } on NetworkException catch (e) {
+      _logDebug("NetworkException: $e");
+      setState(() => _error = e.message);
     } on FirebaseAuthException catch (e) {
-      _logDebug("FirebaseAuthException caught:");
-      _logDebug(" - Code: ${e.code}");
-      _logDebug(" - Message: ${e.message}");
-
+      _logDebug("FirebaseAuthException caught: ${e.code} - ${e.message}");
       if (e.code == 'user-not-found') {
         _error = 'No account found for this email.';
       } else if (e.code == 'wrong-password') {
-        _error = 'Incorrect password. Please try again.';
-      } else if (e.code == 'invalid-credential') {
-        _error = 'Invalid email or password. Please check and try again.';
+        _error = 'Incorrect password.';
       } else if (e.code == 'invalid-email') {
         _error = 'The email address is badly formatted.';
       } else {
@@ -146,16 +157,9 @@ class _SignInScreenState extends State<SignInScreen> {
           backgroundColor: Colors.green,
         ),
       );
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send reset link: ${e.message}'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send reset link: ${e.toString()}')),
+        SnackBar(content: Text('Failed to send reset link: $e')),
       );
     }
   }
@@ -206,7 +210,8 @@ class _SignInScreenState extends State<SignInScreen> {
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.1)),
                       ),
                       child: Form(
                         key: _formKey,
@@ -229,26 +234,32 @@ class _SignInScreenState extends State<SignInScreen> {
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: Text(
                                   _error!,
-                                  style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                                  style: const TextStyle(
+                                      color: Colors.redAccent, fontSize: 14),
                                   textAlign: TextAlign.center,
                                 ),
                               ),
                             TextFormField(
                               controller: _emailController,
                               style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration('Email', Icons.email_outlined),
+                              decoration: _buildInputDecoration(
+                                  'Email', Icons.email_outlined),
                               keyboardType: TextInputType.emailAddress,
-                              validator: (val) =>
-                                  val != null && val.contains('@') ? null : 'Please enter a valid email',
+                              validator: (val) => val != null && val.contains('@')
+                                  ? null
+                                  : 'Please enter a valid email',
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: _passwordController,
                               style: const TextStyle(color: Colors.white),
-                              decoration: _buildInputDecoration('Password', Icons.lock_outline),
+                              decoration: _buildInputDecoration(
+                                  'Password', Icons.lock_outline),
                               obscureText: true,
                               validator: (val) =>
-                                  val != null && val.isNotEmpty ? null : 'Please enter your password',
+                                  val != null && val.isNotEmpty
+                                      ? null
+                                      : 'Please enter your password',
                             ),
                             Align(
                               alignment: Alignment.centerRight,
@@ -262,15 +273,18 @@ class _SignInScreenState extends State<SignInScreen> {
                             ),
                             const SizedBox(height: 12),
                             _isLoading
-                                ? const Center(child: CircularProgressIndicator())
+                                ? const Center(
+                                    child: CircularProgressIndicator())
                                 : ElevatedButton(
                                     onPressed: _signIn,
                                     style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
                                       backgroundColor: Colors.amber[800],
                                       foregroundColor: Colors.white,
                                     ),
-                                    child: const Text('Sign In', style: TextStyle(fontSize: 16)),
+                                    child: const Text('Sign In',
+                                        style: TextStyle(fontSize: 16)),
                                   ),
                           ],
                         ),

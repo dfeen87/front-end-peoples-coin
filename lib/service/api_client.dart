@@ -1,4 +1,3 @@
-// lib/service/api_client.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io'; // Required for SocketException
@@ -122,13 +121,9 @@ class PeoplesCoinApiClient {
     return UserAccount.fromJson(data);
   }
 
-  // === Updated username check ===
+  // Updated method: check username availability
   Future<bool> checkUsernameAvailability(String username) async {
-    // Direct call to backend GET route
-    final url = Uri.parse(
-      '$baseUrl/users/username-check/${Uri.encodeComponent(username)}',
-    );
-
+    final url = Uri.parse('$baseUrl/users/username-check/${Uri.encodeComponent(username)}');
     try {
       final response = await _httpClient.get(url, headers: _jsonHeaders).timeout(_timeout);
       final data = _handleResponse(response);
@@ -143,15 +138,28 @@ class PeoplesCoinApiClient {
     }
   }
 
+  Future<void> createUserAccount({
+    required String firebaseUid,
+    required String email,
+    String? username,
+  }) async {
+    final body = {
+      'firebase_uid': firebaseUid,
+      'email': email,
+      if (username != null) 'username': username,
+    };
+    await _post('api/v1/users', body: body);
+  }
+
   Future<void> createUserWallet({
     required String username,
     required String publicKey,
     required String encryptedPrivateKey,
   }) => _post('api/v1/users/register-wallet', body: {
-    'username': username,
-    'public_key': publicKey,
-    'encrypted_private_key': encryptedPrivateKey,
-  });
+        'username': username,
+        'public_key': publicKey,
+        'encrypted_private_key': encryptedPrivateKey,
+      });
 
   // === Goodwill Actions ===
 
@@ -237,6 +245,24 @@ class PeoplesCoinApiClient {
     } on TimeoutException {
       throw NetworkException('The request timed out. Please try again.');
     }
+  }
+
+  // === PoW Challenge & Verification ===
+
+  Future<Map<String, dynamic>> getPowChallenge() async {
+    final data = await _get('immune/pow_challenge');
+    return data as Map<String, dynamic>;
+  }
+
+  Future<bool> verifyPow({
+    required String challenge,
+    required String nonce,
+  }) async {
+    final response = await _post('immune/verify_pow', body: {
+      'challenge': challenge,
+      'nonce': nonce,
+    });
+    return response['success'] == true;
   }
 }
 
