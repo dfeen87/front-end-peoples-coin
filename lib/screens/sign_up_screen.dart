@@ -34,6 +34,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Timer? _debounceTimer; // For debounce
 
+  static const int _minUsernameLength = 3; // Minimum chars before checking
+
   static const String recaptchaSiteKey = String.fromEnvironment(
     'RECAPTCHA_SITE_KEY',
     defaultValue: '',
@@ -57,10 +59,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   void _onUsernameChanged() {
-    // Cancel previous timer if still active
     _debounceTimer?.cancel();
-
-    // Start new timer
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       _checkUsername();
     });
@@ -69,7 +68,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Future<void> _checkUsername() async {
     final username = _usernameController.text.trim();
 
-    if (username.isEmpty) {
+    // Skip check if empty or too short to avoid unnecessary requests
+    if (username.isEmpty || username.length < _minUsernameLength) {
       if (mounted) {
         setState(() {
           _usernameAvailable = false;
@@ -334,7 +334,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (_checkingUsername) {
       return const LinearProgressIndicator(minHeight: 2, color: Colors.amber);
     }
-    if (_usernameController.text.trim().isEmpty) {
+    if (_usernameController.text.trim().isEmpty ||
+        _usernameController.text.trim().length < _minUsernameLength) {
       return const SizedBox(height: 18); // Maintain consistent space
     }
     return SizedBox(
