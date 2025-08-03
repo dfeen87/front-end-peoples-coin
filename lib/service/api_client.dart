@@ -14,7 +14,7 @@ import '../models/proposal_to_send.dart';
 import '../models/vote_to_send.dart';
 import '../models/public_ledger_entry.dart';
 
-// ENHANCEMENT: Custom exceptions for better error handling in the UI
+// --- Custom exceptions for better UI handling ---
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
@@ -39,19 +39,25 @@ class PeoplesCoinApiClient {
   final String baseUrl;
   final http.Client _httpClient;
 
-  // ENHANCEMENT: Inject http.Client for testability
   PeoplesCoinApiClient({http.Client? httpClient, String? baseUrl})
       : _httpClient = httpClient ?? http.Client(),
-        baseUrl = baseUrl ?? dotenv.env['API_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
+        baseUrl = baseUrl ??
+            dotenv.env['API_URL'] ??
+            'https://peoples-coin-service-105378934751.us-central1.run.app';
 
   static const _timeout = Duration(seconds: 15);
-  Map<String, String> get _jsonHeaders => {'Content-Type': 'application/json'};
 
-  // --- Centralized GET ---
+  /// Only for POST/PUT requests
+  Map<String, String> get _jsonHeaders => {
+        'Content-Type': 'application/json',
+      };
+
+  // --- Centralized GET (no Content-Type to avoid CORS preflight) ---
   Future<dynamic> _get(String endpoint) async {
     final uri = Uri.parse('$baseUrl/$endpoint');
     try {
-      final response = await _httpClient.get(uri, headers: _jsonHeaders).timeout(_timeout);
+      final response =
+          await _httpClient.get(uri).timeout(_timeout); // no headers
       return _handleResponse(response);
     } on SocketException {
       throw NetworkException('Please check your internet connection.');
@@ -64,10 +70,13 @@ class PeoplesCoinApiClient {
   }
 
   // --- Centralized POST ---
-  Future<dynamic> _post(String endpoint, {required Map<String, dynamic> body}) async {
+  Future<dynamic> _post(String endpoint,
+      {required Map<String, dynamic> body}) async {
     final uri = Uri.parse('$baseUrl/$endpoint');
     try {
-      final response = await _httpClient.post(uri, headers: _jsonHeaders, body: json.encode(body)).timeout(_timeout);
+      final response = await _httpClient
+          .post(uri, headers: _jsonHeaders, body: json.encode(body))
+          .timeout(_timeout);
       return _handleResponse(response);
     } on SocketException {
       throw NetworkException('Please check your internet connection.');
@@ -93,24 +102,22 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // === New: Verify reCAPTCHA token with backend ===
+  // === New: Verify reCAPTCHA token ===
   Future<bool> verifyRecaptchaToken(String token) async {
-    final response = await _post('api/v1/recaptcha/verify', body: {
-      'token': token,
-    });
-    // Assuming the backend returns { "success": true } on valid token
+    final response =
+        await _post('api/v1/recaptcha/verify', body: {'token': token});
     return response['success'] == true;
   }
 
   // === User ===
-
   Future<void> unifiedSignUp({
     required String email,
     required String password,
     required String username,
-    String? recaptchaToken, // optionally accept recaptcha token
+    String? recaptchaToken,
   }) async {
-    final url = Uri.parse('https://us-central1-brightacts-frontend-50f58.cloudfunctions.net/unifiedSignUp');
+    final url = Uri.parse(
+        'https://us-central1-brightacts-frontend-50f58.cloudfunctions.net/unifiedSignUp');
     final body = {
       'email': email,
       'password': password,
@@ -118,7 +125,9 @@ class PeoplesCoinApiClient {
       if (recaptchaToken != null) 'recaptchaToken': recaptchaToken,
     };
     try {
-      final response = await _httpClient.post(url, headers: _jsonHeaders, body: json.encode(body)).timeout(_timeout);
+      final response = await _httpClient
+          .post(url, headers: _jsonHeaders, body: json.encode(body))
+          .timeout(_timeout);
       _handleResponse(response);
     } on SocketException {
       throw NetworkException('Please check your internet connection.');
@@ -132,10 +141,13 @@ class PeoplesCoinApiClient {
     return UserAccount.fromJson(data);
   }
 
+  /// --- Fixed: No headers so no CORS preflight ---
   Future<bool> checkUsernameAvailability(String username) async {
-    final url = Uri.parse('$baseUrl/users/username-check/${Uri.encodeComponent(username)}');
+    final url = Uri.parse(
+        '$baseUrl/users/username-check/${Uri.encodeComponent(username)}');
     try {
-      final response = await _httpClient.get(url, headers: _jsonHeaders).timeout(_timeout);
+      final response =
+          await _httpClient.get(url).timeout(_timeout); // no headers
       final data = _handleResponse(response);
       return data['available'] == true;
     } on SocketException {
@@ -165,25 +177,27 @@ class PeoplesCoinApiClient {
     required String username,
     required String publicKey,
     required String encryptedPrivateKey,
-  }) => _post('api/v1/users/register-wallet', body: {
+  }) =>
+      _post('api/v1/users/register-wallet', body: {
         'username': username,
         'public_key': publicKey,
         'encrypted_private_key': encryptedPrivateKey,
       });
 
   // === Goodwill Actions ===
-
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
-    final List<dynamic> data = await _get('api/v1/users/$userId/goodwill-actions');
+    final List<dynamic> data =
+        await _get('api/v1/users/$userId/goodwill-actions');
     return data.map((item) => GoodwillAction.fromJson(item)).toList();
   }
 
-  Future<Map<String, dynamic>> submitGoodwill(GoodwillActionToSend actionToSend) async {
-    return await _post('metabolic/submit_goodwill', body: actionToSend.toJson()) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> submitGoodwill(
+      GoodwillActionToSend actionToSend) async {
+    return await _post('metabolic/submit_goodwill',
+        body: actionToSend.toJson()) as Map<String, dynamic>;
   }
 
   // === Proposals ===
-
   Future<List<Proposal>> listProposals({String? status}) async {
     var endpoint = 'api/v1/governance/proposals';
     if (status != null && status.isNotEmpty) {
@@ -198,30 +212,38 @@ class PeoplesCoinApiClient {
     return Proposal.fromJson(data);
   }
 
-  Future<Map<String, dynamic>> createProposal(ProposalToSend proposalToSend) async {
-    return await _post('api/v1/governance/proposals', body: proposalToSend.toJson()) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> createProposal(
+      ProposalToSend proposalToSend) async {
+    return await _post('api/v1/governance/proposals',
+        body: proposalToSend.toJson()) as Map<String, dynamic>;
   }
 
   // === Votes ===
-
   Future<Map<String, dynamic>> submitVote(VoteToSend voteToSend) async {
-    return await _post('api/v1/governance/proposals/${voteToSend.proposalId}/vote', body: voteToSend.toJson()) as Map<String, dynamic>;
+    return await _post(
+        'api/v1/governance/proposals/${voteToSend.proposalId}/vote',
+        body: voteToSend.toJson()) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> getVotingResults(String proposalId) async {
     final data = await _get('api/v1/governance/proposals/$proposalId/results');
-    return {'forVotes': data['forVotes'], 'againstVotes': data['againstVotes']};
+    return {
+      'forVotes': data['forVotes'],
+      'againstVotes': data['againstVotes']
+    };
   }
 
   // === Ledger ===
-
   Future<List<PublicLedgerEntry>> getLedgerEntries({int page = 1}) async {
-    final List<dynamic> data = await _get('api/v1/ledger/public?page=$page');
+    final List<dynamic> data =
+        await _get('api/v1/ledger/public?page=$page');
     return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
   }
 
-  Future<List<PublicLedgerEntry>> searchLedger({required String query}) async {
-    final endpoint = 'api/v1/ledger/search?q=${Uri.encodeComponent(query)}';
+  Future<List<PublicLedgerEntry>> searchLedger(
+      {required String query}) async {
+    final endpoint =
+        'api/v1/ledger/search?q=${Uri.encodeComponent(query)}';
     final List<dynamic> data = await _get(endpoint);
     return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
   }
@@ -244,11 +266,13 @@ class PeoplesCoinApiClient {
   Future<String> checkMetabolicStatus() async {
     final uri = Uri.parse('$baseUrl/metabolic/status');
     try {
-      final response = await _httpClient.get(uri, headers: _jsonHeaders).timeout(_timeout);
+      final response =
+          await _httpClient.get(uri).timeout(_timeout); // no headers
       if (response.statusCode == 200) {
         return response.body;
       } else {
-        throw ApiException('Failed to check metabolic status', statusCode: response.statusCode);
+        throw ApiException('Failed to check metabolic status',
+            statusCode: response.statusCode);
       }
     } on SocketException {
       throw NetworkException('Please check your internet connection.');
@@ -258,7 +282,6 @@ class PeoplesCoinApiClient {
   }
 
   // === PoW Challenge & Verification ===
-
   Future<Map<String, dynamic>> getPowChallenge() async {
     final data = await _get('immune/pow_challenge');
     return data as Map<String, dynamic>;
@@ -268,10 +291,8 @@ class PeoplesCoinApiClient {
     required String challenge,
     required String nonce,
   }) async {
-    final response = await _post('immune/verify_pow', body: {
-      'challenge': challenge,
-      'nonce': nonce,
-    });
+    final response = await _post('immune/verify_pow',
+        body: {'challenge': challenge, 'nonce': nonce});
     return response['success'] == true;
   }
 }
