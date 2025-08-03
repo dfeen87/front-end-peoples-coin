@@ -47,7 +47,7 @@ class PeoplesCoinAppState extends ChangeNotifier {
 
   // Future<UserAccount> getUserById(String userId) => apiClient.getUserById(userId);
   // Future<void> createUserAccount(...) => apiClient.createUserAccount(...);
-  // etc.
+  // Add other wrapper methods as needed
 
   // --- Add any additional shared app state and methods below ---
 }

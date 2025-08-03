@@ -38,7 +38,7 @@ import 'screens/sign_up_screen.dart' as sign_up;
 import 'screens/sign_in_screen.dart' as sign_in;
 import 'widgets/navigation_card.dart';
 import 'widgets/dynamic_nebula_background.dart';
-
+import 'app_state_providers.dart'; 
 
 // --- CONFIGURATION & CONSTANTS ---
 const String reCaptchaSiteKeyProd = String.fromEnvironment(
@@ -131,12 +131,12 @@ final router = GoRouter(
   ],
 );
 
-
-// --- APP ENTRY POINT ---
 Future<void> main() async {
   try {
     await _bootstrapApp();
+
     final apiClient = PeoplesCoinApiClient();
+
     runApp(RootProviderScope(
       apiClient: apiClient,
       child: const BrightActsApp(),
@@ -202,8 +202,8 @@ class ErrorDisplayApp extends StatelessWidget {
 }
 
 class RootProviderScope extends StatelessWidget {
-  final Widget child;
   final PeoplesCoinApiClient apiClient;
+  final Widget child;
 
   const RootProviderScope({
     super.key,
@@ -216,20 +216,27 @@ class RootProviderScope extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<PeoplesCoinApiClient>.value(value: apiClient),
+
+        // Add your ChangeNotifierProviders that need either apiClient or appState
         ChangeNotifierProvider(
-          create: (context) => MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>()),
+          create: (context) =>
+              MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>()),
         ),
         ChangeNotifierProvider(
-          create: (context) => UserProvider(context.read<PeoplesCoinApiClient>()),
+          create: (context) =>
+              UserProvider(context.read<PeoplesCoinApiClient>()),
         ),
         ChangeNotifierProvider(
-          create: (context) => ProposalProvider(context.read<PeoplesCoinApiClient>()),
+          create: (context) =>
+              ProposalProvider(context.read<PeoplesCoinApiClient>()),
         ),
         ChangeNotifierProvider(
-          create: (context) => LedgerProvider(context.read<PeoplesCoinApiClient>()),
+          create: (context) =>
+              LedgerProvider(context.read<PeoplesCoinApiClient>()),
         ),
         ChangeNotifierProvider(
-          create: (context) => GoodwillProcessingProvider(context.read<PeoplesCoinApiClient>()),
+          create: (context) =>
+              GoodwillProcessingProvider(context.read<PeoplesCoinApiClient>()),
         ),
       ],
       child: child,

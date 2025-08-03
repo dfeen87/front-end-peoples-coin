@@ -1,3 +1,5 @@
+// lib/service/api_client.dart
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io'; // Required for SocketException
@@ -5,8 +7,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 
-import '../app_state_providers.dart'; // ✅ import for delegation
-// Import your models
 import '../models/user_account.dart';
 import '../models/goodwill_action.dart';
 import '../models/goodwill_action_to_send.dart';
@@ -15,7 +15,7 @@ import '../models/proposal_to_send.dart';
 import '../models/vote_to_send.dart';
 import '../models/public_ledger_entry.dart';
 
-// --- Custom exceptions for better UI handling ---
+// Custom exceptions
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
@@ -23,9 +23,7 @@ class ApiException implements Exception {
   ApiException(this.message, {this.statusCode, this.responseBody});
 
   @override
-  String toString() {
-    return 'ApiException: $message (Status: $statusCode)';
-  }
+  String toString() => 'ApiException: $message (Status: $statusCode)';
 }
 
 class NetworkException implements Exception {
@@ -39,26 +37,21 @@ class NetworkException implements Exception {
 class PeoplesCoinApiClient {
   final String baseUrl;
   final http.Client _httpClient;
-  final PeoplesCoinAppState _appState; // ✅ dependency
 
   PeoplesCoinApiClient({
     http.Client? httpClient,
     String? baseUrl,
-    required PeoplesCoinAppState appState, // ✅ require it
   })  : _httpClient = httpClient ?? http.Client(),
-        _appState = appState,
         baseUrl = baseUrl ??
             dotenv.env['API_URL'] ??
             'https://peoples-coin-service-105378934751.us-central1.run.app';
 
   static const _timeout = Duration(seconds: 15);
 
-  /// Only for POST/PUT requests
   Map<String, String> get _jsonHeaders => {
         'Content-Type': 'application/json',
       };
 
-  // --- Centralized GET (no Content-Type to avoid CORS preflight) ---
   Future<dynamic> _get(String endpoint) async {
     final uri = Uri.parse('$baseUrl/$endpoint');
     try {
@@ -74,7 +67,6 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // --- Centralized POST ---
   Future<dynamic> _post(String endpoint,
       {required Map<String, dynamic> body}) async {
     final uri = Uri.parse('$baseUrl/$endpoint');
@@ -93,7 +85,6 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // --- Response handler ---
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;
@@ -107,14 +98,12 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // === New: Verify reCAPTCHA token ===
   Future<bool> verifyRecaptchaToken(String token) async {
     final response =
         await _post('api/v1/recaptcha/verify', body: {'token': token});
     return response['success'] == true;
   }
 
-  // === User ===
   Future<void> unifiedSignUp({
     required String email,
     required String password,
@@ -146,9 +135,22 @@ class PeoplesCoinApiClient {
     return UserAccount.fromJson(data);
   }
 
-  /// ✅ Fixed: Delegate to app_state_providers.dart for correct path & headers
-  Future<bool> checkUsernameAvailability(String username) {
-    return _appState.checkUsernameAvailability(username);
+  // Now _checkUsernameAvailability does the fetch itself
+  Future<bool> checkUsernameAvailability(String username) async {
+    final url = Uri.parse(
+        '$baseUrl/users/username-check/${Uri.encodeComponent(username)}');
+    try {
+      final response = await _httpClient.get(url).timeout(_timeout);
+      final data = _handleResponse(response);
+      return data['available'] == true;
+    } on SocketException {
+      throw NetworkException('Please check your internet connection.');
+    } on TimeoutException {
+      throw NetworkException('The request timed out. Please try again.');
+    } catch (e) {
+      if (kDebugMode) print('Error checking username: $e');
+      rethrow;
+    }
   }
 
   Future<void> createUserAccount({
@@ -175,7 +177,6 @@ class PeoplesCoinApiClient {
         'encrypted_private_key': encryptedPrivateKey,
       });
 
-  // === Goodwill Actions ===
   Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
     final List<dynamic> data =
         await _get('api/v1/users/$userId/goodwill-actions');
@@ -188,7 +189,6 @@ class PeoplesCoinApiClient {
         body: actionToSend.toJson()) as Map<String, dynamic>;
   }
 
-  // === Proposals ===
   Future<List<Proposal>> listProposals({String? status}) async {
     var endpoint = 'api/v1/governance/proposals';
     if (status != null && status.isNotEmpty) {
@@ -209,7 +209,6 @@ class PeoplesCoinApiClient {
         body: proposalToSend.toJson()) as Map<String, dynamic>;
   }
 
-  // === Votes ===
   Future<Map<String, dynamic>> submitVote(VoteToSend voteToSend) async {
     return await _post(
         'api/v1/governance/proposals/${voteToSend.proposalId}/vote',
@@ -224,7 +223,6 @@ class PeoplesCoinApiClient {
     };
   }
 
-  // === Ledger ===
   Future<List<PublicLedgerEntry>> getLedgerEntries({int page = 1}) async {
     final List<dynamic> data =
         await _get('api/v1/ledger/public?page=$page');
@@ -253,7 +251,6 @@ class PeoplesCoinApiClient {
     }) as Map<String, dynamic>;
   }
 
-  // === Metabolic status check ===
   Future<String> checkMetabolicStatus() async {
     final uri = Uri.parse('$baseUrl/metabolic/status');
     try {
@@ -272,7 +269,6 @@ class PeoplesCoinApiClient {
     }
   }
 
-  // === PoW Challenge & Verification ===
   Future<Map<String, dynamic>> getPowChallenge() async {
     final data = await _get('immune/pow_challenge');
     return data as Map<String, dynamic>;
