@@ -136,22 +136,23 @@ class PeoplesCoinApiClient {
   }
 
   // Now _checkUsernameAvailability does the fetch itself
-  Future<bool> checkUsernameAvailability(String username) async {
-    final url = Uri.parse(
-        '$baseUrl/users/username-check/${Uri.encodeComponent(username)}');
-    try {
-      final response = await _httpClient.get(url).timeout(_timeout);
-      final data = _handleResponse(response);
-      return data['available'] == true;
-    } on SocketException {
-      throw NetworkException('Please check your internet connection.');
-    } on TimeoutException {
-      throw NetworkException('The request timed out. Please try again.');
-    } catch (e) {
-      if (kDebugMode) print('Error checking username: $e');
-      rethrow;
-    }
+Future<bool> checkUsernameAvailability(String username) async {
+  final endpoint = 'api/v1/users/username-check/${Uri.encodeComponent(username)}';
+  final uri = Uri.parse('$baseUrl/$endpoint');
+
+  try {
+    final response = await _httpClient.get(uri).timeout(_timeout);
+    final data = _handleResponse(response);
+    return data['available'] == true;
+  } on SocketException {
+    throw NetworkException('Please check your internet connection.');
+  } on TimeoutException {
+    throw NetworkException('The request timed out. Please try again.');
+  } catch (e) {
+    if (kDebugMode) print('Error checking username availability: $e');
+    rethrow;
   }
+}
 
   Future<void> createUserAccount({
     required String firebaseUid,
