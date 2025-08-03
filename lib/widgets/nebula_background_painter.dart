@@ -1,16 +1,18 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'; // <<< ADDED THIS IMPORT
+import 'package:flutter/foundation.dart';
 
 class NebulaBackgroundPainter extends CustomPainter {
   final Offset center;  // Normalized 0.0 – 1.0
   final List<Color> colors;
   final double noiseIntensity;
+  final Random noiseRandom;
 
   NebulaBackgroundPainter({
     required this.center,
     required this.colors,
     required this.noiseIntensity,
+    required this.noiseRandom,
   });
 
   @override
@@ -28,21 +30,20 @@ class NebulaBackgroundPainter extends CustomPainter {
       stops: List.generate(colors.length, (i) => i / (colors.length - 1)),
     );
 
-    final Paint paint = Paint()
+    final paint = Paint()
       ..shader = gradient.createShader(rect);
 
     // Paint gradient background
     canvas.drawRect(rect, paint);
 
     // Star-like noise overlay
-    final random = Random(123); // fixed seed = consistent noise
     final noisePaint = Paint();
     final int noiseCount = (5000 * noiseIntensity).round();
 
     for (int i = 0; i < noiseCount; i++) {
-      final x = random.nextDouble() * size.width;
-      final y = random.nextDouble() * size.height;
-      noisePaint.color = Colors.white.withOpacity(random.nextDouble() * 0.12);
+      final x = noiseRandom.nextDouble() * size.width;
+      final y = noiseRandom.nextDouble() * size.height;
+      noisePaint.color = Colors.white.withOpacity(noiseRandom.nextDouble() * 0.12);
       canvas.drawCircle(Offset(x, y), 0.4, noisePaint);
     }
   }
@@ -54,3 +55,4 @@ class NebulaBackgroundPainter extends CustomPainter {
         oldDelegate.noiseIntensity != noiseIntensity;
   }
 }
+

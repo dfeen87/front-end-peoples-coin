@@ -1,315 +1,54 @@
-// lib/service/api_client.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+// lib/app_state_providers.dart
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
-import '../models/user_account.dart';
-import '../models/goodwill_action.dart';
-import '../models/goodwill_action_to_send.dart';
-import '../models/proposal.dart';
-import '../models/proposal_to_send.dart';
-import '../models/vote.dart';
-import '../models/vote_to_send.dart';
-import '../models/public_ledger_entry.dart';
+import 'service/api_client.dart';
 
-class PeoplesCoinApiClient {
-  final String baseUrl;
+/// Main app state class holding shared state and services.
+/// You can expand this with more providers or services as needed.
+class PeoplesCoinAppState extends ChangeNotifier {
+  final PeoplesCoinApiClient apiClient;
 
-  PeoplesCoinApiClient({String? baseUrl})
-      : baseUrl = baseUrl ?? dotenv.env['API_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
+  PeoplesCoinAppState({PeoplesCoinApiClient? apiClient})
+      : apiClient = apiClient ?? PeoplesCoinApiClient();
 
-  Map<String, String> get _jsonHeaders => {'Content-Type': 'application/json'};
+  // --- Example of state variables you might want to keep ---
+  // String? _currentUsername;
+  // bool _isLoggedIn = false;
 
-  // === User ===
+  // String? get currentUsername => _currentUsername;
+  // set currentUsername(String? username) {
+  //   _currentUsername = username;
+  //   notifyListeners();
+  // }
 
-  Future<void> createUserAccount({
-    required String firebaseUid,
-    required String email,
-    required String username,
-  }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users');
-    final body = json.encode({
-      'firebase_uid': firebaseUid,
-      'email': email,
-      'username': username,
-    });
+  // bool get isLoggedIn => _isLoggedIn;
+  // set isLoggedIn(bool loggedIn) {
+  //   _isLoggedIn = loggedIn;
+  //   notifyListeners();
+  // }
 
-    try {
-      final response = await http.post(uri, headers: _jsonHeaders, body: body).timeout(const Duration(seconds: 10));
+  // --- Delegated API client methods ---
 
-      if (response.statusCode != 201) {
-        throw Exception('Failed to create user account in database. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in createUserAccount: $e');
-      rethrow;
-    }
-  }
-
-  Future<UserAccount> getUserById(String userId) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users/$userId');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        return UserAccount.fromJson(json.decode(response.body));
-      } else {
-        throw Exception('Failed to fetch user account. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getUserById: $e');
-      rethrow;
-    }
-  }
-
+  /// Checks if the given username is available by delegating to the API client.
   Future<bool> checkUsernameAvailability(String username) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users/username-check/$username');
     try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['available'] == true;
-      }
-      throw Exception('Failed to check username availability. Status: ${response.statusCode}, Body: ${response.body}');
+      return await apiClient.checkUsernameAvailability(username);
     } catch (e) {
-      if (kDebugMode) print('Error in checkUsernameAvailability: $e');
+      if (kDebugMode) {
+        print('Error in checkUsernameAvailability: $e');
+      }
       rethrow;
     }
   }
 
-  Future<void> createUserWallet({
-    required String username,
-    required String publicKey,
-    required String encryptedPrivateKey,
-  }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users/register-wallet');
-    final body = json.encode({
-      'username': username,
-      'public_key': publicKey,
-      'encrypted_private_key': encryptedPrivateKey,
-    });
+  /// Example: Add more delegation methods to wrap API calls here...
 
-    try {
-      final response = await http.post(uri, headers: _jsonHeaders, body: body).timeout(const Duration(seconds: 10));
+  // Future<UserAccount> getUserById(String userId) => apiClient.getUserById(userId);
+  // Future<void> createUserAccount(...) => apiClient.createUserAccount(...);
+  // etc.
 
-      if (response.statusCode != 201) {
-        throw Exception('Failed to create user wallet. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in createUserWallet: $e');
-      rethrow;
-    }
-  }
-
-  // === Goodwill Actions ===
-
-  Future<List<GoodwillAction>> getUserGoodwillActions(String userId) async {
-    final uri = Uri.parse('$baseUrl/api/v1/users/$userId/goodwill-actions');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((item) => GoodwillAction.fromJson(item)).toList();
-      } else {
-        throw Exception('Failed to fetch goodwill actions. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getUserGoodwillActions: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>> submitGoodwill(GoodwillActionToSend actionToSend) async {
-    final uri = Uri.parse('$baseUrl/metabolic/submit_goodwill');
-    try {
-      final response = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: json.encode(actionToSend.toJson()),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 201) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to submit goodwill. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in submitGoodwill: $e');
-      rethrow;
-    }
-  }
-
-  // === Proposals ===
-
-  Future<List<Proposal>> listProposals({String? status}) async {
-    var url = '$baseUrl/api/v1/governance/proposals';
-    if (status != null && status.isNotEmpty) {
-      url += '?status=$status';
-    }
-    final uri = Uri.parse(url);
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((item) => Proposal.fromJson(item)).toList();
-      } else {
-        throw Exception('Failed to fetch proposals. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in listProposals: $e');
-      rethrow;
-    }
-  }
-
-  Future<Proposal> getProposalDetails(String proposalId) async {
-    final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/$proposalId');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        return Proposal.fromJson(json.decode(response.body));
-      } else {
-        throw Exception('Failed to fetch proposal details. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getProposalDetails: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>> createProposal(ProposalToSend proposalToSend) async {
-    final uri = Uri.parse('$baseUrl/api/v1/governance/proposals');
-    try {
-      final response = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: json.encode(proposalToSend.toJson()),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 201) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to create proposal. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in createProposal: $e');
-      rethrow;
-    }
-  }
-
-  // === Votes ===
-
-  Future<Map<String, dynamic>> submitVote(VoteToSend voteToSend) async {
-    final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/${voteToSend.proposalId}/vote');
-    try {
-      final response = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: json.encode(voteToSend.toJson()),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to submit vote. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in submitVote: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>> getVotingResults(String proposalId) async {
-    final uri = Uri.parse('$baseUrl/api/v1/governance/proposals/$proposalId/results');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {'forVotes': data['forVotes'], 'againstVotes': data['againstVotes']};
-      } else {
-        throw Exception('Failed to get voting results. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getVotingResults: $e');
-      rethrow;
-    }
-  }
-
-  // === Ledger ===
-
-  Future<List<PublicLedgerEntry>> getLedgerEntries({int page = 1}) async {
-    final uri = Uri.parse('$baseUrl/api/v1/ledger/public?page=$page');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
-      } else {
-        throw Exception('Failed to fetch public ledger. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in getLedgerEntries: $e');
-      rethrow;
-    }
-  }
-
-  Future<List<PublicLedgerEntry>> searchLedger({required String query}) async {
-    final uri = Uri.parse('$baseUrl/api/v1/ledger/search?q=${Uri.encodeComponent(query)}');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((item) => PublicLedgerEntry.fromJson(item)).toList();
-      } else {
-        throw Exception('Failed to search public ledger. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in searchLedger: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>> sendLoves({
-    required String senderWalletId,
-    required String recipientWalletId,
-    required int amount,
-    String? memo,
-  }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/transactions/send');
-    final body = json.encode({
-      'sender_id': senderWalletId,
-      'recipient_id': recipientWalletId,
-      'amount': amount,
-      if (memo != null && memo.isNotEmpty) 'memo': memo,
-    });
-
-    try {
-      final response = await http.post(uri, headers: _jsonHeaders, body: body).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to send loves. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in sendLoves: $e');
-      rethrow;
-    }
-  }
-
-  // === Metabolic status check ===
-
-  Future<String> checkMetabolicStatus() async {
-    final uri = Uri.parse('$baseUrl/metabolic/status');
-    try {
-      final response = await http.get(uri, headers: _jsonHeaders).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        return response.body;
-      } else {
-        throw Exception('Failed to check metabolic status. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      if (kDebugMode) print('Error in checkMetabolicStatus: $e');
-      rethrow;
-    }
-  }
+  // --- Add any additional shared app state and methods below ---
 }
+

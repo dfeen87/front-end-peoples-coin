@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 
+import '../app_state_providers.dart'; // ✅ import for delegation
 // Import your models
 import '../models/user_account.dart';
 import '../models/goodwill_action.dart';
@@ -38,9 +39,14 @@ class NetworkException implements Exception {
 class PeoplesCoinApiClient {
   final String baseUrl;
   final http.Client _httpClient;
+  final PeoplesCoinAppState _appState; // ✅ dependency
 
-  PeoplesCoinApiClient({http.Client? httpClient, String? baseUrl})
-      : _httpClient = httpClient ?? http.Client(),
+  PeoplesCoinApiClient({
+    http.Client? httpClient,
+    String? baseUrl,
+    required PeoplesCoinAppState appState, // ✅ require it
+  })  : _httpClient = httpClient ?? http.Client(),
+        _appState = appState,
         baseUrl = baseUrl ??
             dotenv.env['API_URL'] ??
             'https://peoples-coin-service-105378934751.us-central1.run.app';
@@ -56,8 +62,7 @@ class PeoplesCoinApiClient {
   Future<dynamic> _get(String endpoint) async {
     final uri = Uri.parse('$baseUrl/$endpoint');
     try {
-      final response =
-          await _httpClient.get(uri).timeout(_timeout); // no headers
+      final response = await _httpClient.get(uri).timeout(_timeout);
       return _handleResponse(response);
     } on SocketException {
       throw NetworkException('Please check your internet connection.');
@@ -141,23 +146,9 @@ class PeoplesCoinApiClient {
     return UserAccount.fromJson(data);
   }
 
-  /// --- Fixed: No headers so no CORS preflight ---
-  Future<bool> checkUsernameAvailability(String username) async {
-    final url = Uri.parse(
-        '$baseUrl/users/username-check/${Uri.encodeComponent(username)}');
-    try {
-      final response =
-          await _httpClient.get(url).timeout(_timeout); // no headers
-      final data = _handleResponse(response);
-      return data['available'] == true;
-    } on SocketException {
-      throw NetworkException('Please check your internet connection.');
-    } on TimeoutException {
-      throw NetworkException('The request timed out. Please try again.');
-    } catch (e) {
-      if (kDebugMode) print('Error checking username: $e');
-      rethrow;
-    }
+  /// ✅ Fixed: Delegate to app_state_providers.dart for correct path & headers
+  Future<bool> checkUsernameAvailability(String username) {
+    return _appState.checkUsernameAvailability(username);
   }
 
   Future<void> createUserAccount({
@@ -267,7 +258,7 @@ class PeoplesCoinApiClient {
     final uri = Uri.parse('$baseUrl/metabolic/status');
     try {
       final response =
-          await _httpClient.get(uri).timeout(_timeout); // no headers
+          await _httpClient.get(uri).timeout(_timeout);
       if (response.statusCode == 200) {
         return response.body;
       } else {
