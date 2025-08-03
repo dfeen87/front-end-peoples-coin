@@ -1,3 +1,5 @@
+import 'dart:async'; // For Timer and debounce
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -30,6 +32,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _checkingUsername = false;
   bool _isPasswordObscured = true;
 
+  Timer? _debounceTimer; // For debounce
+
   static const String recaptchaSiteKey = String.fromEnvironment(
     'RECAPTCHA_SITE_KEY',
     defaultValue: '',
@@ -38,20 +42,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   void initState() {
     super.initState();
-    _usernameController.addListener(_checkUsername);
+    _usernameController.addListener(_onUsernameChanged);
   }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _usernameController.removeListener(_onUsernameChanged);
     _usernameController.dispose();
     _confirmPasswordController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  void _onUsernameChanged() {
+    // Cancel previous timer if still active
+    _debounceTimer?.cancel();
+
+    // Start new timer
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _checkUsername();
+    });
   }
 
   Future<void> _checkUsername() async {
     final username = _usernameController.text.trim();
+
     if (username.isEmpty) {
       if (mounted) {
         setState(() {
@@ -61,6 +78,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
       return;
     }
+
     if (mounted) setState(() => _checkingUsername = true);
 
     try {
@@ -187,17 +205,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      // This tells the body to go behind the AppBar
-      extendBodyBehindAppBar: true, 
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        // The AppBar is now transparent to show the background
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
         children: [
           const DynamicNebulaBackground(),
-          // The Center widget is back, to center the card
           Center(
             child: SingleChildScrollView(
               child: Padding(
@@ -345,3 +360,4 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 }
+
