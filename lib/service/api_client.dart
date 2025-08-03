@@ -137,7 +137,9 @@ class PeoplesCoinApiClient {
 
   // Now _checkUsernameAvailability does the fetch itself
 Future<bool> checkUsernameAvailability(String username) async {
-  final endpoint = 'api/v1/users/username-check/${Uri.encodeComponent(username)}';
+  // ✅ Match backend route with /api/v1 prefix
+  final endpoint =
+      'api/v1/users/username-check/${Uri.encodeComponent(username)}';
   final uri = Uri.parse('$baseUrl/$endpoint');
 
   try {
@@ -149,7 +151,9 @@ Future<bool> checkUsernameAvailability(String username) async {
   } on TimeoutException {
     throw NetworkException('The request timed out. Please try again.');
   } catch (e) {
-    if (kDebugMode) print('Error checking username availability: $e');
+    if (kDebugMode) {
+      print('Error checking username availability: $e');
+    }
     rethrow;
   }
 }
