@@ -1,4 +1,4 @@
-import 'dart:async'; // For Timer and debounce
+import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -27,13 +27,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       TextEditingController();
 
   bool _isLoading = false;
-  String? _usernameValidationError; // Error message from async check
-  bool _checkingUsername = false;
+  String? _usernameValidationError;
   bool _isPasswordObscured = true;
 
-  Timer? _debounceTimer; // For debounce
-
-  static const int _minUsernameLength = 3; // Minimum chars before checking
+  static const int _minUsernameLength = 3;
 
   static const String recaptchaSiteKey = String.fromEnvironment(
     'RECAPTCHA_SITE_KEY',
@@ -41,68 +38,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   );
 
   @override
-  void initState() {
-    super.initState();
-    _usernameController.addListener(_onUsernameChanged);
-  }
-
-  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _usernameController.removeListener(_onUsernameChanged);
     _usernameController.dispose();
     _confirmPasswordController.dispose();
-    _debounceTimer?.cancel();
     super.dispose();
-  }
-
-  void _onUsernameChanged() {
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      if (_formKey.currentState != null) {
-        _checkUsername();
-      }
-    });
-  }
-
-  Future<void> _checkUsername() async {
-    final username = _usernameController.text.trim();
-
-    if (username.length < _minUsernameLength) {
-      if (mounted) {
-        setState(() {
-          _checkingUsername = false;
-          _usernameValidationError = null;
-        });
-        _formKey.currentState?.validate();
-      }
-      return;
-    }
-
-    if (mounted) setState(() => _checkingUsername = true);
-
-    try {
-      final apiClient = context.read<PeoplesCoinApiClient>();
-      final available = await apiClient.checkUsernameAvailability(username);
-      if (mounted) {
-        setState(() {
-          _usernameValidationError =
-              available ? null : 'Username is not available';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _usernameValidationError = 'Could not verify username';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _checkingUsername = false);
-        _formKey.currentState?.validate();
-      }
-    }
   }
 
   void _showError(String message) {
@@ -112,7 +53,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  Future<void> _checkUsernameAvailability() async {
+    final username = _usernameController.text.trim();
+    final apiClient = context.read<PeoplesCoinApiClient>();
+    final available = await apiClient.checkUsernameAvailability(username);
+
+    if (!available) {
+      if (mounted) {
+        setState(() {
+          _usernameValidationError = 'Username is not available';
+        });
+      }
+      throw Exception('Username is not available');
+    }
+
+    if (mounted) {
+      setState(() {
+        _usernameValidationError = null;
+      });
+    }
+  }
+
   Future<void> _signUpWithEmail() async {
+    // Validate form fields first
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     if (recaptchaSiteKey.isEmpty && kReleaseMode) {
@@ -123,6 +86,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Perform the username check here before proceeding
+      await _checkUsernameAvailability();
+
       final token = await executeRecaptcha(recaptchaSiteKey, 'signup');
       if (token.isEmpty && kReleaseMode) {
         throw Exception('Failed to get reCAPTCHA token.');
@@ -153,7 +119,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       };
       _showError(friendlyMessage);
     } catch (e) {
-      _showError('An unexpected error occurred: $e');
+      _showError('An unexpected error occurred: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -210,7 +176,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
       body: Stack(
         children: [
-          const DynamicNebulaBackground(), // ✅ animated nebula background
+          const DynamicNebulaBackground(),
           Center(
             child: SingleChildScrollView(
               child: Padding(
@@ -262,12 +228,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               if (val.trim().length < _minUsernameLength) {
                                 return 'Username must be at least $_minUsernameLength characters';
                               }
+                              // Use the error message from the button press validation
                               return _usernameValidationError;
                             },
                           ),
-                          const SizedBox(height: 8),
-                          _buildUsernameAvailabilityIndicator(),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _isPasswordObscured,
@@ -335,34 +300,4 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
     );
   }
-
-  Widget _buildUsernameAvailabilityIndicator() {
-    if (_usernameValidationError != null && !_checkingUsername) {
-      return const SizedBox(height: 18);
-    }
-    if (_checkingUsername) {
-      return const LinearProgressIndicator(minHeight: 2, color: Colors.amber);
-    }
-    final username = _usernameController.text.trim();
-    if (username.isEmpty || username.length < _minUsernameLength) {
-      return const SizedBox(height: 18);
-    }
-    return SizedBox(
-      height: 18,
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle, color: Colors.greenAccent, size: 16),
-          const SizedBox(width: 8),
-          Text(
-            'Username available',
-            style: TextStyle(
-              color: Colors.greenAccent,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
-
