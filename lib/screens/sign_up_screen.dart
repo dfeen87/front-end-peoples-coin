@@ -1,5 +1,4 @@
 import 'dart:async'; // For Timer and debounce
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -28,7 +27,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       TextEditingController();
 
   bool _isLoading = false;
-  bool _usernameAvailable = false;
+  String? _usernameValidationError; // Error message from async check
   bool _checkingUsername = false;
   bool _isPasswordObscured = true;
 
@@ -61,20 +60,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void _onUsernameChanged() {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      _checkUsername();
+      if (_formKey.currentState != null) {
+        _checkUsername();
+      }
     });
   }
 
   Future<void> _checkUsername() async {
     final username = _usernameController.text.trim();
 
-    // Skip check if empty or too short to avoid unnecessary requests
-    if (username.isEmpty || username.length < _minUsernameLength) {
+    if (username.length < _minUsernameLength) {
       if (mounted) {
         setState(() {
-          _usernameAvailable = false;
           _checkingUsername = false;
+          _usernameValidationError = null;
         });
+        _formKey.currentState?.validate();
       }
       return;
     }
@@ -86,18 +87,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final available = await apiClient.checkUsernameAvailability(username);
       if (mounted) {
         setState(() {
-          _usernameAvailable = available;
+          _usernameValidationError =
+              available ? null : 'Username is not available';
         });
       }
     } catch (e) {
-      if (kDebugMode) print('Username check error: $e');
       if (mounted) {
         setState(() {
-          _usernameAvailable = false;
+          _usernameValidationError = 'Could not verify username';
         });
       }
     } finally {
-      if (mounted) setState(() => _checkingUsername = false);
+      if (mounted) {
+        setState(() => _checkingUsername = false);
+        _formKey.currentState?.validate();
+      }
     }
   }
 
@@ -111,11 +115,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Future<void> _signUpWithEmail() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    if (!_usernameAvailable) {
-      _showError('Username is not available.');
-      return;
-    }
-
     if (recaptchaSiteKey.isEmpty && kReleaseMode) {
       _showError('reCAPTCHA site key not configured.');
       return;
@@ -125,7 +124,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       final token = await executeRecaptcha(recaptchaSiteKey, 'signup');
-
       if (token.isEmpty && kReleaseMode) {
         throw Exception('Failed to get reCAPTCHA token.');
       }
@@ -212,7 +210,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
       body: Stack(
         children: [
-          const DynamicNebulaBackground(),
+          const DynamicNebulaBackground(), // ✅ animated nebula background
           Center(
             child: SingleChildScrollView(
               child: Padding(
@@ -243,6 +241,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           const SizedBox(height: 24),
                           TextFormField(
                             controller: _emailController,
+                            style: const TextStyle(color: Colors.white),
                             decoration: _buildInputDecoration(
                                 'Email', Icons.alternate_email),
                             keyboardType: TextInputType.emailAddress,
@@ -253,12 +252,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _usernameController,
+                            style: const TextStyle(color: Colors.white),
                             decoration: _buildInputDecoration(
                                 'Username', Icons.person_outline),
-                            validator: (val) =>
-                                (val?.trim().isNotEmpty ?? false)
-                                    ? null
-                                    : 'Please enter a username',
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) {
+                                return 'Please enter a username';
+                              }
+                              if (val.trim().length < _minUsernameLength) {
+                                return 'Username must be at least $_minUsernameLength characters';
+                              }
+                              return _usernameValidationError;
+                            },
                           ),
                           const SizedBox(height: 8),
                           _buildUsernameAvailabilityIndicator(),
@@ -266,6 +271,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _isPasswordObscured,
+                            style: const TextStyle(color: Colors.white),
                             decoration: _buildInputDecoration(
                               'Password',
                               Icons.lock_outline,
@@ -279,10 +285,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           TextFormField(
                             controller: _confirmPasswordController,
                             obscureText: _isPasswordObscured,
+                            style: const TextStyle(color: Colors.white),
                             decoration: _buildInputDecoration(
                               'Confirm Password',
                               Icons.lock_person_outlined,
-                              suffixIcon: passwordVisibilityToggle,
                             ),
                             validator: (val) {
                               if (val == null || val.isEmpty) {
@@ -331,28 +337,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Widget _buildUsernameAvailabilityIndicator() {
+    if (_usernameValidationError != null && !_checkingUsername) {
+      return const SizedBox(height: 18);
+    }
     if (_checkingUsername) {
       return const LinearProgressIndicator(minHeight: 2, color: Colors.amber);
     }
-    if (_usernameController.text.trim().isEmpty ||
-        _usernameController.text.trim().length < _minUsernameLength) {
-      return const SizedBox(height: 18); // Maintain consistent space
+    final username = _usernameController.text.trim();
+    if (username.isEmpty || username.length < _minUsernameLength) {
+      return const SizedBox(height: 18);
     }
     return SizedBox(
-      height: 18, // Fixed height to prevent layout jumps
+      height: 18,
       child: Row(
         children: [
-          Icon(
-            _usernameAvailable ? Icons.check_circle : Icons.error,
-            color: _usernameAvailable ? Colors.greenAccent : Colors.redAccent,
-            size: 16,
-          ),
+          const Icon(Icons.check_circle, color: Colors.greenAccent, size: 16),
           const SizedBox(width: 8),
           Text(
-            _usernameAvailable ? 'Username available' : 'Username not available',
+            'Username available',
             style: TextStyle(
-              color:
-                  _usernameAvailable ? Colors.greenAccent : Colors.redAccent,
+              color: Colors.greenAccent,
               fontSize: 12,
             ),
           ),
