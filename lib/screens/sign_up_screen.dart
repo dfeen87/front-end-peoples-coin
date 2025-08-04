@@ -33,7 +33,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   static const int _minUsernameLength = 3;
 
   static const String recaptchaSiteKey = String.fromEnvironment(
-    'RECAPTCHA_SITE_KEY',
+    'RECAPTCHA_SITE_KEY_PROD',
     defaultValue: '',
   );
 
