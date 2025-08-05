@@ -12,39 +12,35 @@ external Object _grecaptchaExecute(String siteKey, Object options);
 
 final Completer<void> _recaptchaLoadedCompleter = Completer<void>();
 
-/// Call this ONCE in your app startup before using getRecaptchaToken()
+/// Call once at startup
 void initializeRecaptchaV3() {
   if (!kIsWeb) {
-    if (!_recaptchaLoadedCompleter.isCompleted) {
-      _recaptchaLoadedCompleter.complete();
-    }
+    _recaptchaLoadedCompleter.complete();
     return;
   }
 
+  // Ensure global JS callback exists for HTML script tag
+  js.context['recaptchaOnLoad'] = () {
+    print('✅ reCAPTCHA v3 API loaded and ready.');
+    if (!_recaptchaLoadedCompleter.isCompleted) {
+      _recaptchaLoadedCompleter.complete();
+    }
+  };
+
+  // If grecaptcha already exists, resolve immediately
   if (js.context.hasProperty('grecaptcha')) {
     if (!_recaptchaLoadedCompleter.isCompleted) {
       _recaptchaLoadedCompleter.complete();
     }
-    return;
   }
-
-  // When API loads
-  js.context['recaptchaOnLoad'] = () {
-    if (!_recaptchaLoadedCompleter.isCompleted) {
-      _recaptchaLoadedCompleter.complete();
-      print('✅ reCAPTCHA v3 API loaded and ready.');
-    }
-  };
 }
 
-/// Get a reCAPTCHA token for a given action
+/// Get a token for a given action (e.g., "signup")
 Future<String> getRecaptchaToken(String siteKey, String action) async {
   if (!kIsWeb) return '';
 
-  if (!_recaptchaLoadedCompleter.isCompleted) {
-    print('⏳ Waiting for reCAPTCHA script to load...');
-    await _recaptchaLoadedCompleter.future;
-  }
+  // Wait for the script to load
+  await _recaptchaLoadedCompleter.future;
 
   final completer = Completer<String>();
 
@@ -52,9 +48,9 @@ Future<String> getRecaptchaToken(String siteKey, String action) async {
     _grecaptchaReady(allowInterop(() {
       final options = js.JsObject.jsify({'action': action});
       final Object promise = _grecaptchaExecute(siteKey, options);
-      promiseToFuture<String>(promise).then((token) {
-        completer.complete(token);
-      }).catchError((error) {
+      promiseToFuture<String>(promise)
+          .then(completer.complete)
+          .catchError((error) {
         print('❌ Error generating token: $error');
         completer.completeError(error);
       });

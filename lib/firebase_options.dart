@@ -23,7 +23,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAazPuY9zTlYkm730_NFKV6YoL0ZhfomQo',
+    apiKey: 'AIzaSyC0PZq7NkMouTR4-DDiCGiMLdfLB7AREgc',
     authDomain: 'brightacts-frontend-50f58.firebaseapp.com',
     projectId: 'brightacts-frontend-50f58',
     storageBucket: 'brightacts-frontend-50f58.firebasestorage.app',

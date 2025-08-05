@@ -1,4 +1,8 @@
+// lib/screens/sign_up_screen.dart
+
+// --- IMPORTS ---
 import 'dart:async';
+import 'dart:convert'; // Added for jsonDecode
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +14,8 @@ import '../service/api_client.dart';
 import '../service/recaptcha_service.dart';
 import '../widgets/dynamic_nebula_background.dart';
 
+enum UsernameStatus { idle, checking, available, unavailable, tooShort }
+
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -20,25 +26,35 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
-
-  bool _isLoading = false;
-  String? _usernameValidationError;
-  bool _isPasswordObscured = true;
-
-  static const int _minUsernameLength = 3;
-
   static const String recaptchaSiteKey = String.fromEnvironment(
     'RECAPTCHA_SITE_KEY_PROD',
     defaultValue: '',
   );
 
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+
+  bool _isLoading = false;
+  bool _isPasswordObscured = true;
+  UsernameStatus _usernameStatus = UsernameStatus.idle;
+  Timer? _debounce;
+
+  static const int _minUsernameLength = 3;
+  static const Duration _debounceDuration = Duration(milliseconds: 500);
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController.addListener(_onUsernameChanged);
+  }
+
   @override
   void dispose() {
+    _debounce?.cancel();
+    _usernameController.removeListener(_onUsernameChanged);
+
     _emailController.dispose();
     _passwordController.dispose();
     _usernameController.dispose();
@@ -53,80 +69,139 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  Future<void> _checkUsernameAvailability() async {
-    final username = _usernameController.text.trim();
-    final apiClient = context.read<PeoplesCoinApiClient>();
-    final available = await apiClient.checkUsernameAvailability(username);
-
-    if (!available) {
-      if (mounted) {
-        setState(() {
-          _usernameValidationError = 'Username is not available';
-        });
-      }
-      throw Exception('Username is not available');
-    }
-
-    if (mounted) {
-      setState(() {
-        _usernameValidationError = null;
-      });
-    }
+  void _onUsernameChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(_debounceDuration, () {
+      _checkUsernameAvailability();
+    });
   }
 
-  Future<void> _signUpWithEmail() async {
-    // Validate form fields first
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  Future<void> _checkUsernameAvailability() async {
+    final username = _usernameController.text.trim();
 
-    if (recaptchaSiteKey.isEmpty && kReleaseMode) {
-      _showError('reCAPTCHA site key not configured.');
+    if (username.length < _minUsernameLength) {
+      if (mounted) setState(() => _usernameStatus = UsernameStatus.tooShort);
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _usernameStatus = UsernameStatus.checking);
 
     try {
-      // Perform the username check here before proceeding
-      await _checkUsernameAvailability();
-
-      final token = await executeRecaptcha(recaptchaSiteKey, 'signup');
-      if (token.isEmpty && kReleaseMode) {
-        throw Exception('Failed to get reCAPTCHA token.');
+      final apiClient = context.read<PeoplesCoinApiClient>();
+      final isAvailable = await apiClient.checkUsernameAvailability(username);
+      if (mounted) {
+        setState(() {
+          _usernameStatus =
+              isAvailable ? UsernameStatus.available : UsernameStatus.unavailable;
+        });
       }
-
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      final user = userCredential.user;
-      if (user != null) {
-        final apiClient = context.read<PeoplesCoinApiClient>();
-        await apiClient.createUserAccount(
-          firebaseUid: user.uid,
-          email: user.email ?? '',
-          username: _usernameController.text.trim(),
-        );
-      }
-
-      if (mounted) context.go('/home');
-    } on FirebaseAuthException catch (e) {
-      final friendlyMessage = switch (e.code) {
-        'email-already-in-use' => 'This email is already registered.',
-        'weak-password' => 'The password is too weak.',
-        'invalid-email' => 'Invalid email format.',
-        _ => 'Sign-up error: ${e.message}'
-      };
-      _showError(friendlyMessage);
     } catch (e) {
-      _showError('An unexpected error occurred: ${e.toString()}');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _usernameStatus = UsernameStatus.idle);
+      _showError("Couldn't verify username. Please try again.");
     }
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData icon,
-      {Widget? suffixIcon}) {
+Future<void> _signUpWithEmail() async {
+  if (!(_formKey.currentState?.validate() ?? false)) return;
+
+  if (_usernameStatus != UsernameStatus.available) {
+    _showError('Please choose an available username.');
+    return;
+  }
+
+  final email = _emailController.text.trim();
+  final password = _passwordController.text.trim();
+
+  // Additional input sanity checks before Firebase call
+  if (email.isEmpty) {
+    _showError('Email cannot be empty.');
+    return;
+  }
+  if (!email.contains('@') || !email.contains('.')) {
+    _showError('Please enter a valid email address.');
+    return;
+  }
+  if (password.isEmpty) {
+    _showError('Password cannot be empty.');
+    return;
+  }
+  if (password.length < 6) {
+    _showError('Password must be at least 6 characters.');
+    return;
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    print('Attempting sign-up with email: $email and password length: ${password.length}');
+
+    // reCAPTCHA token fetch (keep your logic)
+    final recaptchaService = RecaptchaService();
+    final token = await recaptchaService.executeRecaptcha(
+      recaptchaSiteKey,
+      'signup',
+    );
+
+    if (token.isEmpty && kReleaseMode) {
+      throw Exception('Failed to get reCAPTCHA token.');
+    }
+
+    // Firebase create user call
+    final userCredential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    final user = userCredential.user;
+    if (user != null) {
+      final apiClient = context.read<PeoplesCoinApiClient>();
+      await apiClient.createUserAccount(
+        firebaseUid: user.uid,
+        email: user.email ?? '',
+        username: _usernameController.text.trim(),
+        recaptchaToken: token,
+      );
+    }
+
+    if (mounted) context.go('/home');
+  } on FirebaseAuthException catch (e) {
+    print('--- Firebase Auth Exception ---');
+    print('Code: ${e.code}');
+    print('Message: ${e.message}');
+    print('-------------------------------');
+
+    final friendlyMessage = switch (e.code) {
+      'email-already-in-use' => 'This email is already registered.',
+      'weak-password' => 'The password is too weak.',
+      'invalid-email' => 'Invalid email format.',
+      _ => 'Sign-up error: ${e.message}'
+    };
+    _showError(friendlyMessage);
+  } on ApiException catch (e) {
+    debugPrint(
+        'API Error: ${e.message} (status: ${e.statusCode})\nBody: ${e.responseBody}');
+    final backendMsg = _extractBackendMessage(e.responseBody);
+    _showError(backendMsg ?? e.message);
+  } catch (e, stack) {
+    debugPrint('Unexpected error: $e\n$stack');
+    _showError('Unexpected error: $e');
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
+
+  String? _extractBackendMessage(String? body) {
+    if (body == null || body.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map && decoded['message'] is String) {
+        return decoded['message'];
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  InputDecoration _buildInputDecoration(String label, IconData icon, {Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(color: Colors.blueGrey[200]),
@@ -151,6 +226,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
         borderSide: const BorderSide(color: Colors.redAccent, width: 2),
       ),
     );
+  }
+
+  Widget? _buildUsernameSuffixIcon() {
+    switch (_usernameStatus) {
+      case UsernameStatus.checking:
+        return const Padding(
+          padding: EdgeInsets.all(10.0),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
+          ),
+        );
+      case UsernameStatus.available:
+        return const Icon(Icons.check_circle, color: Colors.greenAccent);
+      case UsernameStatus.unavailable:
+      case UsernameStatus.tooShort:
+        return const Icon(Icons.error, color: Colors.redAccent);
+      case UsernameStatus.idle:
+      default:
+        return null;
+    }
   }
 
   @override
@@ -220,16 +317,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             controller: _usernameController,
                             style: const TextStyle(color: Colors.white),
                             decoration: _buildInputDecoration(
-                                'Username', Icons.person_outline),
+                              'Username',
+                              Icons.person_outline,
+                              suffixIcon: _buildUsernameSuffixIcon(),
+                            ),
                             validator: (val) {
-                              if (val == null || val.trim().isEmpty) {
-                                return 'Please enter a username';
+                              switch (_usernameStatus) {
+                                case UsernameStatus.tooShort:
+                                  return 'Username must be at least $_minUsernameLength characters';
+                                case UsernameStatus.unavailable:
+                                  return 'This username is already taken';
+                                case UsernameStatus.checking:
+                                  return 'Checking username...';
+                                case UsernameStatus.idle:
+                                  if (val == null || val.trim().isEmpty) {
+                                    return 'Please enter a username';
+                                  }
+                                  return null;
+                                case UsernameStatus.available:
+                                default:
+                                  return null;
                               }
-                              if (val.trim().length < _minUsernameLength) {
-                                return 'Username must be at least $_minUsernameLength characters';
-                              }
-                              // Use the error message from the button press validation
-                              return _usernameValidationError;
                             },
                           ),
                           const SizedBox(height: 16),
@@ -252,9 +360,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             obscureText: _isPasswordObscured,
                             style: const TextStyle(color: Colors.white),
                             decoration: _buildInputDecoration(
-                              'Confirm Password',
-                              Icons.lock_person_outlined,
-                            ),
+                                'Confirm Password', Icons.lock_person_outlined),
                             validator: (val) {
                               if (val == null || val.isEmpty) {
                                 return 'Please confirm your password';
@@ -273,8 +379,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               width: double.infinity,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 16),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
                                   backgroundColor: Colors.amber[800],
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -288,6 +394,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 ),
                               ),
                             ),
+                          const SizedBox(height: 20),
+                          RichText(
+                            text: TextSpan(
+                              text: 'Already have an account? ',
+                              style: TextStyle(color: Colors.blueGrey[200]),
+                              children: <TextSpan>[
+                                TextSpan(
+                                  text: 'Sign In',
+                                  style: const TextStyle(
+                                    color: Colors.amber,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = () {
+                                      context.go('/signin');
+                                    },
+                                ),
+                              ],
+                            ),
+                          )
                         ],
                       ),
                     ),

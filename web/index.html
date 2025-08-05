@@ -1,41 +1,47 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <base href="/">
+  <head>
+    <base href="/" />
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  
-  <meta name="description" content="A Web3 platform for recognizing and rewarding positiv$">
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="description" content="Record and explore acts of goodwill on the Bright Acts platform." />
 
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Don's Bright Acts">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Bright Acts" />
+    <link rel="apple-touch-icon" href="icons/Icon-192.png" />
 
-  <link rel="icon" type="image/png" href="favicon.png"/>
+    <link rel="icon" type="image/png" href="favicon.png" />
 
-  <title>Don's Bright Acts</title>
+    <title>Bright Acts | A Goodwill Ledger</title>
+    <link rel="manifest" href="manifest.json" />
 
-  <link rel="manifest" href="manifest.json">
-  
-  <script src="https://www.google.com/recaptcha/api.js?render=6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F"></script>
-
-
-</head>
-<body>
-  <script src="flutter_bootstrap.js" async></script>
-
-  <script>
-    window.addEventListener('load', function(ev) {
-      _flutter.loader.load({
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            appRunner.runApp();
+    <!-- Set serviceWorkerVersion to null to avoid JS errors -->
+    <script>
+      var serviceWorkerVersion = null;
+    </script>
+  </head>
+  <body>
+    <script src="flutter.js" defer></script>
+    <script>
+      window.addEventListener('load', function () {
+        if (window._flutter && _flutter.loader) {
+          _flutter.loader.loadEntrypoint({
+            serviceWorker: {
+              serviceWorkerVersion: serviceWorkerVersion,
+            },
+            onEntrypointLoaded: function (engineInitializer) {
+              engineInitializer.initializeEngine().then(function (appRunner) {
+                appRunner.runApp();
+              });
+            },
           });
+        } else {
+          console.error('_flutter.loader is not defined yet');
         }
       });
-    });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
+

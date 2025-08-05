@@ -10,8 +10,8 @@ import 'service/api_client.dart';
 class PeoplesCoinAppState extends ChangeNotifier {
   final PeoplesCoinApiClient apiClient;
 
-  PeoplesCoinAppState({PeoplesCoinApiClient? apiClient})
-      : apiClient = apiClient ?? PeoplesCoinApiClient();
+  // Require the API client explicitly — no default creation here
+  PeoplesCoinAppState({required this.apiClient});
 
   // --- Example of state variables you might want to keep ---
   // String? _currentUsername;

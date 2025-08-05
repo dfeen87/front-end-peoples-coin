@@ -1,38 +1,39 @@
-library recaptcha; // Must be the very first line (before imports)
+// lib/service/recaptcha_service.dart
 
 import 'dart:async';
 import 'package:js/js.dart';
+import 'dart:js_util';
 
-@JS('grecaptcha.execute')
-external void _execute(String siteKey, RecaptchaOptions options);
-
+// JS interop class for options
 @JS()
 @anonymous
 class RecaptchaOptions {
   external String get action;
-  external Function(String token) get callback;
-
-  external factory RecaptchaOptions({
-    String action,
-    Function(String) callback,
-  });
+  external factory RecaptchaOptions({String action});
 }
 
-/// Executes Google reCAPTCHA v3 with the given [siteKey] and [action].
-/// Returns the generated token as a [Future<String>].
-Future<String> executeRecaptcha(String siteKey, String action) {
-  final completer = Completer<String>();
+// JS function binding
+@JS('grecaptcha.execute')
+external Object _execute(String siteKey, RecaptchaOptions options);
 
-  _execute(
-    siteKey,
-    RecaptchaOptions(
-      action: action,
-      callback: allowInterop((String token) {
-        completer.complete(token);
-      }),
-    ),
-  );
+class RecaptchaService {
+  /// Generates a reCAPTCHA token for a given action.
+  Future<String> executeRecaptcha(String siteKey, String action) async {
+    if (siteKey.isEmpty) {
+      throw Exception('reCAPTCHA Site Key is not set. Use --dart-define to provide it.');
+    }
 
-  return completer.future;
+    final options = RecaptchaOptions(action: action);
+
+    final Object promise = _execute(siteKey, options);
+
+    try {
+      final token = await promiseToFuture<String>(promise);
+      return token;
+    } catch (e) {
+      print('Failed to execute reCAPTCHA. Error: $e');
+      throw Exception('Could not retrieve reCAPTCHA token.');
+    }
+  }
 }
 

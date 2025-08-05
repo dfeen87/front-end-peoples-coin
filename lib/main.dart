@@ -1,50 +1,37 @@
-// lib/main.dart 
-
-// --- IMPORTS ---
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
+
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
-import 'package:simple_animations/simple_animations.dart';
 
-// Import your project-specific models and services
 import 'firebase_options.dart';
-import 'models/user_account.dart';
 import 'models/tech_system.dart';
-import 'service/api_client.dart';
-
-// Import your providers and pages
-import 'state/auth_provider.dart' as MyAppAuthProvider;
-import 'state/user_provider.dart';
-import 'state/proposal_provider.dart';
-import 'state/goodwill_processing_provider.dart';
-import 'state/ledger_provider.dart';
-import 'pages/submit_goodwill_page.dart';
-import 'pages/my_portfolio_page.dart';
+import 'models/user_account.dart';
 import 'pages/governance_page.dart';
+import 'pages/my_portfolio_page.dart';
 import 'pages/my_wallet_page.dart';
 import 'pages/public_ledger_page.dart';
-import 'screens/welcome_screen.dart';
+import 'pages/submit_goodwill_page.dart';
 import 'screens/code_display_page.dart';
-import 'screens/sign_up_screen.dart' as sign_up;
 import 'screens/sign_in_screen.dart' as sign_in;
-import 'widgets/navigation_card.dart';
+import 'screens/sign_up_screen.dart' as sign_up;
+import 'screens/welcome_screen.dart';
+import 'service/api_client.dart';
+import 'state/auth_provider.dart' as MyAppAuthProvider;
+import 'state/goodwill_processing_provider.dart';
+import 'state/ledger_provider.dart';
+import 'state/proposal_provider.dart';
+import 'state/user_provider.dart';
 import 'widgets/dynamic_nebula_background.dart';
-import 'app_state_providers.dart'; 
-
-// --- CONFIGURATION & CONSTANTS ---
-const String reCaptchaSiteKeyProd = String.fromEnvironment(
-  'RECAPTCHA_SITE_KEY_PROD',
-  defaultValue: '',
-);
+import 'widgets/navigation_card.dart';
 
 class AppRoutes {
   static const String startup = '/';
@@ -61,7 +48,10 @@ class AppTheme {
     fontFamily: 'Roboto',
     primarySwatch: Colors.blue,
     scaffoldBackgroundColor: Colors.transparent,
-    appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0, foregroundColor: Colors.white),
+    appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white),
     textTheme: const TextTheme(
       bodyLarge: TextStyle(color: Colors.white70),
       bodyMedium: TextStyle(color: Colors.white70),
@@ -69,13 +59,10 @@ class AppTheme {
       headlineSmall: TextStyle(color: Colors.white),
       titleLarge: TextStyle(color: Colors.white70),
     ),
-    popupMenuTheme: PopupMenuThemeData(color: Colors.black.withOpacity(0.5), textStyle: const TextStyle(color: Colors.white), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0))),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
-    ),
   );
 }
 
+// --- RESTORED HELPER CLASSES ---
 class AppDurations {
   static const fast = Duration(milliseconds: 300);
   static const medium = Duration(milliseconds: 400);
@@ -99,89 +86,116 @@ class AppBreakpoints {
   static const double tablet = 768;
   static const double desktop = 1200;
 }
+// --- END RESTORED CLASSES ---
 
+late final GoRouter router;
 
-// --- ROUTER CONFIGURATION ---
-final router = GoRouter(
-  initialLocation: AppRoutes.startup,
-  routes: [
-    GoRoute(
-      path: AppRoutes.startup,
-      builder: (context, state) => const AppStartupController(),
-    ),
-    ShellRoute(
-      builder: (context, state, child) => AppShell(child: child),
-      routes: [
-        GoRoute(path: AppRoutes.welcome, builder: (context, state) => const WelcomeScreen()),
-        GoRoute(path: AppRoutes.signIn, builder: (context, state) => const sign_in.SignInScreen()),
-        GoRoute(path: AppRoutes.signUp, builder: (context, state) => const sign_up.SignUpScreen()),
-        GoRoute(path: AppRoutes.home, builder: (context, state) => const HomePage()),
-        GoRoute(
-          path: AppRoutes.codeViewer,
-          builder: (context, state) {
-            final system = state.extra as TechSystem?;
-            if (system != null) {
-              return CodeDisplayPage(title: 'Code Viewer', system: system);
-            }
-            return const Scaffold(body: Center(child: Text('Error: No system data provided.')));
-          },
-        ),
-      ],
-    ),
-  ],
-);
+void _initializeRouter(MyAppAuthProvider.AuthProvider authProvider) {
+  router = GoRouter(
+    initialLocation: AppRoutes.startup,
+    routes: [
+      GoRoute(path: AppRoutes.startup, builder: (context, state) => const StartupScreen()),
+      ShellRoute(
+        builder: (context, state, child) => AppShell(child: child),
+        routes: [
+          GoRoute(path: AppRoutes.welcome, builder: (context, state) => const WelcomeScreen()),
+          GoRoute(path: AppRoutes.signIn, builder: (context, state) => const sign_in.SignInScreen()),
+          GoRoute(path: AppRoutes.signUp, builder: (context, state) => const sign_up.SignUpScreen()),
+          GoRoute(path: AppRoutes.home, builder: (context, state) => const HomePage()),
+          GoRoute(
+            path: AppRoutes.codeViewer,
+            builder: (context, state) {
+              final system = state.extra as TechSystem?;
+              if (system != null) {
+                return CodeDisplayPage(title: 'Code Viewer', system: system);
+              }
+              return const Scaffold(
+                body: Center(child: Text('Error: No system data provided.')),
+              );
+            },
+          ),
+        ],
+      ),
+    ],
+    redirect: (BuildContext context, GoRouterState state) {
+      final loggedIn = authProvider.user != null;
+      final isInitializing = authProvider.isInitializing;
+
+      if (kDebugMode) {
+        print("[BrightActs] Redirect check → loggedIn=$loggedIn, isInitializing=$isInitializing, current=${state.matchedLocation}");
+      }
+
+      if (isInitializing) {
+          return state.matchedLocation == AppRoutes.startup ? null : AppRoutes.startup;
+      }
+
+      final onAuthRoute = [
+        AppRoutes.welcome,
+        AppRoutes.signIn,
+        AppRoutes.signUp
+      ].contains(state.matchedLocation);
+
+      if (loggedIn && (onAuthRoute || state.matchedLocation == AppRoutes.startup)) return AppRoutes.home;
+      if (!loggedIn && !onAuthRoute) return AppRoutes.welcome;
+
+      return null;
+    },
+    refreshListenable: authProvider,
+  );
+}
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: 'web/assets/.env');
+
   try {
-    await _bootstrapApp();
+    final firebaseApiKey = dotenv.env['FIREBASE_API_KEY'];
+    if (firebaseApiKey == null || firebaseApiKey.isEmpty) {
+      throw Exception('FIREBASE_API_KEY is missing from .env file');
+    }
+
+    final firebaseOptions = FirebaseOptions(
+      apiKey: firebaseApiKey,
+      authDomain: "brightacts-frontend-50f58.firebaseapp.com",
+      projectId: "brightacts-frontend-50f58",
+      storageBucket: "brightacts-frontend-50f58.appspot.com",
+      messagingSenderId: "289762069070",
+      appId: "1:289762069070:web:9f41491407211b0b9a111f",
+    );
+
+    await _bootstrapApp(firebaseOptions);
 
     final apiClient = PeoplesCoinApiClient();
+    final authProvider = MyAppAuthProvider.AuthProvider(apiClient);
+
+    _initializeRouter(authProvider);
 
     runApp(RootProviderScope(
       apiClient: apiClient,
+      authProvider: authProvider,
       child: const BrightActsApp(),
     ));
   } catch (error, stackTrace) {
     if (kDebugMode) {
-      print('FATAL ERROR DURING BOOTSTRAP: $error');
+      print('[BrightActs] FATAL ERROR DURING BOOTSTRAP: $error');
       print(stackTrace);
     }
     runApp(ErrorDisplayApp(error: error.toString()));
   }
 }
 
-Future<void> _bootstrapApp() async {
-  WidgetsFlutterBinding.ensureInitialized();
+Future<void> _bootstrapApp(FirebaseOptions options) async {
+  await Firebase.initializeApp(options: options);
 
-  // 🔹 Load environment variables
-  await dotenv.load();
-
-  // 🔹 Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  await FirebaseAppCheck.instance.activate(
+    webProvider: ReCaptchaV3Provider('6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F'),
   );
 
-  // 🔹 Firebase App Check Debug Token (only in debug mode)
   if (kDebugMode) {
-    FirebaseAppCheck.instance.getToken(true).then((String? token) {
-      if (token != null) {
-        print('------------------------------------------------------------');
-        print('Firebase App Check DEBUG TOKEN: $token');
-        print('------------------------------------------------------------');
-      }
-    });
-    print("App bootstrapped successfully in debug mode.");
-  }
-
-  if (!kIsWeb) {
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    print("[BrightActs] ✅ Firebase initialized & App Check activated");
   }
 }
 
-// --- PROVIDER & ERROR HANDLING WIDGETS ---
 class ErrorDisplayApp extends StatelessWidget {
   final String error;
   const ErrorDisplayApp({super.key, required this.error});
@@ -190,10 +204,13 @@ class ErrorDisplayApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
+        backgroundColor: Colors.black,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text("Fatal Application Error:\n\n$error", textAlign: TextAlign.center),
+            child: Text("Fatal Application Error:\n\n$error",
+                style: const TextStyle(color: Colors.redAccent),
+                textAlign: TextAlign.center),
           ),
         ),
       ),
@@ -203,11 +220,13 @@ class ErrorDisplayApp extends StatelessWidget {
 
 class RootProviderScope extends StatelessWidget {
   final PeoplesCoinApiClient apiClient;
+  final MyAppAuthProvider.AuthProvider authProvider;
   final Widget child;
 
   const RootProviderScope({
     super.key,
     required this.apiClient,
+    required this.authProvider,
     required this.child,
   });
 
@@ -216,46 +235,22 @@ class RootProviderScope extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<PeoplesCoinApiClient>.value(value: apiClient),
-
-        // Add your ChangeNotifierProviders that need either apiClient or appState
-        ChangeNotifierProvider(
-          create: (context) =>
-              MyAppAuthProvider.AuthProvider(context.read<PeoplesCoinApiClient>()),
-        ),
-        ChangeNotifierProvider(
-          create: (context) =>
-              UserProvider(context.read<PeoplesCoinApiClient>()),
-        ),
-        ChangeNotifierProvider(
-          create: (context) =>
-              ProposalProvider(context.read<PeoplesCoinApiClient>()),
-        ),
-        ChangeNotifierProvider(
-          create: (context) =>
-              LedgerProvider(context.read<PeoplesCoinApiClient>()),
-        ),
-        ChangeNotifierProvider(
-          create: (context) =>
-              GoodwillProcessingProvider(context.read<PeoplesCoinApiClient>()),
-        ),
+        ChangeNotifierProvider.value(value: authProvider),
+        ChangeNotifierProvider(create: (_) => UserProvider(apiClient)),
+        ChangeNotifierProvider(create: (_) => ProposalProvider(apiClient)),
+        ChangeNotifierProvider(create: (_) => LedgerProvider(apiClient)),
+        ChangeNotifierProvider(create: (_) => GoodwillProcessingProvider(apiClient)),
       ],
       child: child,
     );
   }
 }
 
-
-// --- ROOT APP WIDGETS ---
 class BrightActsApp extends StatelessWidget {
   const BrightActsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light.copyWith(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Colors.black.withOpacity(0.5),
-      systemNavigationBarIconBrightness: Brightness.light,
-    ));
     return MaterialApp.router(
       title: 'BrightActs',
       debugShowCheckedModeBanner: false,
@@ -282,41 +277,27 @@ class AppShell extends StatelessWidget {
   }
 }
 
-class AppStartupController extends StatefulWidget {
-  const AppStartupController({super.key});
-  @override
-  State<AppStartupController> createState() => _AppStartupControllerState();
-}
-
-class _AppStartupControllerState extends State<AppStartupController> {
-  @override
-  void initState() {
-    super.initState();
-    _initializeApp();
-  }
-
-  Future<void> _initializeApp() async {
-    await WidgetsBinding.instance.endOfFrame;
-    final authProvider = Provider.of<MyAppAuthProvider.AuthProvider>(context, listen: false);
-    await authProvider.checkCurrentUser();
-    if (mounted) {
-      if (authProvider.user == null) {
-        context.go(AppRoutes.welcome);
-      } else {
-        context.read<UserProvider>().fetchUser(authProvider.user!.uid);
-        context.go(AppRoutes.home);
-      }
-    }
-  }
+class StartupScreen extends StatelessWidget {
+  const StartupScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(backgroundColor: Colors.black, body: Center(child: CircularProgressIndicator(color: Colors.deepPurple)));
+    return const Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 20),
+            Text("Loading BrightActs...", style: TextStyle(color: Colors.white70)),
+          ],
+        ),
+      ),
+    );
   }
 }
 
-
-// --- PRIMARY PAGE WIDGET ---
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
   @override
@@ -365,7 +346,12 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AnimatedSlide(offset: _showUiElements ? Offset.zero : const Offset(0, -1.5), duration: AppDurations.fast, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16.0), child: _buildWelcomeHeader())),
+            AnimatedSlide(
+                offset: _showUiElements ? Offset.zero : const Offset(0, -1.5),
+                duration: AppDurations.fast,
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: _buildWelcomeHeader())),
             SizedBox(height: verticalMargin),
             Expanded(child: _buildPageView()),
             SizedBox(height: verticalMargin),
@@ -376,15 +362,30 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildNavigationPage({required String title, required String description, required IconData icon, required Color cardColor, required String buttonText, required Widget pageToOpen}) {
-    return NavigationCard(title: title, description: description, icon: icon, cardColor: cardColor, expandedContent: _cardContent(context, buttonText, pageToOpen: pageToOpen));
+  Widget _buildNavigationPage({
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color cardColor,
+    required String buttonText,
+    required Widget pageToOpen,
+  }) {
+    return NavigationCard(
+      title: title,
+      description: description,
+      icon: icon,
+      cardColor: cardColor,
+      expandedContent: _cardContent(context, buttonText, pageToOpen: pageToOpen),
+    );
   }
 
-  Widget _cardContent(BuildContext context, String buttonText, {required Widget pageToOpen}) {
+  Widget _cardContent(BuildContext context, String buttonText,
+      {required Widget pageToOpen}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Detailed information about this section.', style: TextStyle(color: Colors.white70, fontSize: 14)),
+        const Text('Detailed information about this section.',
+            style: TextStyle(color: Colors.white70, fontSize: 14)),
         const Spacer(),
         Center(
           child: ElevatedButton(
@@ -392,7 +393,11 @@ class _HomePageState extends State<HomePage> {
               HapticFeedback.lightImpact();
               _showSlidingFormOverlay(context, pageToOpen);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.buttonPrimary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.buttonPrimary,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
             child: Text(buttonText, style: const TextStyle(fontSize: 16)),
           ),
         ),
@@ -416,7 +421,11 @@ class _HomePageState extends State<HomePage> {
               icon: const Icon(Icons.settings),
               onPressed: () {
                 HapticFeedback.mediumImpact();
-                showModalBottomSheet(context: context, backgroundColor: Colors.transparent, isScrollControlled: true, builder: (_) => const SettingsBottomSheet());
+                showModalBottomSheet(
+                    context: context,
+                    backgroundColor: Colors.transparent,
+                    isScrollControlled: true,
+                    builder: (_) => const SettingsBottomSheet());
               },
             ),
           ],
@@ -434,23 +443,51 @@ class _HomePageState extends State<HomePage> {
           return const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('// CONNECTION INTERRUPTED', style: TextStyle(color: Colors.redAccent, fontSize: 24, fontFamily: 'monospace')),
-              Text('  Could not load user data.', style: TextStyle(color: Colors.white70)),
+              Text('// CONNECTION INTERRUPTED',
+                  style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 24,
+                      fontFamily: 'monospace')),
+              Text('  Could not load user data.',
+                  style: TextStyle(color: Colors.white70)),
             ],
           );
         }
-        final welcomeText = authUser != null ? 'Welcome, ${authUser.displayName ?? authUser.email ?? authUser.uid}' : 'Connecting...';
+        final welcomeText = authUser != null
+            ? 'Welcome, ${authUser.displayName ?? authUser.email ?? authUser.uid}'
+            : 'Connecting...';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            MatrixText(targetText: welcomeText, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 24, fontFamily: 'monospace'), isLoading: userProvider.isLoading),
+            MatrixText(
+                targetText: welcomeText,
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineMedium
+                    ?.copyWith(fontSize: 24, fontFamily: 'monospace'),
+                isLoading: userProvider.isLoading),
             const SizedBox(height: 8),
             Row(
               children: [
-                Text('Your Balance: ', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
-                if (userProvider.isLoading) Text("******", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18, color: Colors.white))
-                else if (userAccount != null) SlotMachineBalance(balance: userAccount.balance.toInt(), textStyle: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 18, color: Colors.amber, fontWeight: FontWeight.bold)),
-                Text(' Loves', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
+                Text('Your Balance: ',
+                    style:
+                        Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
+                if (userProvider.isLoading)
+                  Text("******",
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontSize: 18, color: Colors.white))
+                else if (userAccount != null)
+                  SlotMachineBalance(
+                      balance: userAccount.balance.toInt(),
+                      textStyle: Theme.of(context).textTheme.titleLarge!.copyWith(
+                          fontSize: 18,
+                          color: Colors.amber,
+                          fontWeight: FontWeight.bold)),
+                Text(' Loves',
+                    style:
+                        Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
               ],
             ),
           ],
@@ -487,7 +524,8 @@ class _HomePageState extends State<HomePage> {
       child: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'Governance'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Portfolio'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet), label: 'Portfolio'),
           BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Record'),
           BottomNavigationBarItem(icon: Icon(Icons.public), label: 'Ledger'),
           BottomNavigationBarItem(icon: Icon(Icons.wallet), label: 'Wallet'),
@@ -506,10 +544,12 @@ class _HomePageState extends State<HomePage> {
 
   void _onItemTapped(int index) {
     HapticFeedback.lightImpact();
-    _pageController.animateToPage(index, duration: AppDurations.fast, curve: Curves.ease);
+    _pageController.animateToPage(index,
+        duration: AppDurations.fast, curve: Curves.ease);
   }
 
-  Future<void> _showSlidingFormOverlay(BuildContext context, Widget content) async {
+  Future<void> _showSlidingFormOverlay(
+      BuildContext context, Widget content) async {
     setState(() => _showUiElements = false);
     await Future.delayed(AppDurations.fast);
     await showGeneralDialog(
@@ -519,8 +559,13 @@ class _HomePageState extends State<HomePage> {
       barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: AppDurations.medium,
       transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-        return SlideTransition(position: Tween<Offset>(begin: const Offset(0.0, -1.0), end: Offset.zero).animate(curve), child: FadeTransition(opacity: animation, child: child));
+        final curve =
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+        return SlideTransition(
+            position:
+                Tween<Offset>(begin: const Offset(0.0, -1.0), end: Offset.zero)
+                    .animate(curve),
+            child: FadeTransition(opacity: animation, child: child));
       },
       pageBuilder: (context, animation, secondaryAnimation) {
         final mediaQuery = MediaQuery.of(context);
@@ -530,9 +575,15 @@ class _HomePageState extends State<HomePage> {
           child: Container(
             width: mediaQuery.size.width * (isDesktop ? 0.4 : 0.9),
             height: mediaQuery.size.height * 0.85,
-            margin: EdgeInsets.only(top: mediaQuery.padding.top + (AppBar().preferredSize.height / 2), bottom: mediaQuery.padding.bottom),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(25.0), border: Border.all(color: Colors.white.withOpacity(0.2))),
-            child: ClipRRect(borderRadius: BorderRadius.circular(25.0), child: content),
+            margin: EdgeInsets.only(
+                top: mediaQuery.padding.top + (AppBar().preferredSize.height / 2),
+                bottom: mediaQuery.padding.bottom),
+            decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(25.0),
+                border: Border.all(color: Colors.white.withOpacity(0.2))),
+            child: ClipRRect(
+                borderRadius: BorderRadius.circular(25.0), child: content),
           ),
         );
       },
@@ -541,8 +592,6 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-
-// --- REUSABLE WIDGETS & COMPONENTS ---
 class SettingsBottomSheet extends StatelessWidget {
   const SettingsBottomSheet({super.key});
 
@@ -552,34 +601,63 @@ class SettingsBottomSheet extends StatelessWidget {
       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
       child: Container(
         padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: Colors.black.withOpacity(0.75), borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)), border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2)))),
+        decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.75),
+            borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2)))),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey[700], borderRadius: BorderRadius.circular(12))),
+            Container(
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                    color: Colors.grey[700],
+                    borderRadius: BorderRadius.circular(12))),
             const SizedBox(height: 20),
-            const Text('Settings & Info', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text('Settings & Info',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-            _buildLinkButton(context: context, text: 'Donate to Bright Acts', icon: Icons.volunteer_activism, color: Colors.pinkAccent, url: 'https://buy.stripe.com/4gM3cv65RfBnbOue7i24000'),
+            _buildLinkButton(
+                context: context,
+                text: 'Donate to Bright Acts',
+                icon: Icons.volunteer_activism,
+                color: Colors.pinkAccent,
+                url: 'https://buy.stripe.com/some-valid-stripe-link'),
             const SizedBox(height: 10),
-            _buildLinkButton(context: context, text: 'Follow on LinkedIn', icon: Icons.group_work, color: Colors.lightBlueAccent, url: 'https://www.linkedin.com/company/the-people-s-coin/'),
+            _buildLinkButton(
+                context: context,
+                text: 'Follow on LinkedIn',
+                icon: Icons.group_work,
+                color: Colors.lightBlueAccent,
+                url: 'https://www.linkedin.com/company/the-people-s-coin/'),
             const SizedBox(height: 10),
-            _buildLinkButton(context: context, text: 'Docs & Codebase', icon: Icons.code, url: 'https://github.com/DonMichaelFeeney/Brightacts'),
+            _buildLinkButton(
+                context: context,
+                text: 'Docs & Codebase',
+                icon: Icons.code,
+                url: 'https://github.com/DonMichaelFeeney/Brightacts'),
             const SizedBox(height: 10),
-            _buildLinkButton(context: context, text: 'Get Support', icon: Icons.support_agent, onPressed: () => _launchSupportEmail(context)),
+            _buildLinkButton(
+                context: context,
+                text: 'Get Support',
+                icon: Icons.support_agent,
+                onPressed: () => _launchSupportEmail(context)),
             const SizedBox(height: 10),
             Divider(color: Colors.white.withOpacity(0.3)),
             const SizedBox(height: 10),
             TextButton.icon(
               icon: const Icon(Icons.logout, color: Colors.redAccent),
-              label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
+              label: const Text('Sign Out',
+                  style: TextStyle(color: Colors.redAccent, fontSize: 16)),
               onPressed: () async {
                 HapticFeedback.heavyImpact();
                 Navigator.of(context).pop();
                 await context.read<MyAppAuthProvider.AuthProvider>().signOut();
-                if (context.mounted) {
-                  context.go(AppRoutes.welcome);
-                }
               },
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom),
@@ -590,33 +668,49 @@ class SettingsBottomSheet extends StatelessWidget {
   }
 
   void _launchSupportEmail(BuildContext context) async {
-    final Uri emailLaunchUri = Uri(scheme: 'mailto', path: 'support@brightacts.com', query: 'subject=Bright Acts Support Request');
+    final Uri emailLaunchUri =
+        Uri(scheme: 'mailto', path: 'support@brightacts.com', query: 'subject=Bright Acts Support Request');
     try {
       await url_launcher.launchUrl(emailLaunchUri);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch email app.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not launch email app.')));
       }
     }
   }
 
-  Widget _buildLinkButton({required BuildContext context, required String text, required IconData icon, Color? color, String? url, VoidCallback? onPressed}) {
+  Widget _buildLinkButton(
+      {required BuildContext context,
+      required String text,
+      required IconData icon,
+      Color? color,
+      String? url,
+      VoidCallback? onPressed}) {
     final bool isEnabled = onPressed != null || url != null;
     final Color enabledColor = color ?? Colors.amber[700]!;
     final Color disabledColor = Colors.grey[600]!;
     return TextButton.icon(
       icon: Icon(icon, color: isEnabled ? enabledColor : disabledColor),
-      label: Text(text, style: TextStyle(color: isEnabled ? Colors.white : Colors.grey[600], fontSize: 16)),
-      onPressed: isEnabled ? (onPressed ?? () async {
-        if (url != null) {
-          final uri = Uri.parse(url);
-          if (!await url_launcher.launchUrl(uri, mode: url_launcher.LaunchMode.externalApplication)) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not launch $url')));
-            }
-          }
-        }
-      }) : null,
+      label: Text(text,
+          style: TextStyle(
+              color: isEnabled ? Colors.white : Colors.grey[600],
+              fontSize: 16)),
+      onPressed: isEnabled
+          ? (onPressed ??
+              () async {
+                if (url != null) {
+                  final uri = Uri.parse(url);
+                  if (!await url_launcher.launchUrl(uri,
+                      mode: url_launcher.LaunchMode.externalApplication)) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Could not launch $url')));
+                    }
+                  }
+                }
+              })
+          : null,
     );
   }
 }
@@ -625,7 +719,11 @@ class MatrixText extends StatefulWidget {
   final String targetText;
   final TextStyle? style;
   final bool isLoading;
-  const MatrixText({super.key, required this.targetText, this.style, this.isLoading = false});
+  const MatrixText(
+      {super.key,
+      required this.targetText,
+      this.style,
+      this.isLoading = false});
   @override
   State<MatrixText> createState() => _MatrixTextState();
 }
@@ -646,7 +744,8 @@ class _MatrixTextState extends State<MatrixText> {
   @override
   void didUpdateWidget(covariant MatrixText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.targetText != oldWidget.targetText || widget.isLoading != oldWidget.isLoading) {
+    if (widget.targetText != oldWidget.targetText ||
+        widget.isLoading != oldWidget.isLoading) {
       _startAnimation();
     }
   }
@@ -664,22 +763,33 @@ class _MatrixTextState extends State<MatrixText> {
 
     if (widget.isLoading) {
       _timer = Timer.periodic(const Duration(milliseconds: 60), (timer) {
-        if (!mounted) { timer.cancel(); return; }
-        setState(() { _displayText = _generateRandomString(widget.targetText.length); });
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        setState(() {
+          _displayText = _generateRandomString(widget.targetText.length);
+        });
       });
     } else {
       _timer = Timer.periodic(const Duration(milliseconds: 40), (timer) {
-        if (!mounted) { timer.cancel(); return; }
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
         setState(() {
           if (_revealIndex >= widget.targetText.length) {
             _displayText = widget.targetText;
             timer.cancel();
             return;
           }
-          String scramblingPart = _generateRandomString(widget.targetText.length - _revealIndex);
+          String scramblingPart =
+              _generateRandomString(widget.targetText.length - _revealIndex);
           String revealedPart = widget.targetText.substring(0, _revealIndex);
           _displayText = revealedPart + scramblingPart;
-          if (timer.tick % 2 == 0) { _revealIndex++; }
+          if (timer.tick % 2 == 0) {
+            _revealIndex++;
+          }
         });
       });
     }
@@ -687,7 +797,8 @@ class _MatrixTextState extends State<MatrixText> {
 
   String _generateRandomString(int length) {
     if (length <= 0) return '';
-    return String.fromCharCodes(Iterable.generate(length, (_) => _chars.codeUnitAt(_random.nextInt(_chars.length))));
+    return String.fromCharCodes(Iterable.generate(
+        length, (_) => _chars.codeUnitAt(_random.nextInt(_chars.length))));
   }
 
   @override
@@ -700,12 +811,17 @@ class SlotMachineBalance extends StatefulWidget {
   final int balance;
   final TextStyle textStyle;
   final Duration duration;
-  const SlotMachineBalance({super.key, required this.balance, required this.textStyle, this.duration = const Duration(milliseconds: 1500)});
+  const SlotMachineBalance(
+      {super.key,
+      required this.balance,
+      required this.textStyle,
+      this.duration = const Duration(milliseconds: 1500)});
   @override
   State<SlotMachineBalance> createState() => _SlotMachineBalanceState();
 }
 
-class _SlotMachineBalanceState extends State<SlotMachineBalance> with SingleTickerProviderStateMixin {
+class _SlotMachineBalanceState extends State<SlotMachineBalance>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   int _displayBalance = 0;
@@ -732,7 +848,13 @@ class _SlotMachineBalanceState extends State<SlotMachineBalance> with SingleTick
   }
 
   void _animateToBalance(int newBalance, {required int from}) {
-    _animation = Tween<double>(begin: from.toDouble(), end: newBalance.toDouble()).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut))..addListener(() { setState(() { _displayBalance = _animation.value.round(); }); });
+    _animation = Tween<double>(begin: from.toDouble(), end: newBalance.toDouble())
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut))
+      ..addListener(() {
+        setState(() {
+          _displayBalance = _animation.value.round();
+        });
+      });
     _controller.reset();
     _controller.forward();
   }
@@ -742,3 +864,4 @@ class _SlotMachineBalanceState extends State<SlotMachineBalance> with SingleTick
     return Text(_displayBalance.toString(), style: widget.textStyle);
   }
 }
+

@@ -1,4 +1,4 @@
-import 'dart:async'; 
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,18 +16,12 @@ final List<TechSystem> backendSystems = [
     icon: Icons.edit_document,
     title: 'Act Submission',
     description: 'Captures and validates user-submitted acts of goodwill.',
-    color: Color(0xFFDA70D6), // Matches "Record Act" color
+    color: Color(0xFFDA70D6),
     code: r'''
-// Validates and prepares a new "Bright Act" for the network.
 class ActValidator {
   bool validate(ActSubmission submission) {
-    if (submission.description.isEmpty) {
-      return false; // Act must have a description.
-    }
-    if (submission.evidence.isNotProvided) {
-      return false; // Evidence is required for verification.
-    }
-    // Additional validation logic...
+    if (submission.description.isEmpty) return false;
+    if (submission.evidence.isNotProvided) return false;
     print("Act validated successfully.");
     return true;
   }
@@ -38,21 +32,16 @@ class ActValidator {
     icon: Icons.gavel,
     title: 'Governance Protocol',
     description: 'Manages community proposals and on-chain voting.',
-    color: Color(0xFF8A2BE2), // Matches "Governance" color
+    color: Color(0xFF8A2BE2),
     code: r'''
-// A smart contract to handle community voting.
 contract Governance {
   mapping(uint => Proposal) public proposals;
   mapping(address => bool) public hasVoted;
 
   function vote(uint proposalId, bool supports) public {
     require(!hasVoted[msg.sender], "Already voted.");
-    
-    if (supports) {
-      proposals[proposalId].yesVotes++;
-    } else {
-      proposals[proposalId].noVotes++;
-    }
+    if (supports) proposals[proposalId].yesVotes++;
+    else proposals[proposalId].noVotes++;
     hasVoted[msg.sender] = true;
   }
 }
@@ -62,9 +51,8 @@ contract Governance {
     icon: Icons.public,
     title: 'Immutable Ledger',
     description: 'Records all verified acts on a transparent, public chain.',
-    color: Color(0xFF00BFFF), // Matches "Ledger" color
+    color: Color(0xFF00BFFF),
     code: r'''
-// Records a transaction on the distributed ledger.
 class Ledger {
   List<Transaction> chain = [];
 
@@ -74,7 +62,6 @@ class Ledger {
       userId: user.id,
       timestamp: DateTime.now(),
     );
-    // Hashing and linking to the previous block...
     chain.add(newTx);
     print("New act recorded on the ledger.");
   }
@@ -85,18 +72,14 @@ class Ledger {
     icon: Icons.wallet,
     title: 'Tokenomics Engine',
     description: 'Mints and distributes "Loves" tokens as rewards.',
-    color: Color(0xFF6A5ACD), // Matches "Wallet" color
+    color: Color(0xFF6A5ACD),
     code: r'''
-// Mints new tokens as a reward for a verified act.
 class TokenMinter {
-  final int REWARD_AMOUNT = 10; // Loves per act
+  final int REWARD_AMOUNT = 10;
 
   void issueReward(User user, Act verifiedAct) {
     user.wallet.balance += REWARD_AMOUNT;
-    print(
-      "$REWARD_AMOUNT Loves minted for ${user.id}."
-    );
-    // Logic to update total supply...
+    print("$REWARD_AMOUNT Loves minted for ${user.id}.");
   }
 }
 ''',
@@ -110,6 +93,8 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The conditional logic for the footer has been removed.
+    // The footer is now an independent widget positioned at the bottom of the Stack.
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: GestureDetector(
@@ -122,7 +107,6 @@ class WelcomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
                 child: SingleChildScrollView(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 32),
@@ -133,13 +117,17 @@ class WelcomeScreen extends StatelessWidget {
                       _buildActionButtons(context),
                       const SizedBox(height: 16),
                       _buildTechShowcase(context),
-                      const SizedBox(height: 24),
-                      _buildFooterLinks(),
-                      const SizedBox(height: 24),
+                      // Add some padding to prevent content from being hidden by the fixed footer
+                      const SizedBox(height: 60), 
                     ],
                   ).animate().fadeIn(duration: 500.ms, curve: Curves.easeIn),
                 ),
               ),
+            ),
+            // The footer is now a separate widget placed at the bottom of the stack
+            const Align(
+              alignment: Alignment.bottomCenter,
+              child: _FooterWidget(),
             ),
           ],
         ),
@@ -150,7 +138,6 @@ class WelcomeScreen extends StatelessWidget {
   Widget _buildHeader() {
     return const Column(
       children: [
-        // CHANGED: The title is now just "Bright Acts"
         StrokedText(
           text: 'Bright Acts',
           fontSize: 36,
@@ -164,7 +151,6 @@ class WelcomeScreen extends StatelessWidget {
   Widget _buildMissionStatement() {
     return const Column(
       children: [
-        // MOVED: The DynamicTagline is now part of the Mission Statement section
         DynamicTagline(),
         SizedBox(height: 8),
         StrokedText(
@@ -186,8 +172,7 @@ class WelcomeScreen extends StatelessWidget {
             backgroundColor: Colors.amber[800]!,
             foregroundColor: Colors.black,
             text: 'Join the Movement',
-          ).animate(onPlay: (controller) => controller.repeat())
-              .shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
+          ).animate().shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -196,8 +181,7 @@ class WelcomeScreen extends StatelessWidget {
             backgroundColor: Colors.amber[800]!,
             foregroundColor: Colors.black,
             text: 'Sign In',
-          ).animate(onPlay: (controller) => controller.repeat())
-              .shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
+          ).animate().shimmer(delay: 2.seconds, duration: 1.5.seconds, color: Colors.amber[400]),
         ),
       ],
     ).animate().fade(delay: 200.ms, duration: 800.ms).slideY(begin: 0.3);
@@ -205,7 +189,6 @@ class WelcomeScreen extends StatelessWidget {
 
   Widget _buildTechShowcase(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
         const StrokedText(
           text: 'A Living Ecosystem',
@@ -213,36 +196,46 @@ class WelcomeScreen extends StatelessWidget {
           fontWeight: FontWeight.bold,
         ),
         const SizedBox(height: 16),
-        FlippableCardGroup(
-          key: cardGroupKey,
-          systems: backendSystems,
-        ),
+        FlippableCardGroup(key: cardGroupKey, systems: backendSystems),
       ],
     ).animate().fade(delay: 400.ms, duration: 800.ms);
   }
+}
 
-  Widget _buildFooterLinks() {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _FooterLink(
-          url: 'https://www.linkedin.com/company/the-people-s-coin/',
-          text: 'Follow Us',
+// NEW: Refactored footer into its own independent widget
+class _FooterWidget extends StatelessWidget {
+  const _FooterWidget({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            _FooterLink(
+              url: 'https://www.linkedin.com/company/the-people-s-coin/',
+              text: 'Follow Us',
+            ),
+            StrokedText(text: '  |  ', fontSize: 14),
+            _FooterLink(
+              url: 'https://github.com/DonMichaelFeeney/Brightacts',
+              text: 'View Full Codebase',
+            ),
+            StrokedText(text: '  |  ', fontSize: 14),
+            _FooterLink(
+              url: 'mailto:support@brightacts.com?subject=Bright Acts Support Request',
+              text: 'Support',
+            ),
+          ],
         ),
-        StrokedText(text: '  |  ', fontSize: 14),
-        _FooterLink(
-          url: 'https://github.com/DonMichaelFeeney/Brightacts',
-          text: 'View Full Codebase',
-        ),
-        StrokedText(text: '  |  ', fontSize: 14),
-        _FooterLink(
-          url: 'mailto:support@brightacts.com?subject=Bright Acts Support Request',
-          text: 'Support',
-        ),
-      ],
+      ),
     );
   }
 }
+
 
 class FlippableCardGroup extends StatefulWidget {
   final List<TechSystem> systems;
