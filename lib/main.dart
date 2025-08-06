@@ -146,7 +146,7 @@ void _initializeRouter(MyAppAuthProvider.AuthProvider authProvider) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: 'web/assets/.env');
+  await dotenv.load(fileName: 'config.env');
 
   try {
     final firebaseApiKey = dotenv.env['FIREBASE_API_KEY'];

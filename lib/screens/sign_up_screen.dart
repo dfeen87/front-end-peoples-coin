@@ -1,8 +1,7 @@
 // lib/screens/sign_up_screen.dart
 
-// --- IMPORTS ---
 import 'dart:async';
-import 'dart:convert'; // Added for jsonDecode
+import 'dart:convert';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -26,6 +25,7 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final _formKey = GlobalKey<FormState>();
+
   static const String recaptchaSiteKey = String.fromEnvironment(
     'RECAPTCHA_SITE_KEY_PROD',
     defaultValue: '',
@@ -34,13 +34,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   bool _isLoading = false;
   bool _isPasswordObscured = true;
   UsernameStatus _usernameStatus = UsernameStatus.idle;
-  Timer? _debounce;
 
+  Timer? _debounce;
   static const int _minUsernameLength = 3;
   static const Duration _debounceDuration = Duration(milliseconds: 500);
 
@@ -54,10 +55,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void dispose() {
     _debounce?.cancel();
     _usernameController.removeListener(_onUsernameChanged);
-
     _emailController.dispose();
-    _passwordController.dispose();
     _usernameController.dispose();
+    _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
@@ -71,9 +71,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _onUsernameChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(_debounceDuration, () {
-      _checkUsernameAvailability();
-    });
+    _debounce = Timer(_debounceDuration, _checkUsernameAvailability);
   }
 
   Future<void> _checkUsernameAvailability() async {
@@ -89,119 +87,80 @@ class _SignUpScreenState extends State<SignUpScreen> {
     try {
       final apiClient = context.read<PeoplesCoinApiClient>();
       final isAvailable = await apiClient.checkUsernameAvailability(username);
+
       if (mounted) {
         setState(() {
-          _usernameStatus =
-              isAvailable ? UsernameStatus.available : UsernameStatus.unavailable;
+          _usernameStatus = isAvailable
+              ? UsernameStatus.available
+              : UsernameStatus.unavailable;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _usernameStatus = UsernameStatus.idle);
       _showError("Couldn't verify username. Please try again.");
     }
   }
 
-Future<void> _signUpWithEmail() async {
-  if (!(_formKey.currentState?.validate() ?? false)) return;
+  Future<void> _signUpWithEmail() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-  if (_usernameStatus != UsernameStatus.available) {
-    _showError('Please choose an available username.');
-    return;
-  }
-
-  final email = _emailController.text.trim();
-  final password = _passwordController.text.trim();
-
-  // Additional input sanity checks before Firebase call
-  if (email.isEmpty) {
-    _showError('Email cannot be empty.');
-    return;
-  }
-  if (!email.contains('@') || !email.contains('.')) {
-    _showError('Please enter a valid email address.');
-    return;
-  }
-  if (password.isEmpty) {
-    _showError('Password cannot be empty.');
-    return;
-  }
-  if (password.length < 6) {
-    _showError('Password must be at least 6 characters.');
-    return;
-  }
-
-  setState(() => _isLoading = true);
-
-  try {
-    print('Attempting sign-up with email: $email and password length: ${password.length}');
-
-    // reCAPTCHA token fetch (keep your logic)
-    final recaptchaService = RecaptchaService();
-    final token = await recaptchaService.executeRecaptcha(
-      recaptchaSiteKey,
-      'signup',
-    );
-
-    if (token.isEmpty && kReleaseMode) {
-      throw Exception('Failed to get reCAPTCHA token.');
+    if (_usernameStatus != UsernameStatus.available) {
+      _showError('Please choose an available username.');
+      return;
     }
 
-    // Firebase create user call
-    final userCredential = await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-
-    final user = userCredential.user;
-    if (user != null) {
-      final apiClient = context.read<PeoplesCoinApiClient>();
-      await apiClient.createUserAccount(
-        firebaseUid: user.uid,
-        email: user.email ?? '',
-        username: _usernameController.text.trim(),
-        recaptchaToken: token,
-      );
+    if (recaptchaSiteKey.isEmpty && kReleaseMode) {
+      _showError('reCAPTCHA site key not configured.');
+      return;
     }
 
-    if (mounted) context.go('/home');
-  } on FirebaseAuthException catch (e) {
-    print('--- Firebase Auth Exception ---');
-    print('Code: ${e.code}');
-    print('Message: ${e.message}');
-    print('-------------------------------');
+    setState(() => _isLoading = true);
 
-    final friendlyMessage = switch (e.code) {
-      'email-already-in-use' => 'This email is already registered.',
-      'weak-password' => 'The password is too weak.',
-      'invalid-email' => 'Invalid email format.',
-      _ => 'Sign-up error: ${e.message}'
-    };
-    _showError(friendlyMessage);
-  } on ApiException catch (e) {
-    debugPrint(
-        'API Error: ${e.message} (status: ${e.statusCode})\nBody: ${e.responseBody}');
-    final backendMsg = _extractBackendMessage(e.responseBody);
-    _showError(backendMsg ?? e.message);
-  } catch (e, stack) {
-    debugPrint('Unexpected error: $e\n$stack');
-    _showError('Unexpected error: $e');
-  } finally {
-    if (mounted) setState(() => _isLoading = false);
-  }
-}
-
-  String? _extractBackendMessage(String? body) {
-    if (body == null || body.isEmpty) return null;
     try {
-      final decoded = jsonDecode(body);
-      if (decoded is Map && decoded['message'] is String) {
-        return decoded['message'];
+      // Run reCAPTCHA
+      final recaptchaService = RecaptchaService();
+      final token =
+          await recaptchaService.executeRecaptcha(recaptchaSiteKey, 'signup');
+
+      if (token.isEmpty && kReleaseMode) {
+        throw Exception('Failed to get reCAPTCHA token.');
       }
-    } catch (_) {}
-    return null;
+
+      // Create Firebase user
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      final user = userCredential.user;
+      if (user != null) {
+        final apiClient = context.read<PeoplesCoinApiClient>();
+        await apiClient.createUserAccount(
+          firebaseUid: user.uid,
+          email: user.email ?? '',
+          username: _usernameController.text.trim(),
+          recaptchaToken: token,
+        );
+      }
+
+      if (mounted) context.go('/home');
+    } on FirebaseAuthException catch (e) {
+      final friendlyMessage = switch (e.code) {
+        'email-already-in-use' => 'This email is already registered.',
+        'weak-password' => 'The password is too weak.',
+        'invalid-email' => 'Invalid email format.',
+        _ => 'Sign-up error: ${e.message}'
+      };
+      _showError(friendlyMessage);
+    } catch (e) {
+      _showError('Unexpected error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData icon, {Widget? suffixIcon}) {
+  InputDecoration _buildInputDecoration(String label, IconData icon,
+      {Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(color: Colors.blueGrey[200]),
@@ -236,7 +195,8 @@ Future<void> _signUpWithEmail() async {
           child: SizedBox(
             width: 20,
             height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
+            child:
+                CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
           ),
         );
       case UsernameStatus.available:
@@ -360,7 +320,9 @@ Future<void> _signUpWithEmail() async {
                             obscureText: _isPasswordObscured,
                             style: const TextStyle(color: Colors.white),
                             decoration: _buildInputDecoration(
-                                'Confirm Password', Icons.lock_person_outlined),
+                              'Confirm Password',
+                              Icons.lock_person_outlined,
+                            ),
                             validator: (val) {
                               if (val == null || val.isEmpty) {
                                 return 'Please confirm your password';
@@ -427,3 +389,4 @@ Future<void> _signUpWithEmail() async {
     );
   }
 }
+
