@@ -1,0 +1,188 @@
+// lib/service/api_client.dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+
+class PeoplesCoinApiClient {
+  final String _baseUrl =
+      "https://peoples-coin-service-105378934751.us-east4.run.app";
+
+  // Private helper to get headers with Firebase ID token for authorization
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('No user is currently signed in.');
+    }
+    final token = await user.getIdToken();
+    if (token.isEmpty) {
+      throw Exception('Failed to get Firebase ID token.');
+    }
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  /// Secure GET request for user profile
+  Future<Map<String, dynamic>> getUserProfile() async {
+    final url = Uri.parse('$_baseUrl/api/auth/users/me');
+    final headers = await _getAuthHeaders();
+
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception(
+        'Failed to fetch user profile. '
+        'Status: ${response.statusCode}, Body: ${response.body}',
+      );
+    }
+  }
+
+  /// Secure GET request for ledger entries (supports pagination)
+  Future<List<dynamic>> getLedgerEntries({int page = 1}) async {
+    final url = Uri.parse('$_baseUrl/api/ledger?page=$page');
+    final headers = await _getAuthHeaders();
+
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as List<dynamic>;
+    } else {
+      throw Exception(
+          'Failed to fetch ledger entries. Status: ${response.statusCode}, Body: ${response.body}');
+    }
+  }
+
+  /// Secure GET request for ledger search
+  Future<List<dynamic>> searchLedger({required String query}) async {
+    final url = Uri.parse('$_baseUrl/api/ledger/search?q=$query');
+    final headers = await _getAuthHeaders();
+
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as List<dynamic>;
+    } else {
+      throw Exception(
+          'Failed to search ledger. Status: ${response.statusCode}, Body: ${response.body}');
+    }
+  }
+
+  /// Secure POST request to send "loves"
+  Future<void> sendLoves({
+    required String senderWalletId,
+    required String recipientWalletId,
+    required int amount,
+    String? memo,
+  }) async {
+    final url = Uri.parse('$_baseUrl/api/ledger/send_loves');
+    final headers = await _getAuthHeaders();
+
+    final body = json.encode({
+      'senderWalletId': senderWalletId,
+      'recipientWalletId': recipientWalletId,
+      'amount': amount,
+      if (memo != null) 'memo': memo,
+    });
+
+    final response = await http.post(url, headers: headers, body: body);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Failed to send loves. Status: ${response.statusCode}, Body: ${response.body}');
+    }
+  }
+
+  /// Secure POST request to submit goodwill action
+  Future<Map<String, dynamic>> submitGoodwill(
+      Map<String, dynamic> goodwillAction) async {
+    final url = Uri.parse('$_baseUrl/api/goodwill');
+    final headers = await _getAuthHeaders();
+
+    final response =
+        await http.post(url, headers: headers, body: json.encode(goodwillAction));
+
+    if (response.statusCode == 201) {
+      return json.decode(response.body);
+    } else {
+      throw Exception(
+          'Failed to submit goodwill. Status: ${response.statusCode}, Body: ${response.body}');
+    }
+  }
+
+  /// Secure GET request to fetch user account by ID
+  Future<Map<String, dynamic>> getUserAccount(String userId) async {
+    final url = Uri.parse('$_baseUrl/api/users/$userId');
+    final headers = await _getAuthHeaders();
+
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception(
+          'Failed to fetch user account. Status: ${response.statusCode}, Body: ${response.body}');
+    }
+  }
+
+  /// Secure GET request to fetch goodwill actions for a user
+  Future<List<dynamic>> getUserGoodwillActions(String userId) async {
+    final url = Uri.parse('$_baseUrl/api/users/$userId/goodwill_actions');
+    final headers = await _getAuthHeaders();
+
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as List<dynamic>;
+    } else {
+      throw Exception(
+          'Failed to fetch goodwill actions. Status: ${response.statusCode}, Body: ${response.body}');
+    }
+  }
+
+  /// Secure GET request for voting results
+  Future<Map<String, dynamic>> getVotingResults(String proposalId) async {
+    final url = Uri.parse('$_baseUrl/api/voting/$proposalId/results');
+    final headers = await _getAuthHeaders();
+
+    try {
+      final response = await http.get(url, headers: headers);
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Failed to fetch voting results. '
+          'Status: ${response.statusCode}, Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error fetching voting results: $e');
+    }
+  }
+
+  /// Secure POST request to create a user and wallet after sign-up
+  Future<void> createUserAndWallet({
+    required String username,
+    required String idToken,
+    required String recaptchaToken,
+    required String publicKey,
+    required String encryptedPrivateKey,
+  }) async {
+    final url = Uri.parse('$_baseUrl/api/auth/users/create');
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $idToken',
+    };
+    final body = json.encode({
+      'username': username,
+      'recaptchaToken': recaptchaToken,
+      'publicKey': publicKey,
+      'encryptedPrivateKey': encryptedPrivateKey,
+    });
+
+    final response = await http.post(url, headers: headers, body: body);
+
+    if (response.statusCode != 201) {
+      throw Exception(
+          'Failed to create user and wallet. Status: ${response.statusCode}, Body: ${response.body}');
+    }
+  }
+}
+

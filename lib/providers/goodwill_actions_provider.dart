@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart'; // Needed for ChangeNotifier
 import '../models/goodwill_action.dart';
 import '../service/api_client.dart';
 
@@ -22,13 +21,25 @@ class GoodwillActionsProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _actions = await _apiClient.getUserGoodwillActions(userId);
+      // Call API client with only one arg: userId
+      final rawList = await _apiClient.getUserGoodwillActions(userId: userId);
+      // You may want to parse these into GoodwillAction objects here:
+      _actions = rawList.map((json) => GoodwillAction.fromJson(json)).toList();
     } catch (e) {
       _error = 'Failed to fetch goodwill actions: $e';
-      _actions = []; // FIX: Clear the list on error
+      _actions = [];
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
+
+  Future<void> submitGoodwill(Map<String, idToken: dynamic> actionToSend) async {
+    try {
+      await _apiClient.submitGoodwill(actionToSend);
+    } catch (e) {
+      throw Exception('Failed to submit goodwill action: $e');
+    }
+  }
 }
+

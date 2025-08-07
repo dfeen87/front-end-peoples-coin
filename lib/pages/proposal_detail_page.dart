@@ -44,10 +44,18 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
     super.dispose();
   }
 
-  void _onVotePressed(String voteValue) {
+  void _onVotePressed(String voteValue) async {
     final proposal = context.read<ProposalProvider>().selectedProposal;
-    final userId = context.read<MyAppAuthProvider.AuthProvider>().user?.uid;
-    if (proposal == null || userId == null) return;
+    final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
+    final userId = authProvider.user?.uid;
+    final idToken = await authProvider.user?.getIdToken();
+
+    if (proposal == null || userId == null || idToken == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: User not authenticated or proposal not loaded.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
 
     showDialog(
       context: context,
@@ -73,7 +81,7 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
                   voterUserId: userId,
                   voteValue: voteValue,
                 );
-                final result = await context.read<ProposalProvider>().submitVote(vote);
+                final result = await context.read<ProposalProvider>().submitVote(vote: vote, idToken: idToken);
                 if (result['success'] == true && mounted) {
                   _showVoteSuccessDialog();
                 }

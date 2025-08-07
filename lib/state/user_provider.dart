@@ -1,99 +1,107 @@
-// lib/state/user_provider.dart
-
-import 'package:flutter/foundation.dart'; // For kDebugMode and ChangeNotifier
-import '../models/user_account.dart';    // Your UserAccount model
-import '../service/api_client.dart';       // Your ApiClient to fetch data
-import '../models/goodwill_action.dart'; // Your GoodwillAction model
+// lib/providers/user_provider.dart
+import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/user_account.dart';
+import '../service/api_client.dart';
+import '../models/goodwill_action.dart';
 
 class UserProvider with ChangeNotifier {
-  final PeoplesCoinApiClient _apiClient; // Dependency: Your API client
+  final PeoplesCoinApiClient _apiClient;
 
-  // --- User Account State ---
-  UserAccount? _currentUser; // This stores the current user's data
+  UserAccount? _currentUser;
   bool _isLoading = false;
   String? _error;
 
-  // --- User's Goodwill Actions (Portfolio) State ---
   List<GoodwillAction> _userActions = [];
   bool _isFetchingActions = false;
   String? _actionsError;
 
-  // --- Getters for User Account ---
-  // This getter is what all pages should use to access the current user
-  UserAccount? get currentUser => _currentUser; // <-- This is the getter to use
+  UserAccount? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   bool get hasError => _error != null;
   String? get error => _error;
 
-  // --- Getters for User Portfolio ---
   List<GoodwillAction> get userActions => _userActions;
   bool get isFetchingActions => _isFetchingActions;
   bool get hasActionsError => _actionsError != null;
   String? get actionsError => _actionsError;
 
-  // Constructor: Requires an instance of PeoplesCoinApiClient
   UserProvider(this._apiClient);
 
-  /// Sets the current user account and notifies listeners.
-  /// This is typically called after a successful login or user data refresh.
+  /// Always gets a fresh Firebase ID token
+  Future<String> _getIdToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('User is not signed in.');
+    final token = await user.getIdToken();
+    if (token.isEmpty) throw Exception('Failed to get Firebase ID token.');
+    return token;
+  }
+
   void setCurrentUser(UserAccount? user) {
     _currentUser = user;
     notifyListeners();
   }
 
-  /// Clears the current user account, effectively logging out the user.
   void clearUser() {
     _currentUser = null;
     notifyListeners();
   }
 
-  /// Fetch user account info from the backend API.
-  /// Replaces the mock data with an actual API call.
-  Future<void> fetchUser(String userId) async {
+  /// Fetch authenticated user profile securely
+  Future<void> fetchUser() async {
     _isLoading = true;
-    _error = null; // Clear previous errors
+    _error = null;
     notifyListeners();
 
     try {
-      _currentUser = await _apiClient.getUserById(userId);
-      if (kDebugMode) print('[UserProvider] Fetched user: ${_currentUser?.username}');
+      final idToken = await _getIdToken();
+      _currentUser = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
+      if (kDebugMode) {
+        print('[UserProvider] Fetched user: ${_currentUser?.username}');
+      }
     } catch (e) {
       _error = "Failed to fetch user data: $e";
-      _currentUser = null; // Clear the user if fetching fails
-      if (kDebugMode) print('[UserProvider] Error fetching user: $e');
+      _currentUser = null;
+      if (kDebugMode) {
+        print('[UserProvider] Error fetching user: $e');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Fetch user's goodwill actions portfolio from backend
+  /// Fetch authenticated user's goodwill actions securely
   Future<void> fetchUserActions(String userId) async {
     _isFetchingActions = true;
     _actionsError = null;
     notifyListeners();
 
     try {
-      _userActions = await _apiClient.getUserGoodwillActions(userId);
-      if (kDebugMode) print('[UserProvider] Fetched ${_userActions.length} user actions.');
+      final idToken = await _getIdToken();
+      _userActions = await _apiClient.getUserGoodwillActions(userId: userId, idToken: idToken);
+      if (kDebugMode) {
+        print('[UserProvider] Fetched ${_userActions.length} user actions.');
+      }
     } catch (e) {
       _actionsError = "Failed to fetch your Bright Acts: $e";
-      if (kDebugMode) print('[UserProvider] Error fetching user actions: $e');
+      if (kDebugMode) {
+        print('[UserProvider] Error fetching user actions: $e');
+      }
     } finally {
       _isFetchingActions = false;
       notifyListeners();
     }
   }
 
-  /// Clears current user-related error state
   void clearError() {
     _error = null;
     notifyListeners();
   }
 
-  /// Clears current actions-related error state
   void clearActionsError() {
     _actionsError = null;
     notifyListeners();
   }
 }
+

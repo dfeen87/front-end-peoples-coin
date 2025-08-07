@@ -1,3 +1,5 @@
+// lib/state/auth_provider.dart
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
@@ -37,15 +39,22 @@ class AuthProvider with ChangeNotifier {
   Future<void> _onAuthStateChanged(fb_auth.User? firebaseUser) async {
     // If the user object is the same, no need to do anything.
     if (firebaseUser?.uid == _user?.uid && !_isInitializing) return;
-    
+
     _user = firebaseUser;
 
     if (firebaseUser != null) {
-      // If a user is logged in, always fetch their associated backend profile.
+      // If a user is logged in, get their ID token and fetch their profile.
       try {
-        _userAccount = await _apiClient.getUserById(firebaseUser.uid);
+        final idToken = await firebaseUser.getIdToken();
+        if (idToken != null) {
+          _userAccount = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
+        } else {
+          // If ID token is null, we can't authenticate with backend
+          _userAccount = null;
+          _user = null;
+        }
       } catch (e) {
-        print('Error fetching user account: $e');
+        if (kDebugMode) print('Error fetching user account: $e');
         // If the backend profile is missing, we treat it as a failed login.
         _userAccount = null;
         _user = null; // Force sign out.
@@ -59,7 +68,7 @@ class AuthProvider with ChangeNotifier {
     if (_isInitializing) {
       _isInitializing = false;
     }
-    
+
     // Ensure loading indicators from sign-in/sign-up are turned off.
     _isLoading = false;
 
@@ -107,9 +116,10 @@ class AuthProvider with ChangeNotifier {
 
     _user = UserMock(email: email);
     try {
-      _userAccount = await _apiClient.getUserById(_user!.uid);
+      // Pass a mock ID token for the backend call
+      _userAccount = await _apiClient.getAuthenticatedUserProfile(idToken: 'mock_id_token');
     } catch (e) {
-      print('Error fetching mock user account: $e');
+      if (kDebugMode) print('Error fetching mock user account: $e');
       _userAccount = null;
       _user = null; // Failed to get profile, so fail the login.
     }

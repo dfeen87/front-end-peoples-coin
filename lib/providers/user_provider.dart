@@ -1,52 +1,120 @@
-import 'package:flutter/foundation.dart'; // For kDebugMode and ChangeNotifier
+// lib/providers/user_provider.dart
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_account.dart';
+import '../models/goodwill_action.dart';
 import '../service/api_client.dart';
 
+/// Manages user profile data and goodwill actions, including loading states and error handling.
 class UserProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
 
+  // --- State for current user ---
   UserAccount? _currentUser;
-  bool _isLoading = false;
-  String? _error;
+  bool _isLoadingUser = false;
+  String? _userError;
 
-  UserAccount? get currentUser => _currentUser;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
+  // --- State for goodwill actions ---
+  List<GoodwillAction> _userActions = [];
+  bool _isLoadingActions = false;
+  String? _actionsError;
 
   UserProvider(this._apiClient);
 
+  // --- Getters ---
+  UserAccount? get currentUser => _currentUser;
+  bool get isLoadingUser => _isLoadingUser;
+  String? get userError => _userError;
+
+  List<GoodwillAction> get userActions => _userActions;
+  bool get isLoadingActions => _isLoadingActions;
+  String? get actionsError => _actionsError;
+
+  /// Combined loading state (true if either user data or goodwill actions are loading).
+  bool get isLoading => _isLoadingUser || _isLoadingActions;
+
+  /// Maps known exceptions to user-friendly error messages.
+  String _mapErrorToMessage(Object error) {
+    if (error is TimeoutException) {
+      return "Request timed out. Please try again.";
+    }
+    // Extend with other error mappings as needed.
+    return error.toString();
+  }
+
+  /// Fetches a fresh Firebase ID token safely with a timeout.
+  Future<String> _getIdToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('User is not signed in.');
+
+    final token = await user.getIdToken().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw TimeoutException('ID token fetch timed out'),
+    );
+
+    if (token.isEmpty) {
+      throw Exception('Failed to get Firebase ID token.');
+    }
+
+    return token;
+  }
+
+  /// Fetches user account details securely from the API.
   Future<void> fetchUser(String userId) async {
-    _isLoading = true;
-    _error = null;
+    _isLoadingUser = true;
+    _userError = null;
     notifyListeners();
 
     try {
-      // Replace this with real API call when ready
-      await Future.delayed(const Duration(seconds: 1));
-      _currentUser = UserAccount(
-        id: userId,
-        firebaseUid: 'firebase_123',
-        balance: 1234.56,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        email: 'user@brightacts.com',
-        username: 'GoodSamaritan',
-      );
+      final idToken = await _getIdToken();
+      _currentUser = await _apiClient.getUserAccount(userId, idToken);
+      if (kDebugMode) {
+        print('[UserProvider] Loaded user: ${_currentUser?.username}');
+      }
     } catch (e) {
-      _error = "Failed to fetch user data: $e";
-      _currentUser = null; // FIX: Clear the user if fetching fails
+      _userError = _mapErrorToMessage(e);
+      _currentUser = null;
+      if (kDebugMode) {
+        print('[UserProvider] Error fetching user: $e');
+      }
     } finally {
-      _isLoading = false;
+      _isLoadingUser = false;
       notifyListeners();
     }
   }
 
-  // TODO: Your `MyPortfolioPage` and other pages rely on a `fetchUserActions` method.
-  // This method is missing from this file and needs to be re-added.
-  // Example of what it might look like:
-  /*
+  /// Fetches goodwill actions for the specified user securely from the API.
   Future<void> fetchUserActions(String userId) async {
-    // ...
+    _isLoadingActions = true;
+    _actionsError = null;
+    notifyListeners();
+
+    try {
+      final idToken = await _getIdToken();
+      _userActions = await _apiClient.getUserGoodwillActions(userId: userId, idToken: idToken);
+      if (kDebugMode) {
+        print('[UserProvider] Loaded ${_userActions.length} goodwill actions');
+      }
+    } catch (e) {
+      _actionsError = _mapErrorToMessage(e);
+      _userActions = [];
+      if (kDebugMode) {
+        print('[UserProvider] Error fetching goodwill actions: $e');
+      }
+    } finally {
+      _isLoadingActions = false;
+      notifyListeners();
+    }
   }
-  */
+
+  /// Clears all stored user-related data (typically called on logout).
+  void clearUserData() {
+    _currentUser = null;
+    _userActions = [];
+    _userError = null;
+    _actionsError = null;
+    notifyListeners();
+  }
 }
+

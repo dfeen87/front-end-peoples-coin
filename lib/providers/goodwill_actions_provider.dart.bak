@@ -1,0 +1,45 @@
+import 'package:flutter/foundation.dart';
+import '../models/goodwill_action.dart';
+import '../service/api_client.dart';
+
+class GoodwillActionsProvider with ChangeNotifier {
+  final PeoplesCoinApiClient _apiClient;
+
+  List<GoodwillAction> _actions = [];
+  bool _isLoading = false;
+  String? _error;
+
+  List<GoodwillAction> get actions => _actions;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+
+  GoodwillActionsProvider(this._apiClient);
+
+  Future<void> fetchUserActions(String userId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // Call API client with only one arg: userId
+      final rawList = await _apiClient.getUserGoodwillActions(userId);
+      // You may want to parse these into GoodwillAction objects here:
+      _actions = rawList.map((json) => GoodwillAction.fromJson(json)).toList();
+    } catch (e) {
+      _error = 'Failed to fetch goodwill actions: $e';
+      _actions = [];
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> submitGoodwill(Map<String, dynamic> actionToSend) async {
+    try {
+      await _apiClient.submitGoodwill(actionToSend);
+    } catch (e) {
+      throw Exception('Failed to submit goodwill action: $e');
+    }
+  }
+}
+

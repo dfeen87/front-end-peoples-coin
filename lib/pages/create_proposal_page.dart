@@ -1,11 +1,12 @@
+// lib/pages/create_proposal_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui';
-
 import '../state/proposal_provider.dart';
 import '../models/proposal_to_send.dart';
 import '../state/user_provider.dart';
+import '../state/auth_provider.dart' as MyAppAuthProvider; // Added AuthProvider import
 
 typedef ProposalFormCompletedCallback = void Function();
 
@@ -27,7 +28,7 @@ class CreateProposalPageContent extends StatefulWidget {
 
 class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
   final _formKey = GlobalKey<FormState>();
-  
+
   int _currentStep = 0;
   String _title = '';
   String _description = '';
@@ -71,14 +72,19 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
-      final currentUser = context.read<UserProvider>().currentUser;
-      if (currentUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: User not logged in.')));
+      final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
+      final currentUser = authProvider.user;
+      final idToken = await currentUser?.getIdToken();
+
+      if (currentUser == null || idToken == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: User not logged in or token expired.')));
+        }
         return;
       }
 
       final proposalToSend = ProposalToSend(
-        proposerUserId: currentUser.id,
+        proposerUserId: currentUser.uid,
         title: _title,
         description: _description,
         proposalType: _proposalType,
@@ -86,7 +92,7 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
         voteEndTime: _voteEndDate,
       );
 
-      final result = await context.read<ProposalProvider>().createProposal(proposalToSend);
+      final result = await context.read<ProposalProvider>().createProposal(proposal: proposalToSend, idToken: idToken);
 
       if (result['success'] && mounted) {
         _showSuccessAndExit();
