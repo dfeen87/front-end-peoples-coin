@@ -9,7 +9,7 @@ class ProposalToSend {
   final String description;
   final String proposalType;
   final Map<String, dynamic>? details;
-  final DateTime? voteEndTime; // Added: Field for vote end time
+  final DateTime? voteEndTime; // Optional vote end time
 
   const ProposalToSend({
     required this.proposerUserId,
@@ -17,7 +17,7 @@ class ProposalToSend {
     required this.description,
     required this.proposalType,
     this.details,
-    this.voteEndTime, // Added: Named parameter for vote end time
+    this.voteEndTime,
   });
 
   /// Converts this object into a JSON map for the API request body.
@@ -28,7 +28,8 @@ class ProposalToSend {
       'description': description,
       'proposal_type': proposalType,
       'details': details ?? {},
-      'vote_end_time': voteEndTime?.toIso8601String(), // Added: Convert DateTime to ISO 8601 string for API
+      'vote_end_time': voteEndTime?.toIso8601String(),
     };
   }
 }
+

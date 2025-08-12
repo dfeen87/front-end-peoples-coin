@@ -1,9 +1,13 @@
-// lib/pages/views/send_loves_view.dart
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../state/ledger_provider.dart';
+import '../../state/user_provider.dart';
 
 class SendLovesView extends StatefulWidget {
-  const SendLovesView({super.key});
+  final VoidCallback? onSendComplete;
+
+  const SendLovesView({super.key, this.onSendComplete});
 
   @override
   State<SendLovesView> createState() => _SendLovesViewState();
@@ -21,42 +25,74 @@ class _SendLovesViewState extends State<SendLovesView> {
     super.dispose();
   }
 
-  void _submitSend() {
-    if (_formKey.currentState!.validate()) {
-      // Show a confirmation dialog before sending
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Confirm Transaction'),
-          content: Text(
-              'Are you sure you want to send ${_amountController.text} Loves to ${_addressController.text}?'),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(ctx).pop(),
-            ),
-            FilledButton(
-              child: const Text('Confirm & Send'),
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                // TODO: Replace this with a real API call
-                // For now, we simulate a success message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Transaction submitted successfully! (Simulated)')),
-                );
-                _addressController.clear();
-                _amountController.clear();
-              },
-            ),
-          ],
+  Future<void> _submitSend() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Transaction'),
+        content: Text(
+          'Are you sure you want to send ${_amountController.text} Loves to ${_addressController.text}?',
         ),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+          ),
+          FilledButton(
+            child: const Text('Confirm & Send'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final userProvider = context.read<UserProvider>();
+    final currentWallet = userProvider.currentUser?.walletId;
+
+    if (currentWallet == null || currentWallet.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to send Loves.')),
+      );
+      return;
+    }
+
+    final recipient = _addressController.text.trim();
+    final amount = int.tryParse(_amountController.text.trim()) ?? 0;
+
+    try {
+      await context.read<LedgerProvider>().sendLoves(
+            senderWallet: currentWallet,
+            recipientWallet: recipient,
+            amount: amount,
+            memo: null,
+          );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Successfully sent $amount Loves!')),
+      );
+
+      _addressController.clear();
+      _amountController.clear();
+
+      // Notify parent to refresh balance
+      widget.onSendComplete?.call();
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send Loves: $e')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final userBalanceStr = context.watch<UserProvider>().currentUser?.balance ?? '0';
+    final userBalance = double.tryParse(userBalanceStr) ?? 0;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
       child: Form(
@@ -76,7 +112,6 @@ class _SendLovesViewState extends State<SendLovesView> {
                 if (value == null || value.isEmpty) {
                   return 'Please enter a recipient address.';
                 }
-                // TODO: Add more robust address validation
                 if (value.length < 10) {
                   return 'Please enter a valid address.';
                 }
@@ -98,10 +133,13 @@ class _SendLovesViewState extends State<SendLovesView> {
                 if (value == null || value.isEmpty) {
                   return 'Please enter an amount.';
                 }
-                if (double.tryParse(value) == null || double.parse(value) <= 0) {
+                final amount = double.tryParse(value);
+                if (amount == null || amount <= 0) {
                   return 'Please enter a valid amount greater than zero.';
                 }
-                // TODO: Add a check against the user's current balance
+                if (amount > userBalance) {
+                  return 'Insufficient balance.';
+                }
                 return null;
               },
             ),
@@ -125,3 +163,4 @@ class _SendLovesViewState extends State<SendLovesView> {
     );
   }
 }
+

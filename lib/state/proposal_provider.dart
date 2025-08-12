@@ -34,13 +34,13 @@ class ProposalProvider with ChangeNotifier {
 
   ProposalProvider(this._apiClient);
 
-  Future<void> fetchProposals({String? status}) async {
+  Future<void> fetchProposals({String? status, required String idToken}) async {
     _isFetchingProposals = true;
     _proposalsError = null;
     notifyListeners();
 
     try {
-      _proposals = await _apiClient.listProposals(status: status: status, idToken: idToken);
+      _proposals = await _apiClient.listProposals(status: status, idToken: idToken);
       if (kDebugMode) print('[ProposalProvider] Fetched ${_proposals.length} proposals.');
     } catch (e) {
       _proposalsError = 'Failed to fetch proposals: $e';
@@ -52,13 +52,16 @@ class ProposalProvider with ChangeNotifier {
     }
   }
 
-  Future<void> fetchProposalDetails(String proposalId) async {
+  Future<void> fetchProposalDetails(String proposalId, {required String idToken}) async {
     _isFetchingDetails = true;
     _detailsError = null;
     notifyListeners();
 
     try {
-      _selectedProposal = await _apiClient.getProposalDetails(proposalId: proposalId, idToken: idToken);
+      _selectedProposal = await _apiClient.getProposalDetails(
+        proposalId: proposalId,
+        idToken: idToken,
+      );
       if (kDebugMode) print('[ProposalProvider] Fetched details for proposal: $proposalId.');
     } catch (e) {
       _detailsError = 'Failed to fetch proposal details: $e';
@@ -70,12 +73,16 @@ class ProposalProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> createProposal(proposal: ProposalToSend proposal, idToken: String idToken) async {
+  Future<Map<String, dynamic>> createProposal(
+      {required ProposalToSend proposal, required String idToken}) async {
     _isCreatingProposal = true;
     notifyListeners();
 
     try {
-      final response = await _apiClient.createProposal(proposal: proposal, idToken: idToken);
+      final response = await _apiClient.createProposal(
+        proposal: proposal,
+        idToken: idToken,
+      );
       if (kDebugMode) print('[ProposalProvider] Proposal created successfully.');
       return {'success': true, 'data': response};
     } catch (e) {
@@ -87,16 +94,21 @@ class ProposalProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> submitVote(vote: VoteToSend vote, idToken: String idToken) async {
+  Future<Map<String, dynamic>> submitVote(
+      {required VoteToSend vote, required String idToken}) async {
     _isSubmittingVote = true;
     notifyListeners();
 
     try {
-      final response = await _apiClient.submitVote(vote: vote, idToken: idToken);
+      final response = await _apiClient.submitVote(
+        vote: vote,
+        idToken: idToken,
+      );
       if (kDebugMode) print('[ProposalProvider] Vote submitted successfully.');
 
       if (_selectedProposal != null) {
-        await fetchProposalDetails(_selectedProposal!.id);
+        // You were missing the idToken here.
+        await fetchProposalDetails(_selectedProposal!.id, idToken: idToken);
       }
       return {'success': true, 'data': response};
     } catch (e) {
@@ -108,4 +120,3 @@ class ProposalProvider with ChangeNotifier {
     }
   }
 }
-

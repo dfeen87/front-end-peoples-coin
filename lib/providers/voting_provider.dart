@@ -12,7 +12,7 @@ class VotingProvider with ChangeNotifier {
 
   VotingProvider(this._apiService);
 
-  // Expose unmodifiable views to prevent outside mutation
+  // Expose unmodifiable views to prevent external mutation
   Map<String, int> get forVotes => Map.unmodifiable(_forVotes);
   Map<String, int> get againstVotes => Map.unmodifiable(_againstVotes);
 
@@ -29,12 +29,10 @@ class VotingProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Pass the idToken for authenticated calls
       final results = await _apiService.getVotingResults(proposalId, idToken);
 
-      // Defensive programming: validate and parse returned data
-      _forVotes[proposalId] = (results['forVotes'] is int) ? results['forVotes'] : 0;
-      _againstVotes[proposalId] = (results['againstVotes'] is int) ? results['againstVotes'] : 0;
+      _forVotes[proposalId] = (results['forVotes'] is int) ? results['forVotes'] as int : 0;
+      _againstVotes[proposalId] = (results['againstVotes'] is int) ? results['againstVotes'] as int : 0;
     } catch (e, stacktrace) {
       _error = 'Failed to fetch voting results';
       if (kDebugMode) {

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>reCAPTCHA</title>
+    <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>
+    <script>
+        // This function is called when the API script is loaded and ready
+        function onRecaptchaLoad() {
+            grecaptcha.render('recaptcha-container', {
+                // 2. Your site key is placed here
+                'sitekey': '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F',
+                'callback': onSuccess,
+                'expired-callback': onExpired
+            });
+            // Tell Flutter that the widget is ready to be shown
+            RecaptchaChannel.postMessage('ready');
+        }
+
+        // This function is called when the user successfully completes the challenge
+        function onSuccess(token) {
+            // Send the token back to your Flutter app
+            RecaptchaChannel.postMessage(token);
+        }
+
+        // This function is called if the reCAPTCHA response expires
+        function onExpired() {
+            // Optionally, tell Flutter the token has expired
+            RecaptchaChannel.postMessage('expired');
+        }
+    </script>
+</head>
+<body>
+    <div id="recaptcha-container"></div>
+</body>
+</html>

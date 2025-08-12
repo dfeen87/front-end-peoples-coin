@@ -1,4 +1,5 @@
-// lib/providers/ledger_provider.dart
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/public_ledger_entry.dart';
@@ -15,13 +16,21 @@ class LedgerProvider with ChangeNotifier {
   bool _isFetchingMore = false;
   String? _errorMessage;
 
+  Timer? _pollingTimer;
+
   // --- Getters ---
   List<PublicLedgerEntry> get publicLedgerEntries => _publicLedgerEntries;
   bool get isInitialLoading => _isInitialLoading;
   bool get isFetchingMore => _isFetchingMore;
   String? get errorMessage => _errorMessage;
 
-  LedgerProvider(this._apiClient);
+  LedgerProvider(this._apiClient) {
+    // Load ledger on creation
+    fetchPublicLedgerEntries(isRefresh: true);
+
+    // Start polling backend for goodwill status changes
+    _startPollingGoodwillStatus();
+  }
 
   /// Helper to get ID token for secure API calls
   Future<String> _getIdToken() async {
@@ -55,9 +64,11 @@ class LedgerProvider with ChangeNotifier {
     try {
       final token = await _getIdToken();
 
-      final newEntries = (_currentSearchQuery == null || _currentSearchQuery!.isEmpty)
+      final List<dynamic> rawEntries = (_currentSearchQuery == null || _currentSearchQuery!.isEmpty)
           ? await _apiClient.getLedgerEntries(page: _currentPage, idToken: token)
           : await _apiClient.searchLedger(query: _currentSearchQuery!, idToken: token);
+
+      final newEntries = rawEntries.map((json) => PublicLedgerEntry.fromJson(json)).toList();
 
       if (newEntries.isEmpty) {
         _hasMorePages = false;
@@ -90,31 +101,62 @@ class LedgerProvider with ChangeNotifier {
 
   /// Send loves and refresh ledger
   Future<void> sendLoves({
-    required String senderWalletId,
-    required String recipientWalletId,
+    required String senderWallet,
+    required String recipientWallet,
     required int amount,
     String? memo,
   }) async {
-    notifyListeners(); // Trigger UI loading if you have a sending state
-
     try {
       final token = await _getIdToken();
 
       await _apiClient.sendLoves(
-        senderWalletId: senderWalletId,
-        recipientWalletId: recipientWalletId,
-        amount: amount,
-        memo: memo,
-        idToken: token, // Always pass token now
+        sendLovesData: {
+          'senderWalletId': senderWallet,
+          'recipientWalletId': recipientWallet,
+          'amount': amount,
+          'memo': memo,
+        },
+        idToken: token,
       );
 
-      // Refresh ledger after sending
       await fetchPublicLedgerEntries(isRefresh: true);
     } catch (e) {
       _errorMessage = 'Failed to send loves: $e';
       if (kDebugMode) print('Error sending loves: $e');
       notifyListeners();
+      rethrow;
     }
+  }
+
+  /// Poll backend every 30 seconds to check for goodwill status updates
+  void _startPollingGoodwillStatus() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+      try {
+        final token = await _getIdToken();
+
+        // Implement your API call to check if any goodwill actions changed status
+        // For example, you could fetch latest goodwill actions or a dedicated endpoint
+        // Here, just fetch ledger entries as a simple proxy to detect changes:
+        final entries = await _apiClient.getLedgerEntries(page: 1, idToken: token);
+
+        if (entries.isNotEmpty) {
+          if (kDebugMode) {
+            print('Polling: Goodwill status may have changed, refreshing ledger...');
+          }
+          await fetchPublicLedgerEntries(isRefresh: true);
+        }
+      } catch (e) {
+        if (kDebugMode) print('Polling error: $e');
+      }
+    });
+  }
+
+  /// Clean up timer when provider disposed
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
   }
 }
 

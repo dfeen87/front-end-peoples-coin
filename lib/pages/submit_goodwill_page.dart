@@ -1,16 +1,11 @@
-// lib/pages/submit_goodwill_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:math';
-import 'dart:ui';
-import 'package:flutter/services.dart';
 
 import '../state/goodwill_processing_provider.dart';
 import '../state/user_provider.dart';
-import '../models/goodwill_action_to_send.dart';
-import '../state/auth_provider.dart' as MyAppAuthProvider;
+import '../service/backend_status_service.dart';
 
-// --- Predefined act types with icons for UI clarity ---
 const Map<String, IconData> _actTypes = {
   'Mentorship': Icons.school_outlined,
   'Volunteering': Icons.volunteer_activism_outlined,
@@ -29,11 +24,10 @@ class SubmitGoodwillPage extends StatefulWidget {
   State<SubmitGoodwillPage> createState() => _SubmitGoodwillPageState();
 }
 
-class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProviderStateMixin {
+class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProviderStateMixin, SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
   int _currentStep = 0;
-
   String _actionType = '';
   String _description = '';
   String _impactLevel = 'Medium';
@@ -41,20 +35,21 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
   int _lovesValue = 25;
   int _durationMinutes = 0;
 
-  late final AnimationController _confettiController;
+  late final AnimationController _celebrationController;
+
+  late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _confettiController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    );
+    _celebrationController = AnimationController(vsync: this, duration: const Duration(seconds: 4));
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
-    _confettiController.dispose();
+    _celebrationController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -80,60 +75,17 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     final overlay = Overlay.of(context);
     if (overlay == null) return;
 
-    final overlayEntry = OverlayEntry(builder: (context) => ConfettiOverlay(controller: _confettiController));
-    overlay.insert(overlayEntry);
-    _confettiController.forward(from: 0.0);
+    final overlayEntry = OverlayEntry(
+      builder: (_) => CyclingCelebrationOverlay(controller: _celebrationController),
+    );
 
-    Future.delayed(const Duration(seconds: 3), () {
+    overlay.insert(overlayEntry);
+    _celebrationController.forward(from: 0.0);
+
+    Future.delayed(const Duration(seconds: 4), () {
       overlayEntry.remove();
       if (mounted) Navigator.of(context).pop();
     });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black.withOpacity(0.5),
-      appBar: AppBar(
-        title: const Text('Record a Bright Act'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: const SizedBox.shrink(),
-        actions: [
-          IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
-        ],
-      ),
-      body: Consumer<GoodwillProcessingProvider>(
-        builder: (context, provider, _) {
-          final currentUser = context.watch<UserProvider>().currentUser;
-          if (currentUser == null) {
-            return const Center(child: Text("User not logged in or data not loaded.", style: TextStyle(color: Colors.white70)));
-          }
-
-          return Theme(
-            data: Theme.of(context).copyWith(
-              canvasColor: Colors.black.withOpacity(0.3),
-              colorScheme: ColorScheme.dark(
-                primary: Colors.amber[700]!,
-                onPrimary: Colors.black,
-              ),
-            ),
-            child: Stepper(
-              type: StepperType.horizontal,
-              physics: const ClampingScrollPhysics(),
-              currentStep: _currentStep,
-              onStepTapped: (step) => setState(() => _currentStep = step),
-              onStepContinue: _handleStepContinue(provider),
-              onStepCancel: () {
-                if (_currentStep > 0) setState(() => _currentStep -= 1);
-              },
-              controlsBuilder: _buildControls,
-              steps: _buildSteps(),
-            ),
-          );
-        },
-      ),
-    );
   }
 
   bool _validateAndSaveStep(int step) {
@@ -166,24 +118,56 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     }
   }
 
+  Future<void> _submitForm(GoodwillProcessingProvider provider) async {
+    final currentUser = context.read<UserProvider>().currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error: User not found."), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    final success = await provider.submitGoodwill(
+      performerUserId: currentUser.id!,
+      actionType: _actionType,
+      description: _description.trim(),
+      lovesValue: _lovesValue,
+      contextualData: {
+        'duration_minutes': _durationMinutes,
+        'impact_level': _impactLevel,
+      },
+    );
+
+    if (success && mounted) {
+      _showSuccessOverlay();
+
+      // Optionally: reset form and stepper
+      setState(() {
+        _currentStep = 0;
+        _actionType = '';
+        _description = '';
+        _impactLevel = 'Medium';
+        _durationMinutes = 0;
+        _lovesValue = 25;
+      });
+
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit act: ${provider.error}')),
+      );
+    }
+  }
+
   VoidCallback _handleStepContinue(GoodwillProcessingProvider provider) {
-    return () async { // Made this function async
+    return () async {
       final isStepValid = _validateAndSaveStep(_currentStep);
       if (!isStepValid) return;
 
       if (_currentStep < 4) {
         setState(() => _currentStep += 1);
       } else {
-        // Retrieve the idToken before submitting the form
-        final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-        final idToken = await authProvider.user?.getIdToken();
-        if (idToken == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User not authenticated. Please log in again.'), backgroundColor: Colors.redAccent),
-          );
-          return;
-        }
-        _submitForm(provider, idToken);
+        await _submitForm(provider);
       }
     };
   }
@@ -250,104 +234,59 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     ];
   }
 
+  // --- Step Content Widgets ---
+
   Widget _buildStep1ChooseAct() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "What kind of Bright Act did you perform?",
-          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _actTypes.entries.map((entry) {
-            final selected = _actionType == entry.key;
-            return ChoiceChip(
-              label: Text(entry.key),
-              avatar: Icon(entry.value, color: selected ? Colors.black : Colors.white70),
-              selected: selected,
-              onSelected: (isSelected) {
-                if (isSelected) {
-                  setState(() => _actionType = entry.key);
-                }
-              },
-              selectedColor: Colors.amber[700],
-              backgroundColor: Colors.white.withOpacity(0.1),
-              labelStyle: TextStyle(color: selected ? Colors.black : Colors.white),
-            );
-          }).toList(),
-        ),
-      ],
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _actTypes.entries.map((entry) {
+        final selected = _actionType == entry.key;
+        return ChoiceChip(
+          label: Text(entry.key),
+          avatar: Icon(entry.value, color: selected ? Colors.white : Colors.black54),
+          selected: selected,
+          onSelected: (v) {
+            setState(() => _actionType = v ? entry.key : '');
+          },
+          selectedColor: Colors.amber[700],
+          backgroundColor: Colors.grey[800],
+          labelStyle: TextStyle(color: selected ? Colors.white : Colors.black87),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildStep2Describe() {
     return Form(
       key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Tell us the story.",
-            style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            initialValue: _description,
-            maxLines: 5,
-            decoration: InputDecoration(
-              hintText: 'Describe the act of goodwill...',
-              hintStyle: const TextStyle(color: Colors.white54),
-              filled: true,
-              fillColor: Colors.white.withOpacity(0.1),
-              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide.none),
-            ),
-            style: const TextStyle(color: Colors.white),
-            validator: (val) => val == null || val.trim().isEmpty ? 'Please describe the act.' : null,
-            onChanged: (val) {
-              _description = val;
-              _updateLovesScore();
-            },
-            onSaved: (val) => _description = val ?? '',
-          ),
-        ],
+      child: TextFormField(
+        initialValue: _description,
+        maxLines: 5,
+        decoration: const InputDecoration(
+          hintText: 'Describe your act of goodwill...',
+          filled: true,
+          fillColor: Colors.white12,
+          border: OutlineInputBorder(),
+        ),
+        validator: (val) => val == null || val.trim().isEmpty ? 'Description cannot be empty' : null,
+        onSaved: (val) => _description = val ?? '',
       ),
     );
   }
 
   Widget _buildStep3LovesSlider() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "How much love did this generate?",
-          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.favorite, color: Colors.redAccent.withOpacity(0.5 + (_lovesValue / 200)), size: 24 + (_lovesValue / 2)),
-            const SizedBox(width: 16),
-            Text(
-              '$_lovesValue Loves',
-              style: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
+        Text('Assign a Loves Value: $_lovesValue', style: const TextStyle(color: Colors.white)),
         Slider(
-          value: _lovesValue.toDouble(),
           min: 1,
           max: 100,
           divisions: 99,
-          label: _lovesValue.toString(),
-          onChanged: (val) {
-            setState(() => _lovesValue = val.round());
-          },
-          activeColor: Colors.redAccent,
-          inactiveColor: Colors.redAccent.withOpacity(0.3),
+          value: _lovesValue.toDouble(),
+          onChanged: (val) => setState(() => _lovesValue = val.toInt()),
+          activeColor: Colors.amber,
+          inactiveColor: Colors.amber[200],
         ),
       ],
     );
@@ -357,59 +296,35 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Duration and Impact",
-          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          key: const ValueKey('duration'),
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Duration (minutes)',
-            hintText: 'How long did this act last?',
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
-            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-          ),
-          style: const TextStyle(color: Colors.white),
-          onChanged: (val) {
-            final parsed = int.tryParse(val);
-            if (parsed != null) {
-              setState(() {
-                _durationMinutes = parsed;
-                _updateLovesScore();
-              });
-            }
-          },
-          onSaved: (val) {
-            _durationMinutes = int.tryParse(val ?? '') ?? 0;
-          },
-        ),
-        const SizedBox(height: 24),
         DropdownButtonFormField<String>(
-          decoration: InputDecoration(
+          value: _impactLevel,
+          decoration: const InputDecoration(
             labelText: 'Impact Level',
             filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
-            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+            fillColor: Colors.white12,
           ),
-          value: _impactLevel,
-          dropdownColor: Colors.grey[900],
-          style: const TextStyle(color: Colors.white),
           items: ['Low', 'Medium', 'High']
               .map((level) => DropdownMenuItem(value: level, child: Text(level)))
               .toList(),
+          onChanged: (val) => setState(() => _impactLevel = val ?? 'Medium'),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Duration (minutes)',
+            filled: true,
+            fillColor: Colors.white12,
+          ),
           onChanged: (val) {
-            if (val != null) {
-              setState(() {
-                _impactLevel = val;
-                _updateLovesScore();
-              });
-            }
+            final parsed = int.tryParse(val);
+            if (parsed != null) setState(() => _durationMinutes = parsed);
           },
-          onSaved: (val) {
-            if (val != null) _impactLevel = val;
+          validator: (val) {
+            if (val == null || val.isEmpty) return 'Duration required';
+            final parsed = int.tryParse(val);
+            if (parsed == null || parsed <= 0) return 'Enter valid positive minutes';
+            return null;
           },
         ),
       ],
@@ -420,175 +335,183 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Review and Confirm",
-          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        _buildSummaryRow('Type', _actionType),
-        _buildSummaryRow('Description', _description),
-        _buildSummaryRow('Duration', '$_durationMinutes minutes'),
-        _buildSummaryRow('Impact', _impactLevel),
-        _buildSummaryRow('Loves', '$_lovesValue'),
+        Text('Type: $_actionType', style: const TextStyle(color: Colors.white)),
+        const SizedBox(height: 8),
+        Text('Description:', style: const TextStyle(color: Colors.white70)),
+        Text(_description, style: const TextStyle(color: Colors.white)),
+        const SizedBox(height: 8),
+        Text('Loves Value: $_lovesValue', style: const TextStyle(color: Colors.white)),
+        const SizedBox(height: 8),
+        Text('Impact Level: $_impactLevel', style: const TextStyle(color: Colors.white)),
+        const SizedBox(height: 8),
+        Text('Duration: $_durationMinutes minutes', style: const TextStyle(color: Colors.white)),
       ],
     );
   }
 
-  Widget _buildSummaryRow(String label, String value) {
+  // --- New backend status tab ---
+
+  @override
+  Widget build(BuildContext context) {
+    final goodwillProvider = context.watch<GoodwillProcessingProvider>();
+    final backendStatusService = context.watch<BackendStatusService>();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Submit Bright Act'),
+        backgroundColor: Colors.amber[800],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.add_circle_outline), text: 'Submit Act'),
+            Tab(icon: Icon(Icons.cloud_queue), text: 'Submission Status'),
+          ],
+        ),
+      ),
+      backgroundColor: Colors.grey[900],
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Submit Act Form
+          Stepper(
+            currentStep: _currentStep,
+            onStepContinue: _handleStepContinue(goodwillProvider),
+            onStepCancel: _currentStep == 0 ? null : () => setState(() => _currentStep -= 1),
+            controlsBuilder: _buildControls,
+            steps: _buildSteps(),
+            type: StepperType.vertical,
+            physics: const ClampingScrollPhysics(),
+          ),
+
+          // Submission Status Tab
+          _BackendStatusTab(
+            backendStatusService: backendStatusService,
+            goodwillProvider: goodwillProvider,
+          ),
+        ],
+      ),
+      floatingActionButton: goodwillProvider.isProcessingGoodwill
+          ? FloatingActionButton(
+              onPressed: null,
+              backgroundColor: Colors.amber,
+              child: const CircularProgressIndicator(color: Colors.white),
+            )
+          : null,
+    );
+  }
+}
+
+/// Widget to display backend status & pending submissions nicely
+class _BackendStatusTab extends StatelessWidget {
+  final BackendStatusService backendStatusService;
+  final GoodwillProcessingProvider goodwillProvider;
+
+  const _BackendStatusTab({
+    required this.backendStatusService,
+    required this.goodwillProvider,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (backendStatusService.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (backendStatusService.error != null) {
+      return Center(child: Text('Error: ${backendStatusService.error}', style: const TextStyle(color: Colors.redAccent)));
+    }
+
+    final status = backendStatusService.currentStatus;
+    if (status == null) {
+      return const Center(child: Text('No backend status available.'));
+    }
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
+      padding: const EdgeInsets.all(16),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label:',
-            style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 16),
+          Text('Node Version: ${status.nodeVersion}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            children: [
+              _statusChip('Metabolic System', status.metabolicActive),
+              _statusChip('Nervous System', status.nervousActive),
+              _statusChip('Endocrine System', status.endocrineActive),
+              _statusChip('Immune System', status.immuneActive),
+            ],
           ),
-          const SizedBox(width: 8),
+          const Divider(height: 32, color: Colors.white24),
+          const Text('Recent Events:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+            child: ListView.builder(
+              itemCount: status.recentEvents.length,
+              itemBuilder: (context, index) {
+                final event = status.recentEvents[index];
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.bolt, color: Colors.amberAccent),
+                  title: Text(event, style: const TextStyle(color: Colors.white70)),
+                );
+              },
             ),
+          ),
+
+          // Pending goodwill submissions (show from GoodwillProcessingProvider)
+          const Divider(height: 32, color: Colors.white24),
+          const Text('Pending Goodwill Submissions:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
+          Expanded(
+            child: _PendingSubmissionsList(goodwillProvider: goodwillProvider),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _submitForm(GoodwillProcessingProvider provider, String idToken) async {
-    final currentUser = context.read<UserProvider>().currentUser;
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error: User not found."), backgroundColor: Colors.redAccent),
-      );
-      return;
-    }
-
-    final contextualData = {
-      'duration_minutes': _durationMinutes,
-      'impact_level': _impactLevel,
-    };
-
-    final actionToSend = GoodwillActionToSend(
-      performerUserId: currentUser.id!, // Assuming id is not null
-      actionType: _actionType,
-      description: _description.trim(),
-      lovesValue: _lovesValue,
-      contextualData: contextualData,
-      timestamp: DateTime.now(),
+  Widget _statusChip(String label, bool active) {
+    return Chip(
+      label: Text(label),
+      avatar: Icon(
+        active ? Icons.check_circle : Icons.cancel,
+        color: active ? Colors.greenAccent : Colors.redAccent,
+      ),
+      backgroundColor: Colors.grey[800],
+      labelStyle: const TextStyle(color: Colors.white),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     );
-    
-    final success = await provider.submitGoodwill(
-      performerUserId: actionToSend.performerUserId,
-      actionType: actionToSend.actionType,
-      description: actionToSend.description,
-      lovesValue: actionToSend.lovesValue,
-      contextualData: actionToSend.contextualData,
-      idToken: idToken,
-    );
-
-    if (success && mounted) {
-      _showSuccessOverlay();
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit act: ${provider.error}')),
-      );
-    }
   }
 }
 
-// --- Confetti Overlay for celebration effect ---
-class ConfettiOverlay extends StatefulWidget {
-  final AnimationController controller;
-  const ConfettiOverlay({super.key, required this.controller});
+/// A simple list widget showing pending goodwill submissions
+class _PendingSubmissionsList extends StatelessWidget {
+  final GoodwillProcessingProvider goodwillProvider;
 
-  @override
-  State<ConfettiOverlay> createState() => _ConfettiOverlayState();
-}
-
-class _ConfettiOverlayState extends State<ConfettiOverlay> {
-  late final List<_ConfettiParticle> _particles;
-
-  @override
-  void initState() {
-    super.initState();
-    _particles = List.generate(100, (_) => _ConfettiParticle());
-  }
+  const _PendingSubmissionsList({required this.goodwillProvider});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.controller,
-      builder: (context, _) {
-        return IgnorePointer(
-          child: Scaffold(
-            backgroundColor: Colors.black.withOpacity(0.8 * widget.controller.value),
-            body: Stack(
-              children: [
-                ..._particles.map((p) => p.build(context, widget.controller.value)),
-                Center(
-                  child: ScaleTransition(
-                    scale: CurvedAnimation(parent: widget.controller, curve: Curves.elasticOut),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.check_circle, color: Colors.greenAccent, size: 100),
-                        SizedBox(height: 16),
-                        Text(
-                          "Act Recorded!",
-                          style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+    // For this demo, let's assume goodwillProvider has a List<GoodwillAction> pendingSubmissions.
+    // You would need to add this pending queue tracking in your GoodwillProcessingProvider.
+    final pending = goodwillProvider.pendingSubmissions;
+
+    if (pending.isEmpty) {
+      return const Center(child: Text('No pending submissions.', style: TextStyle(color: Colors.white70)));
+    }
+
+    return ListView.separated(
+      itemCount: pending.length,
+      separatorBuilder: (_, __) => const Divider(color: Colors.white24),
+      itemBuilder: (context, index) {
+        final submission = pending[index];
+        return ListTile(
+          leading: const Icon(Icons.hourglass_empty, color: Colors.amber),
+          title: Text(submission.actionType, style: const TextStyle(color: Colors.amber)),
+          subtitle: Text(submission.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70)),
+          trailing: const Text('Pending', style: TextStyle(color: Colors.amberAccent)),
         );
       },
     );
   }
 }
 
-class _ConfettiParticle {
-  final Color color;
-  final double startX, startY, endY, rotation, scale;
-  final Duration delay;
-
-  _ConfettiParticle()
-      : color = Colors.primaries[Random().nextInt(Colors.primaries.length)].withOpacity(0.8),
-        startX = Random().nextDouble() * 2 - 1,
-        startY = -1.1 - (Random().nextDouble() * 0.5),
-        endY = 1.1,
-        rotation = Random().nextDouble() * 360,
-        scale = Random().nextDouble() * 0.5 + 0.5,
-        delay = Duration(milliseconds: Random().nextInt(500));
-
-  Widget build(BuildContext context, double progress) {
-    final t = (progress - (delay.inMilliseconds / 1000)).clamp(0.0, 1.0);
-    final y = lerpDouble(startY, endY, t)!;
-
-    return Positioned.fill(
-      child: Align(
-        alignment: Alignment(startX, y),
-        child: Transform.rotate(
-          angle: rotation * t,
-          child: Transform.scale(
-            scale: scale,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

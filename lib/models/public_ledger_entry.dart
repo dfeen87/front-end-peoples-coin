@@ -1,10 +1,8 @@
-// lib/models/public_ledger_entry.dart
-
 class PublicLedgerEntry {
   final String id;
   final String title;
   final int lovesValue;
-  final String walletId; // Changed from performerWalletAddress
+  final String walletId;
   final DateTime createdAt;
 
   PublicLedgerEntry({
@@ -18,9 +16,9 @@ class PublicLedgerEntry {
   factory PublicLedgerEntry.fromJson(Map<String, dynamic> json) {
     return PublicLedgerEntry(
       id: json['id'] as String,
-      title: json['title'] as String? ?? 'Unknown Act', // Ensure backend has 'title'
+      title: json['title'] as String? ?? 'Unknown Act',
       lovesValue: json['loves_value'] as int? ?? 0,
-      walletId: json['wallet_id'] as String? ?? '0x000...000', // Ensure backend has 'wallet_id'
+      walletId: json['wallet_id'] as String? ?? '0x000...000',
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -51,3 +49,4 @@ class PublicLedgerEntry {
     };
   }
 }
+

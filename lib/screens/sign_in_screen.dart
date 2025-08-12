@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/gestures.dart';
 
 import '../state/auth_provider.dart' as MyAppAuthProvider;
-import '../widgets/dynamic_nebula_background.dart'; // Added to ensure a consistent background
+import '../widgets/dynamic_nebula_background.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -26,11 +26,13 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
-  /// Handles the sign-in logic when the button is pressed.
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    // Unfocus text fields to dismiss keyboard on submit
+    FocusScope.of(context).unfocus();
 
     final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
 
@@ -40,6 +42,9 @@ class _SignInScreenState extends State<SignInScreen> {
     );
 
     if (result['success'] == false && mounted) {
+      // Clear password on failure for security
+      _passwordController.clear();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result['error'] ?? 'An unknown error occurred.'),
@@ -80,12 +85,13 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final isLoading = context.watch<MyAppAuthProvider.AuthProvider>().isLoading;
-    
+
     final passwordVisibilityToggle = IconButton(
       icon: Icon(
         _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
         color: Colors.blueGrey[300],
       ),
+      tooltip: _isPasswordVisible ? 'Hide password' : 'Show password',
       onPressed: () {
         setState(() {
           _isPasswordVisible = !_isPasswordVisible;
@@ -118,7 +124,6 @@ class _SignInScreenState extends State<SignInScreen> {
                   child: Form(
                     key: _formKey,
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text(
@@ -132,7 +137,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Email Address Field
+                        // Email
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -142,15 +147,18 @@ class _SignInScreenState extends State<SignInScreen> {
                             Icons.email_outlined,
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty || !value.contains('@')) {
+                            if (value == null ||
+                                value.isEmpty ||
+                                !value.contains('@')) {
                               return 'Please enter a valid email address.';
                             }
                             return null;
                           },
+                          enabled: !isLoading,
                         ),
                         const SizedBox(height: 16.0),
 
-                        // Password Field
+                        // Password
                         TextFormField(
                           controller: _passwordController,
                           obscureText: !_isPasswordVisible,
@@ -166,15 +174,17 @@ class _SignInScreenState extends State<SignInScreen> {
                             }
                             return null;
                           },
+                          enabled: !isLoading,
                         ),
                         const SizedBox(height: 24.0),
 
-                        // Sign In Button
+                        // Sign In button
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16.0),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 16.0),
                               backgroundColor: Colors.amber[800],
                               foregroundColor: Colors.black,
                               shape: RoundedRectangleBorder(
@@ -196,7 +206,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                         const SizedBox(height: 20.0),
 
-                        // "Don't have an account?" Text Button
+                        // Sign Up link
                         RichText(
                           text: TextSpan(
                             text: "Don't have an account? ",
@@ -228,3 +238,4 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 }
+

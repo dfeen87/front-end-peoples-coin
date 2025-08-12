@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/proposal.dart';
 import '../pages/proposal_detail_page.dart';
+import 'base_card.dart';
 
 class ProposalCard extends StatelessWidget {
   final Proposal proposal;
@@ -46,62 +47,52 @@ class ProposalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-      color: Colors.white.withOpacity(0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.0),
-        side: BorderSide(color: Colors.white.withOpacity(0.2)),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12.0),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ProposalDetailPage(proposalId: proposal.id),
-            ),
-          );
-        },
-        splashColor: Colors.purple.withOpacity(0.2),
-        highlightColor: Colors.purple.withOpacity(0.1),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8.0,
-                runSpacing: 4.0,
-                children: [
-                  _buildInfoChip(proposal.status.name.toUpperCase(), Colors.purple.shade400),
-                  _buildInfoChip(proposal.proposalType, Colors.blueGrey.shade400),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                proposal.title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                semanticsLabel: 'Proposal title: ${proposal.title}',
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(Icons.timer_outlined, color: Colors.white70, size: 16),
-                  const SizedBox(width: 8),
-                  Text(
-                    _getTimeStatus(),
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                ],
-              ),
-            ],
+    return BaseCard(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ProposalDetailPage(proposalId: proposal.id),
           ),
+        );
+      },
+      splashColor: Colors.purple.withOpacity(0.2),
+      highlightColor: Colors.purple.withOpacity(0.1),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 4.0,
+              children: [
+                _buildInfoChip(proposal.status.name.toUpperCase(), Colors.purple.shade400),
+                _buildInfoChip(proposal.proposalType, Colors.blueGrey.shade400),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              proposal.title,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              semanticsLabel: 'Proposal title: ${proposal.title}',
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.timer_outlined, color: Colors.white70, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  _getTimeStatus(),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

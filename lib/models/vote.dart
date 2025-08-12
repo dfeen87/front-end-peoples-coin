@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-/// Represents a single vote on a proposal, mirroring the
-/// `votes` table in the database.
 @immutable
 class Vote {
   final String id; // UUID
@@ -22,20 +20,18 @@ class Vote {
     required this.updatedAt,
   });
 
-  /// Factory constructor to create a Vote instance from a JSON map.
   factory Vote.fromJson(Map<String, dynamic> json) {
     return Vote(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       voterUserId: json['voter_user_id'] as String?,
-      proposalId: json['proposal_id'] as String,
-      voteValue: json['vote_value'] as String,
+      proposalId: json['proposal_id']?.toString() ?? '',
+      voteValue: json['vote_value'] as String? ?? '',
       rationale: json['rationale'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: _parseDate(json['created_at']),
+      updatedAt: _parseDate(json['updated_at']),
     );
   }
 
-  /// Converts the Vote instance into a JSON map.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -46,6 +42,38 @@ class Vote {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
+  }
+
+  Vote copyWith({
+    String? id,
+    String? voterUserId,
+    String? proposalId,
+    String? voteValue,
+    String? rationale,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Vote(
+      id: id ?? this.id,
+      voterUserId: voterUserId ?? this.voterUserId,
+      proposalId: proposalId ?? this.proposalId,
+      voteValue: voteValue ?? this.voteValue,
+      rationale: rationale ?? this.rationale,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  static DateTime _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 }
 

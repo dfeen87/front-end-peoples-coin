@@ -1,4 +1,3 @@
-// lib/app_state_providers.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -34,3 +33,4 @@ class AppStateProviders extends StatelessWidget {
     );
   }
 }
+

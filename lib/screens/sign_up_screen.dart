@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import dotenv
 
 import '../service/api_client.dart';
 import '../service/recaptcha_service.dart';
@@ -22,11 +23,6 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final _formKey = GlobalKey<FormState>();
-
-  static const String recaptchaSiteKey = String.fromEnvironment(
-    'RECAPTCHA_SITE_KEY_PROD',
-    defaultValue: '',
-  );
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
@@ -68,7 +64,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _onUsernameChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(_debounceDuration, _checkUsernameAvailability);
+    _debounce = Timer(_debounceDuration, () {
+      if (!mounted) return;
+      _checkUsernameAvailability();
+    });
   }
 
   Future<void> _checkUsernameAvailability() async {
@@ -83,24 +82,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       final apiClient = context.read<PeoplesCoinApiClient>();
-      // IMPORTANT: This method should NOT require an idToken to check username availability.
       final isAvailable = await apiClient.checkUsernameAvailability(username);
 
       if (mounted) {
         setState(() {
-          _usernameStatus = isAvailable
-              ? UsernameStatus.available
-              : UsernameStatus.unavailable;
+          _usernameStatus =
+              isAvailable ? UsernameStatus.available : UsernameStatus.unavailable;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _usernameStatus = UsernameStatus.idle);
+      if (mounted) setState(() => _usernameStatus = UsernameStatus.unavailable);
       _showError("Couldn't verify username. Please try again.");
+      if (kDebugMode) {
+        print("Error checking username: $e");
+      }
     }
   }
 
   Future<void> _signUpWithEmail() async {
-    if (_isLoading) return; // Prevent double submit
+    if (_isLoading) return;
 
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
@@ -109,47 +109,48 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    if (recaptchaSiteKey.isEmpty && kReleaseMode) {
-      _showError('reCAPTCHA site key not configured.');
-      return;
-    }
+    final recaptchaSiteKey = dotenv.env['RECAPTCHA_SITE_KEY_PROD'] ?? '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F';
+    final apiBaseUrl = dotenv.env['API_BASE_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
 
     setState(() => _isLoading = true);
 
     try {
-      // Run reCAPTCHA
-      final recaptchaService = RecaptchaService();
-      final token =
-          await recaptchaService.executeRecaptcha(recaptchaSiteKey, 'signup');
+      final recaptchaService = RecaptchaService(
+        context,
+        siteKey: recaptchaSiteKey,
+        verifyUrl: '$apiBaseUrl/verify-recaptcha',
+      );
 
-      if (token.isEmpty && kReleaseMode) {
-        throw Exception('Failed to get reCAPTCHA token.');
+      final token = await recaptchaService.execute();
+      if (token.isEmpty) {
+        throw Exception('reCAPTCHA process was canceled.');
       }
 
-      // Create Firebase user
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
       final user = userCredential.user;
-      if (user != null) {
-        // Get the ID token for backend authentication
-        final idToken = await user.getIdToken();
+      if (user == null) throw Exception('Firebase user creation failed.');
 
-        if (idToken == null || idToken.isEmpty) {
-          throw Exception('Failed to get Firebase ID token.');
-        }
+      final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty)
+        throw Exception('Failed to get Firebase ID token.');
 
-        final apiClient = context.read<PeoplesCoinApiClient>();
-        await apiClient.createUserAndWallet(
-          username: _usernameController.text.trim(),
-          idToken: idToken,
-          recaptchaToken: token,
-          publicKey: 'TODO_public_key',
-          encryptedPrivateKey: 'TODO_encrypted_private_key',
-        );
-      }
+      final apiClient = context.read<PeoplesCoinApiClient>();
+
+      // TODO: Replace these placeholders with actual keys or key generation
+      const publicKey = 'TODO_public_key';
+      const encryptedPrivateKey = 'TODO_encrypted_private_key';
+
+      await apiClient.createUserAndWallet(
+        username: _usernameController.text.trim(),
+        recaptchaToken: token,
+        idToken: idToken,
+        publicKey: publicKey,
+        encryptedPrivateKey: encryptedPrivateKey,
+      );
 
       if (mounted) context.go('/home');
     } on FirebaseAuthException catch (e) {
@@ -157,10 +158,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
         'email-already-in-use' => 'This email is already registered.',
         'weak-password' => 'The password is too weak.',
         'invalid-email' => 'Invalid email format.',
-        _ => 'Sign-up error: ${e.message}'
+        _ => 'Sign-up error: ${e.message}',
       };
       _showError(friendlyMessage);
-    } catch (e) {
+    } catch (e, stack) {
+      if (kDebugMode) {
+        print("Error in sign-up flow: $e\n$stack");
+      }
       final errorMessage = e.toString().toLowerCase();
       if (errorMessage.contains('username_taken')) {
         _showError('This username was just taken. Please choose another one.');
@@ -287,9 +291,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             decoration: _buildInputDecoration(
                                 'Email', Icons.alternate_email),
                             keyboardType: TextInputType.emailAddress,
-                            validator: (val) => (val?.contains('@') ?? false)
-                                ? null
-                                : 'Please enter a valid email',
+                            validator: (val) =>
+                                (val?.contains('@') ?? false)
+                                    ? null
+                                    : 'Please enter a valid email',
                           ),
                           const SizedBox(height: 16),
                           TextFormField(

@@ -6,7 +6,7 @@ import 'dart:ui';
 import '../state/proposal_provider.dart';
 import '../models/proposal_to_send.dart';
 import '../state/user_provider.dart';
-import '../state/auth_provider.dart' as MyAppAuthProvider; // Added AuthProvider import
+import '../state/auth_provider.dart' as MyAppAuthProvider;
 
 typedef ProposalFormCompletedCallback = void Function();
 
@@ -26,7 +26,7 @@ class CreateProposalPageContent extends StatefulWidget {
   State<CreateProposalPageContent> createState() => _CreateProposalPageContentState();
 }
 
-class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
+class _CreateProposalPageContentState extends State<CreateProposalPageContent> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
   int _currentStep = 0;
@@ -36,8 +36,24 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
   DateTime? _voteEndDate;
   final TextEditingController _detailsController = TextEditingController();
 
+  late final AnimationController _stepAnimationController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
+
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _stepAnimationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _fadeAnimation = CurvedAnimation(parent: _stepAnimationController, curve: Curves.easeInOut);
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(_fadeAnimation);
+    _stepAnimationController.forward();
+  }
+
   @override
   void dispose() {
+    _stepAnimationController.dispose();
     _detailsController.dispose();
     super.dispose();
   }
@@ -68,8 +84,9 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
     }
   }
 
-  void _submitForm() async {
+  Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isSubmitting = true);
       _formKey.currentState!.save();
 
       final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
@@ -80,6 +97,7 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: User not logged in or token expired.')));
         }
+        setState(() => _isSubmitting = false);
         return;
       }
 
@@ -94,8 +112,10 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
 
       final result = await context.read<ProposalProvider>().createProposal(proposal: proposalToSend, idToken: idToken);
 
+      setState(() => _isSubmitting = false);
+
       if (result['success'] && mounted) {
-        _showSuccessAndExit();
+        await _showSuccessAndExit();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Submission failed: ${result['error']}')));
       }
@@ -104,18 +124,42 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
     }
   }
 
-  void _showSuccessAndExit() {
-    showDialog(
+  Future<void> _showSuccessAndExit() async {
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const _SuccessDialog(),
-    ).then((_) => widget.onFormCompleted());
+    );
+    widget.onFormCompleted();
+  }
+
+  void _goToStep(int step) async {
+    await _stepAnimationController.reverse();
+    setState(() => _currentStep = step);
+    _stepAnimationController.forward();
+  }
+
+  void _nextStep() async {
+    final isValidStep0 = _formKey.currentState?.validate() ?? false;
+    if (_currentStep == 0 && !isValidStep0) return;
+
+    await _stepAnimationController.reverse();
+
+    setState(() => _currentStep += 1);
+    _stepAnimationController.forward();
+  }
+
+  void _previousStep() async {
+    if (_currentStep == 0) return;
+    await _stepAnimationController.reverse();
+    setState(() => _currentStep -= 1);
+    _stepAnimationController.forward();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // FIX: Made the Scaffold transparent
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Create New Proposal'),
         backgroundColor: Colors.transparent,
@@ -125,56 +169,74 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
           IconButton(
             icon: const Icon(Icons.close),
             onPressed: widget.onFormCompleted,
+            tooltip: 'Close',
           ),
         ],
       ),
-      body: Stepper(
-        type: StepperType.horizontal,
-        currentStep: _currentStep,
-        onStepTapped: (step) => setState(() => _currentStep = step),
-        controlsBuilder: (context, details) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 24.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: <Widget>[
-                if (_currentStep > 0)
-                  TextButton(onPressed: details.onStepCancel, child: const Text('Back')),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: details.onStepContinue,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber[800],
-                    foregroundColor: Colors.black,
-                  ),
-                  child: Text(_currentStep == 2 ? 'Submit' : 'Next'),
-                ),
-              ],
+      body: AnimatedBuilder(
+        animation: _stepAnimationController,
+        builder: (context, child) {
+          return FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: child,
             ),
           );
         },
-        onStepContinue: () {
-          if (_currentStep < 2) {
-            if (_currentStep == 0 && !_formKey.currentState!.validate()) {
-              return;
-            }
-            _formKey.currentState?.save();
-            setState(() => _currentStep += 1);
-          } else {
-            _submitForm();
-          }
-        },
-        onStepCancel: () {
-          if (_currentStep > 0) {
-            setState(() => _currentStep -= 1);
-          }
-        },
+        child: Stepper(
+          type: StepperType.horizontal,
+          currentStep: _currentStep,
+          onStepTapped: (step) => _goToStep(step),
+          controlsBuilder: (context, details) {
+            final isLastStep = _currentStep == 2;
+            return Padding(
+              padding: const EdgeInsets.only(top: 24.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: <Widget>[
+                  if (_currentStep > 0)
+                    TextButton(
+                      onPressed: _isSubmitting ? null : _previousStep,
+                      child: const Text('Back'),
+                    ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _isSubmitting ? null : () {
+                      if (isLastStep) {
+                        _submitForm();
+                      } else {
+                        _nextStep();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber[800],
+                      foregroundColor: Colors.black,
+                      disabledBackgroundColor: Colors.amber.withOpacity(0.4),
+                      disabledForegroundColor: Colors.black38,
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          )
+                        : Text(isLastStep ? 'Submit' : 'Next'),
+                  ),
+                ],
+              ),
+            );
+          },
         steps: [
           _buildStep('Define', _buildStep1Define(), 0),
           _buildStep('Detail', _buildStep2Detail(), 1),
           _buildStep('Review', _buildStep3Review(), 2),
         ],
       ),
+    ),
     );
   }
 
@@ -198,6 +260,7 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
             style: const TextStyle(color: Colors.white),
             validator: (val) => val == null || val.isEmpty ? 'Please enter a title.' : null,
             onSaved: (val) => _title = val!,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -207,6 +270,7 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
             maxLines: 5,
             validator: (val) => val == null || val.isEmpty ? 'Please enter a description.' : null,
             onSaved: (val) => _description = val!,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
           ),
         ],
       ),
@@ -225,6 +289,7 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: 2.5,
+          physics: const NeverScrollableScrollPhysics(),
           children: _proposalTypes.entries.map((entry) {
             final isSelected = _proposalType == entry.key;
             return InkWell(
@@ -279,6 +344,10 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> {
           _buildReviewRow('Description', _description),
           _buildReviewRow('Type', _proposalType),
           _buildReviewRow('Voting Ends', _voteEndDate != null ? DateFormat.yMMMd().format(_voteEndDate!) : 'Not Set'),
+          if (_detailsController.text.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildReviewRow('Additional Details', _detailsController.text),
+          ],
         ],
       ),
     );
@@ -323,7 +392,7 @@ class _SuccessDialogState extends State<_SuccessDialog> with SingleTickerProvide
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
     _controller.forward();
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) Navigator.of(context).pop();
@@ -346,7 +415,7 @@ class _SuccessDialogState extends State<_SuccessDialog> with SingleTickerProvide
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle, color: Colors.greenAccent, size: 70),
+            const Icon(Icons.check_circle, color: Colors.greenAccent, size: 70),
             const SizedBox(height: 20),
             const Text(
               'Proposal Submitted!',
@@ -364,3 +433,4 @@ class _SuccessDialogState extends State<_SuccessDialog> with SingleTickerProvide
     );
   }
 }
+

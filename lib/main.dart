@@ -11,6 +11,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'models/tech_system.dart';
 import 'models/user_account.dart';
@@ -32,15 +33,17 @@ import 'state/user_provider.dart';
 import 'widgets/dynamic_nebula_background.dart';
 import 'widgets/navigation_card.dart';
 
+// Routes definition for easy navigation
 class AppRoutes {
   static const String startup = '/';
   static const String welcome = '/welcome';
-  static const String signIn = '/sign_in';
-  static const String signUp = '/sign_up';
+  static const String signIn = '/sign-in';
+  static const String signUp = '/sign-up';
   static const String home = '/home';
   static const String codeViewer = '/code-viewer';
 }
 
+// Theme setup for dark mode, consistent UI
 class AppTheme {
   static ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
@@ -48,9 +51,10 @@ class AppTheme {
     primarySwatch: Colors.blue,
     scaffoldBackgroundColor: Colors.transparent,
     appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Colors.white),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: Colors.white,
+    ),
     textTheme: const TextTheme(
       bodyLarge: TextStyle(color: Colors.white70),
       bodyMedium: TextStyle(color: Colors.white70),
@@ -61,7 +65,7 @@ class AppTheme {
   );
 }
 
-// --- RESTORED HELPER CLASSES ---
+// Utility constants for durations, colors, and breakpoints
 class AppDurations {
   static const fast = Duration(milliseconds: 300);
   static const medium = Duration(milliseconds: 400);
@@ -73,34 +77,49 @@ class AppColors {
   static const recordAct = Color(0xFFDA70D6);
   static const ledger = Color(0xFF00BFFF);
   static const wallet = Color(0xFF6A5ACD);
-  static final buttonPrimary = Colors.amber[800];
-  static final translucentGovernance = AppColors.governance.withOpacity(0.2);
-  static final translucentPortfolio = AppColors.portfolio.withOpacity(0.2);
-  static final translucentRecordAct = AppColors.recordAct.withOpacity(0.2);
-  static final translucentLedger = AppColors.ledger.withOpacity(0.2);
-  static final translucentWallet = AppColors.wallet.withOpacity(0.2);
+
+  static final buttonPrimary = Colors.amber[800]!;
+  static final translucentGovernance = governance.withOpacity(0.2);
+  static final translucentPortfolio = portfolio.withOpacity(0.2);
+  static final translucentRecordAct = recordAct.withOpacity(0.2);
+  static final translucentLedger = ledger.withOpacity(0.2);
+  static final translucentWallet = wallet.withOpacity(0.2);
 }
 
 class AppBreakpoints {
   static const double tablet = 768;
   static const double desktop = 1200;
 }
-// --- END RESTORED CLASSES ---
 
 late final GoRouter router;
 
-void _initializeRouter(MyAppAuthProvider.AuthProvider authProvider) {
+void initializeRouter(MyAppAuthProvider.AuthProvider authProvider) {
   router = GoRouter(
     initialLocation: AppRoutes.startup,
     routes: [
-      GoRoute(path: AppRoutes.startup, builder: (context, state) => const StartupScreen()),
+      GoRoute(
+        path: AppRoutes.startup,
+        builder: (context, state) => const StartupScreen(),
+      ),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
-          GoRoute(path: AppRoutes.welcome, builder: (context, state) => const WelcomeScreen()),
-          GoRoute(path: AppRoutes.signIn, builder: (context, state) => const sign_in.SignInScreen()),
-          GoRoute(path: AppRoutes.signUp, builder: (context, state) => const sign_up.SignUpScreen()),
-          GoRoute(path: AppRoutes.home, builder: (context, state) => const HomePage()),
+          GoRoute(
+            path: AppRoutes.welcome,
+            builder: (context, state) => const WelcomeScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.signIn,
+            builder: (context, state) => const sign_in.SignInScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.signUp,
+            builder: (context, state) => const sign_up.SignUpScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.home,
+            builder: (context, state) => const HomePage(),
+          ),
           GoRoute(
             path: AppRoutes.codeViewer,
             builder: (context, state) {
@@ -125,17 +144,26 @@ void _initializeRouter(MyAppAuthProvider.AuthProvider authProvider) {
       }
 
       if (isInitializing) {
-          return state.matchedLocation == AppRoutes.startup ? null : AppRoutes.startup;
+        if (state.matchedLocation == AppRoutes.startup) {
+          return null;
+        } else {
+          return AppRoutes.startup;
+        }
       }
 
       final onAuthRoute = [
         AppRoutes.welcome,
         AppRoutes.signIn,
-        AppRoutes.signUp
+        AppRoutes.signUp,
       ].contains(state.matchedLocation);
 
-      if (loggedIn && (onAuthRoute || state.matchedLocation == AppRoutes.startup)) return AppRoutes.home;
-      if (!loggedIn && !onAuthRoute) return AppRoutes.welcome;
+      if (loggedIn && (onAuthRoute || state.matchedLocation == AppRoutes.startup)) {
+        return AppRoutes.home;
+      }
+
+      if (!loggedIn && !onAuthRoute) {
+        return AppRoutes.welcome;
+      }
 
       return null;
     },
@@ -148,43 +176,57 @@ Future<void> main() async {
   await dotenv.load(fileName: 'config.env');
 
   try {
+    // Load and validate environment variables
     final firebaseApiKey = dotenv.env['FIREBASE_API_KEY'];
+    final recaptchaSiteKey = dotenv.env['RECAPTCHA_SITE_KEY_PROD'];
+    final firebaseProjectId = dotenv.env['FIREBASE_PROJECT_ID'];
+    final firebaseAppId = dotenv.env['FIREBASE_APP_ID'];
+
     if (firebaseApiKey == null || firebaseApiKey.isEmpty) {
       throw Exception('FIREBASE_API_KEY is missing from .env file');
+    }
+    if (recaptchaSiteKey == null || recaptchaSiteKey.isEmpty) {
+      throw Exception('RECAPTCHA_SITE_KEY_PROD is missing from .env file');
+    }
+    if (firebaseProjectId == null || firebaseProjectId.isEmpty) {
+      throw Exception('FIREBASE_PROJECT_ID is missing from .env file');
+    }
+    if (firebaseAppId == null || firebaseAppId.isEmpty) {
+      throw Exception('FIREBASE_APP_ID is missing from .env file');
     }
 
     final firebaseOptions = FirebaseOptions(
       apiKey: firebaseApiKey,
-      authDomain: "brightacts-frontend-50f58.firebaseapp.com",
-      projectId: "brightacts-frontend-50f58",
-      storageBucket: 'brightacts-frontend-50f58.firebasestorage.app',
+      authDomain: "$firebaseProjectId.firebaseapp.com",
+      projectId: firebaseProjectId,
+      storageBucket: "$firebaseProjectId.firebasestorage.app",
       messagingSenderId: "289762069070",
-      appId: "1:289762069070:web:2d9a9e1cd7fcb53d9a111f",
+      appId: firebaseAppId,
     );
 
-    // 1️⃣ Initialize Firebase before anything else
     await Firebase.initializeApp(options: firebaseOptions);
-
-    // 2️⃣ Activate App Check with the key from your .env file
     await FirebaseAppCheck.instance.activate(
-      webProvider: ReCaptchaV3Provider(dotenv.env['RECAPTCHA_SITE_KEY_PROD']!),
+      webProvider: ReCaptchaEnterpriseProvider(recaptchaSiteKey),
     );
 
     if (kDebugMode) {
       print("[BrightActs] ✅ Firebase initialized & App Check activated");
     }
 
-    // 3️⃣ Continue with your existing bootstrap logic
     final apiClient = PeoplesCoinApiClient();
     final authProvider = MyAppAuthProvider.AuthProvider(apiClient);
 
-    _initializeRouter(authProvider);
+    initializeRouter(authProvider);
 
-    runApp(RootProviderScope(
-      apiClient: apiClient,
-      authProvider: authProvider,
-      child: const BrightActsApp(),
-    ));
+    runApp(
+      ProviderScope(
+        child: RootProviderScope(
+        apiClient: apiClient,
+        authProvider: authProvider,
+        child: const BrightActsApp(),
+      ),
+   ),
+);
 
   } catch (error, stackTrace) {
     if (kDebugMode) {
@@ -207,9 +249,11 @@ class ErrorDisplayApp extends StatelessWidget {
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text("Fatal Application Error:\n\n$error",
-                style: const TextStyle(color: Colors.redAccent),
-                textAlign: TextAlign.center),
+            child: Text(
+              "Fatal Application Error:\n\n$error",
+              style: const TextStyle(color: Colors.redAccent),
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       ),
@@ -251,7 +295,7 @@ class BrightActsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'BrightActs',
+      title: 'Bright Acts | A Goodwill Ledger',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       darkTheme: AppTheme.darkTheme,
@@ -269,7 +313,7 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Positioned.fill(child: DynamicNebulaBackground()),
+        const Positioned.fill(child: DynamicNebulaBackground()),
         child,
       ],
     );
@@ -304,16 +348,16 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 2;
+  int selectedIndex = 2;
   late final PageController _pageController;
   late final List<Widget> _pages;
-  bool _showUiElements = true;
+  bool showUiElements = true;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: _selectedIndex);
     _pages = _buildPages();
+    _pageController = PageController(initialPage: selectedIndex);
   }
 
   @override
@@ -324,11 +368,51 @@ class _HomePageState extends State<HomePage> {
 
   List<Widget> _buildPages() {
     return [
-      _buildNavigationPage(title: 'Governance', description: 'Influence the future of the platform. View active proposals, create new ones, and cast your votes on community-led initiatives.', icon: Icons.gavel, cardColor: AppColors.translucentGovernance, buttonText: "View Proposals", pageToOpen: const GovernancePage()),
-      _buildNavigationPage(title: 'My Portfolio', description: 'Review your personal history of contributions, track your impact, and see how your acts have strengthened the community.', icon: Icons.account_balance_wallet, cardColor: AppColors.translucentPortfolio, buttonText: "View My Acts", pageToOpen: const MyPortfolioPage()),
-      _buildNavigationPage(title: 'Record Act', description: 'Document a new act of kindness or contribution. Each verified act is rewarded with \'Loves\' and permanently added to the ledger.', icon: Icons.favorite, cardColor: AppColors.translucentRecordAct, buttonText: "Submit a Bright Act", pageToOpen: const SubmitGoodwillPage()),
-      _buildNavigationPage(title: 'Public Ledger', description: 'Explore the transparent and immutable record of every act of goodwill submitted by the community. A testament to our collective impact.', icon: Icons.public, cardColor: AppColors.translucentLedger, buttonText: "View Ledger", pageToOpen: const PublicLedgerPage()),
-      _buildNavigationPage(title: 'My Wallet', description: 'Securely manage your \'Loves\' balance, view transaction history, and send tokens to other members of the community.', icon: Icons.wallet, cardColor: AppColors.translucentWallet, buttonText: "Open Wallet", pageToOpen: const MyWalletPage()),
+      _buildNavigationPage(
+        title: 'Governance',
+        description:
+            'Influence the future of the platform. View active proposals, create new ones, and cast your votes on community-led initiatives.',
+        icon: Icons.gavel,
+        cardColor: AppColors.translucentGovernance,
+        buttonText: "View Proposals",
+        pageToOpen: const GovernancePage(),
+      ),
+      _buildNavigationPage(
+        title: 'My Portfolio',
+        description:
+            'Review your personal history of contributions, track your impact, and see how your acts have strengthened the community.',
+        icon: Icons.account_balance_wallet,
+        cardColor: AppColors.translucentPortfolio,
+        buttonText: "View My Acts",
+        pageToOpen: const MyPortfolioPage(),
+      ),
+      _buildNavigationPage(
+        title: 'Record Act',
+        description:
+            'Document a new act of kindness or contribution. Each verified act is rewarded with \'Loves\' and permanently added to the ledger.',
+        icon: Icons.favorite,
+        cardColor: AppColors.translucentRecordAct,
+        buttonText: "Submit a Bright Act",
+        pageToOpen: const SubmitGoodwillPage(),
+      ),
+      _buildNavigationPage(
+        title: 'Public Ledger',
+        description:
+            'Explore the transparent and immutable record of every act of goodwill submitted by the community. A testament to our collective impact.',
+        icon: Icons.public,
+        cardColor: AppColors.translucentLedger,
+        buttonText: "View Ledger",
+        pageToOpen: const PublicLedgerPage(),
+      ),
+      _buildNavigationPage(
+        title: 'My Wallet',
+        description:
+            'Securely manage your \'Loves\' balance, view transaction history, and send tokens to other members of the community.',
+        icon: Icons.wallet,
+        cardColor: AppColors.translucentWallet,
+        buttonText: "Open Wallet",
+        pageToOpen: const MyWalletPage(),
+      ),
     ];
   }
 
@@ -336,6 +420,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final verticalMargin = screenWidth >= AppBreakpoints.desktop ? 40.0 : 20.0;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -346,11 +431,13 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AnimatedSlide(
-                offset: _showUiElements ? Offset.zero : const Offset(0, -1.5),
-                duration: AppDurations.fast,
-                child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildWelcomeHeader())),
+              offset: showUiElements ? Offset.zero : const Offset(0, -1.5),
+              duration: AppDurations.fast,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: _buildWelcomeHeader(),
+              ),
+            ),
             SizedBox(height: verticalMargin),
             Expanded(child: _buildPageView()),
             SizedBox(height: verticalMargin),
@@ -361,55 +448,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildNavigationPage({
-    required String title,
-    required String description,
-    required IconData icon,
-    required Color cardColor,
-    required String buttonText,
-    required Widget pageToOpen,
-  }) {
-    return NavigationCard(
-      title: title,
-      description: description,
-      icon: icon,
-      cardColor: cardColor,
-      expandedContent: _cardContent(context, buttonText, pageToOpen: pageToOpen),
-    );
-  }
-
-  Widget _cardContent(BuildContext context, String buttonText,
-      {required Widget pageToOpen}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Detailed information about this section.',
-            style: TextStyle(color: Colors.white70, fontSize: 14)),
-        const Spacer(),
-        Center(
-          child: ElevatedButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              _showSlidingFormOverlay(context, pageToOpen);
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.buttonPrimary,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
-            child: Text(buttonText, style: const TextStyle(fontSize: 16)),
-          ),
-        ),
-        const SizedBox(height: 10),
-      ],
-    );
-  }
-
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return PreferredSize(
       preferredSize: const Size.fromHeight(kToolbarHeight),
       child: AnimatedSlide(
-        offset: _showUiElements ? Offset.zero : const Offset(0, -1.5),
+        offset: showUiElements ? Offset.zero : const Offset(0, -1.5),
         duration: AppDurations.fast,
         child: AppBar(
           title: const SizedBox.shrink(),
@@ -421,10 +464,11 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {
                 HapticFeedback.mediumImpact();
                 showModalBottomSheet(
-                    context: context,
-                    backgroundColor: Colors.transparent,
-                    isScrollControlled: true,
-                    builder: (_) => const SettingsBottomSheet());
+                  context: context,
+                  backgroundColor: Colors.transparent,
+                  isScrollControlled: true,
+                  builder: (_) => const SettingsBottomSheet(),
+                );
               },
             ),
           ],
@@ -433,71 +477,80 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildWelcomeHeader() {
-    return Consumer2<MyAppAuthProvider.AuthProvider, UserProvider>(
-      builder: (context, authProvider, userProvider, _) {
-        final userAccount = userProvider.currentUser;
-        final authUser = authProvider.user;
-        if (userProvider.hasError) {
-          return const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+Widget _buildWelcomeHeader() {
+  return Consumer(
+    builder: (context, ref, _) {
+      final walletState = ref.watch(walletFacilitatorProvider);
+      final authProvider = ref.watch(MyAppAuthProvider.authProviderNotifier);
+      final userProvider = ref.watch(userProviderNotifier);
+
+      final authUser = authProvider.user;
+
+      // Determine welcome text
+      final welcomeText = authUser != null
+          ? 'Welcome, ${authUser.displayName ?? authUser.email ?? authUser.uid}'
+          : 'Connecting...';
+
+      // Show balance from wallet facilitator state
+      String balanceText;
+      if (walletState.isLoading) {
+        balanceText = "Loading...";
+      } else if (walletState.errorMessage != null) {
+        balanceText = "Error";
+      } else {
+        balanceText = walletState.balance.toStringAsFixed(2);
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MatrixText(
+            targetText: welcomeText,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontSize: 24,
+                  fontFamily: 'monospace',
+                ),
+            isLoading: userProvider.isLoading,
+          ),
+          const SizedBox(height: 8),
+          Row(
             children: [
-              Text('// CONNECTION INTERRUPTED',
-                  style: TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 24,
-                      fontFamily: 'monospace')),
-              Text('  Could not load user data.',
-                  style: TextStyle(color: Colors.white70)),
+              Text(
+                'Your Wallet Balance: ',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+              ),
+              if (walletState.isLoading)
+                Text(
+                  "******",
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 18,
+                        color: Colors.white,
+                      ),
+                )
+              else
+                SlotMachineBalance(
+                  balance: (walletState.balance).toInt(),
+                  textStyle: Theme.of(context).textTheme.titleLarge!.copyWith(
+                        fontSize: 18,
+                        color: Colors.amber,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              Text(
+                ' Loves',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+              ),
             ],
-          );
-        }
-        final welcomeText = authUser != null
-            ? 'Welcome, ${authUser.displayName ?? authUser.email ?? authUser.uid}'
-            : 'Connecting...';
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            MatrixText(
-                targetText: welcomeText,
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineMedium
-                    ?.copyWith(fontSize: 24, fontFamily: 'monospace'),
-                isLoading: userProvider.isLoading),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Text('Your Balance: ',
-                    style:
-                        Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
-                if (userProvider.isLoading)
-                  Text("******",
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontSize: 18, color: Colors.white))
-                else if (userAccount != null)
-                  SlotMachineBalance(
-                      balance: userAccount.balance.toInt(),
-                      textStyle: Theme.of(context).textTheme.titleLarge!.copyWith(
-                          fontSize: 18,
-                          color: Colors.amber,
-                          fontWeight: FontWeight.bold)),
-                Text(' Loves',
-                    style:
-                        Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
-              ],
-            ),
-          ],
-        );
-      },
-    );
-  }
+          ),
+        ],
+      );
+    },
+  );
+}
 
   Widget _buildPageView() {
     return AnimatedOpacity(
-      opacity: _showUiElements ? 1 : 0,
+      opacity: showUiElements ? 1 : 0,
       duration: AppDurations.fast,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -506,9 +559,9 @@ class _HomePageState extends State<HomePage> {
           itemCount: _pages.length,
           itemBuilder: (context, index) => _pages[index],
           onPageChanged: (index) {
-            if (_selectedIndex != index) {
+            if (selectedIndex != index) {
               HapticFeedback.selectionClick();
-              setState(() => _selectedIndex = index);
+              setState(() => selectedIndex = index);
             }
           },
         ),
@@ -518,18 +571,17 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildBottomNavBar() {
     return AnimatedSlide(
-      offset: _showUiElements ? Offset.zero : const Offset(0, 2),
+      offset: showUiElements ? Offset.zero : const Offset(0, 2),
       duration: AppDurations.fast,
       child: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'Governance'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_wallet), label: 'Portfolio'),
+          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Portfolio'),
           BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Record'),
           BottomNavigationBarItem(icon: Icon(Icons.public), label: 'Ledger'),
           BottomNavigationBarItem(icon: Icon(Icons.wallet), label: 'Wallet'),
         ],
-        currentIndex: _selectedIndex,
+        currentIndex: selectedIndex,
         selectedItemColor: AppColors.buttonPrimary,
         unselectedItemColor: Colors.white70,
         onTap: _onItemTapped,
@@ -543,186 +595,48 @@ class _HomePageState extends State<HomePage> {
 
   void _onItemTapped(int index) {
     HapticFeedback.lightImpact();
-    _pageController.animateToPage(index,
-        duration: AppDurations.fast, curve: Curves.ease);
+    _pageController.animateToPage(index, duration: AppDurations.fast, curve: Curves.ease);
   }
 
-  Future<void> _showSlidingFormOverlay(
-      BuildContext context, Widget content) async {
-    setState(() => _showUiElements = false);
-    await Future.delayed(AppDurations.fast);
-    await showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.black.withOpacity(0.5),
-      transitionDuration: AppDurations.medium,
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curve =
-            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-        return SlideTransition(
-            position:
-                Tween<Offset>(begin: const Offset(0.0, -1.0), end: Offset.zero)
-                    .animate(curve),
-            child: FadeTransition(opacity: animation, child: child));
-      },
-      pageBuilder: (context, animation, secondaryAnimation) {
-        final mediaQuery = MediaQuery.of(context);
-        final isDesktop = mediaQuery.size.width >= AppBreakpoints.desktop;
-        return Align(
-          alignment: Alignment.center,
-          child: Container(
-            width: mediaQuery.size.width * (isDesktop ? 0.4 : 0.9),
-            height: mediaQuery.size.height * 0.85,
-            margin: EdgeInsets.only(
-                top: mediaQuery.padding.top + (AppBar().preferredSize.height / 2),
-                bottom: mediaQuery.padding.bottom),
-            decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(25.0),
-                border: Border.all(color: Colors.white.withOpacity(0.2))),
-            child: ClipRRect(
-                borderRadius: BorderRadius.circular(25.0), child: content),
-          ),
-        );
-      },
-    );
-    setState(() => _showUiElements = true);
-  }
-}
-
-class SettingsBottomSheet extends StatelessWidget {
-  const SettingsBottomSheet({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.75),
-            borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2)))),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                    color: Colors.grey[700],
-                    borderRadius: BorderRadius.circular(12))),
-            const SizedBox(height: 20),
-            const Text('Settings & Info',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            _buildLinkButton(
-                context: context,
-                text: 'Donate to Bright Acts',
-                icon: Icons.volunteer_activism,
-                color: Colors.pinkAccent,
-                url: 'https://buy.stripe.com/some-valid-stripe-link'),
-            const SizedBox(height: 10),
-            _buildLinkButton(
-                context: context,
-                text: 'Follow on LinkedIn',
-                icon: Icons.group_work,
-                color: Colors.lightBlueAccent,
-                url: 'https://www.linkedin.com/company/the-people-s-coin/'),
-            const SizedBox(height: 10),
-            _buildLinkButton(
-                context: context,
-                text: 'Docs & Codebase',
-                icon: Icons.code,
-                url: 'https://github.com/DonMichaelFeeney/Brightacts'),
-            const SizedBox(height: 10),
-            _buildLinkButton(
-                context: context,
-                text: 'Get Support',
-                icon: Icons.support_agent,
-                onPressed: () => _launchSupportEmail(context)),
-            const SizedBox(height: 10),
-            Divider(color: Colors.white.withOpacity(0.3)),
-            const SizedBox(height: 10),
-            TextButton.icon(
-              icon: const Icon(Icons.logout, color: Colors.redAccent),
-              label: const Text('Sign Out',
-                  style: TextStyle(color: Colors.redAccent, fontSize: 16)),
-              onPressed: () async {
-                HapticFeedback.heavyImpact();
-                Navigator.of(context).pop();
-                await context.read<MyAppAuthProvider.AuthProvider>().signOut();
-              },
-            ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
-        ),
+  Widget _buildNavigationPage({
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color cardColor,
+    required String buttonText,
+    required Widget pageToOpen,
+  }) {
+    return Center(
+      child: NavigationCard(
+        icon: icon,
+        title: title,
+        description: description,
+        cardColor: cardColor,
+        buttonText: buttonText,
+        onPressed: () {
+          HapticFeedback.selectionClick();
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => pageToOpen),
+          );
+        },
       ),
     );
   }
-
-  void _launchSupportEmail(BuildContext context) async {
-    final Uri emailLaunchUri =
-        Uri(scheme: 'mailto', path: 'support@brightacts.com', query: 'subject=Bright Acts Support Request');
-    try {
-      await url_launcher.launchUrl(emailLaunchUri);
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not launch email app.')));
-      }
-    }
-  }
-
-  Widget _buildLinkButton(
-      {required BuildContext context,
-      required String text,
-      required IconData icon,
-      Color? color,
-      String? url,
-      VoidCallback? onPressed}) {
-    final bool isEnabled = onPressed != null || url != null;
-    final Color enabledColor = color ?? Colors.amber[700]!;
-    final Color disabledColor = Colors.grey[600]!;
-    return TextButton.icon(
-      icon: Icon(icon, color: isEnabled ? enabledColor : disabledColor),
-      label: Text(text,
-          style: TextStyle(
-              color: isEnabled ? Colors.white : Colors.grey[600],
-              fontSize: 16)),
-      onPressed: isEnabled
-          ? (onPressed ??
-              () async {
-                if (url != null) {
-                  final uri = Uri.parse(url);
-                  if (!await url_launcher.launchUrl(uri,
-                      mode: url_launcher.LaunchMode.externalApplication)) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Could not launch $url')));
-                    }
-                  }
-                }
-              })
-          : null,
-    );
-  }
 }
 
+// MatrixText and SlotMachineBalance widgets with animation
 class MatrixText extends StatefulWidget {
   final String targetText;
   final TextStyle? style;
   final bool isLoading;
-  const MatrixText(
-      {super.key,
-      required this.targetText,
-      this.style,
-      this.isLoading = false});
+
+  const MatrixText({
+    super.key,
+    required this.targetText,
+    this.style,
+    this.isLoading = false,
+  });
+
   @override
   State<MatrixText> createState() => _MatrixTextState();
 }
@@ -743,8 +657,7 @@ class _MatrixTextState extends State<MatrixText> {
   @override
   void didUpdateWidget(covariant MatrixText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.targetText != oldWidget.targetText ||
-        widget.isLoading != oldWidget.isLoading) {
+    if (widget.targetText != oldWidget.targetText || widget.isLoading != oldWidget.isLoading) {
       _startAnimation();
     }
   }
@@ -782,10 +695,10 @@ class _MatrixTextState extends State<MatrixText> {
             timer.cancel();
             return;
           }
-          String scramblingPart =
-              _generateRandomString(widget.targetText.length - _revealIndex);
-          String revealedPart = widget.targetText.substring(0, _revealIndex);
+          final scramblingPart = _generateRandomString(widget.targetText.length - _revealIndex);
+          final revealedPart = widget.targetText.substring(0, _revealIndex);
           _displayText = revealedPart + scramblingPart;
+
           if (timer.tick % 2 == 0) {
             _revealIndex++;
           }
@@ -810,17 +723,19 @@ class SlotMachineBalance extends StatefulWidget {
   final int balance;
   final TextStyle textStyle;
   final Duration duration;
-  const SlotMachineBalance(
-      {super.key,
-      required this.balance,
-      required this.textStyle,
-      this.duration = const Duration(milliseconds: 1500)});
+
+  const SlotMachineBalance({
+    super.key,
+    required this.balance,
+    required this.textStyle,
+    this.duration = const Duration(milliseconds: 1500),
+  });
+
   @override
   State<SlotMachineBalance> createState() => _SlotMachineBalanceState();
 }
 
-class _SlotMachineBalanceState extends State<SlotMachineBalance>
-    with SingleTickerProviderStateMixin {
+class _SlotMachineBalanceState extends State<SlotMachineBalance> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   int _displayBalance = 0;
@@ -854,6 +769,7 @@ class _SlotMachineBalanceState extends State<SlotMachineBalance>
           _displayBalance = _animation.value.round();
         });
       });
+
     _controller.reset();
     _controller.forward();
   }
@@ -863,3 +779,146 @@ class _SlotMachineBalanceState extends State<SlotMachineBalance>
     return Text(_displayBalance.toString(), style: widget.textStyle);
   }
 }
+
+// Settings Bottom Sheet with useful links and sign out button
+class SettingsBottomSheet extends StatelessWidget {
+  const SettingsBottomSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.75),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+          border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2))),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey[700],
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Settings & Info',
+              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            _buildLinkButton(
+              context: context,
+              text: 'Donate to Bright Acts',
+              icon: Icons.volunteer_activism,
+              color: Colors.pinkAccent,
+              url: 'https://buy.stripe.com/some-valid-stripe-link',
+            ),
+            const SizedBox(height: 10),
+            _buildLinkButton(
+              context: context,
+              text: 'Follow on LinkedIn',
+              icon: Icons.group_work,
+              color: Colors.lightBlueAccent,
+              url: 'https://www.linkedin.com/company/the-people-s-coin/',
+            ),
+            const SizedBox(height: 10),
+            _buildLinkButton(
+              context: context,
+              text: 'Docs & Codebase',
+              icon: Icons.code,
+              url: 'https://github.com/DonMichaelFeeney/Brightacts',
+            ),
+            const SizedBox(height: 10),
+            _buildLinkButton(
+              context: context,
+              text: 'Get Support',
+              icon: Icons.support_agent,
+              onPressed: () => _launchSupportEmail(context),
+            ),
+            const SizedBox(height: 10),
+            Divider(color: Colors.white.withOpacity(0.3)),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              icon: const Icon(Icons.logout, color: Colors.redAccent),
+              label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
+              onPressed: () async {
+                HapticFeedback.heavyImpact();
+                Navigator.of(context).pop();
+                await context.read<MyAppAuthProvider.AuthProvider>().signOut();
+              },
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _launchSupportEmail(BuildContext context) async {
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: 'support@brightacts.com',
+      queryParameters: {'subject': 'Bright Acts Support Request'},
+    );
+
+    try {
+      if (!await url_launcher.launchUrl(emailLaunchUri)) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not launch email app.')),
+          );
+        }
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch email app.')),
+        );
+      }
+    }
+  }
+
+  Widget _buildLinkButton({
+    required BuildContext context,
+    required String text,
+    required IconData icon,
+    Color? color,
+    String? url,
+    VoidCallback? onPressed,
+  }) {
+    final bool isEnabled = onPressed != null || url != null;
+    final Color enabledColor = color ?? Colors.amber[700]!;
+    final Color disabledColor = Colors.grey[600]!;
+
+    return TextButton.icon(
+      icon: Icon(icon, color: isEnabled ? enabledColor : disabledColor),
+      label: Text(
+        text,
+        style: TextStyle(color: isEnabled ? Colors.white : disabledColor, fontSize: 16),
+      ),
+      onPressed: isEnabled
+          ? (onPressed ??
+              () async {
+                if (url != null) {
+                  final uri = Uri.parse(url);
+                  if (!await url_launcher.launchUrl(uri, mode: url_launcher.LaunchMode.externalApplication)) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not launch $url')));
+                    }
+                  }
+                }
+              })
+          : null,
+    );
+  }
+}
+

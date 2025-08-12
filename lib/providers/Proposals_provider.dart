@@ -16,7 +16,10 @@ class ProposalProvider with ChangeNotifier {
   String? _detailsError;
 
   bool _isCreatingProposal = false;
+  String? _createProposalError;
+
   bool _isSubmittingVote = false;
+  String? _submitVoteError;
 
   List<Proposal> get proposals => _proposals;
   bool get isFetchingProposals => _isFetchingProposals;
@@ -27,10 +30,14 @@ class ProposalProvider with ChangeNotifier {
   String? get detailsError => _detailsError;
 
   bool get isCreatingProposal => _isCreatingProposal;
+  String? get createProposalError => _createProposalError;
+
   bool get isSubmittingVote => _isSubmittingVote;
+  String? get submitVoteError => _submitVoteError;
 
   ProposalProvider(this._apiClient);
 
+  /// Fetch proposals, optionally filtered by status
   Future<void> fetchProposals({String? status}) async {
     _isFetchingProposals = true;
     _proposalsError = null;
@@ -48,13 +55,14 @@ class ProposalProvider with ChangeNotifier {
     }
   }
 
+  /// Fetch detailed info about a specific proposal
   Future<void> fetchProposalDetails(String proposalId) async {
     _isFetchingDetails = true;
     _detailsError = null;
     notifyListeners();
 
     try {
-      final json = await _apiClient.getProposalDetails(proposalId: proposalId, idToken: idToken);
+      final json = await _apiClient.getProposalDetails(proposalId: proposalId);
       _selectedProposal = Proposal.fromJson(json);
     } catch (e) {
       _detailsError = 'Failed to fetch proposal details: $e';
@@ -65,22 +73,28 @@ class ProposalProvider with ChangeNotifier {
     }
   }
 
+  /// Create a new proposal and refresh the list on success
   Future<void> createProposal(ProposalToSend proposal) async {
     _isCreatingProposal = true;
+    _createProposalError = null;
     notifyListeners();
 
     try {
       await _apiClient.createProposal(proposal.toJson());
+      // Refresh proposals after creation
+      await fetchProposals();
     } catch (e) {
-      throw Exception('Failed to create proposal: $e');
+      _createProposalError = 'Failed to create proposal: $e';
     } finally {
       _isCreatingProposal = false;
       notifyListeners();
     }
   }
 
+  /// Submit a vote and refresh proposal details on success
   Future<void> submitVote(VoteToSend vote) async {
     _isSubmittingVote = true;
+    _submitVoteError = null;
     notifyListeners();
 
     try {
@@ -89,7 +103,7 @@ class ProposalProvider with ChangeNotifier {
         await fetchProposalDetails(_selectedProposal!.id);
       }
     } catch (e) {
-      throw Exception('Failed to submit vote: $e');
+      _submitVoteError = 'Failed to submit vote: $e';
     } finally {
       _isSubmittingVote = false;
       notifyListeners();

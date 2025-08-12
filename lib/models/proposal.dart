@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart'; // Corrected import path
+import 'package:flutter/foundation.dart';
 
 /// Mirrors the 'proposal_status' ENUM in your database
 enum ProposalStatus {
@@ -44,18 +44,18 @@ class Proposal {
   /// Factory constructor to create a Proposal instance from a JSON map.
   factory Proposal.fromJson(Map<String, dynamic> json) {
     return Proposal(
-      id: json['id'] as String,
-      proposerUserId: json['proposer_user_id'] as String?,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      status: _statusFromString(json['status'] as String?),
-      voteStartTime: json['vote_start_time'] != null ? DateTime.parse(json['vote_start_time']) : null,
-      voteEndTime: json['vote_end_time'] != null ? DateTime.parse(json['vote_end_time']) : null,
-      requiredQuorum: double.parse(json['required_quorum'].toString()),
-      proposalType: json['proposal_type'] as String,
-      details: json['details'] as Map<String, dynamic>?,
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      id: json['id']?.toString() ?? '',
+      proposerUserId: json['proposer_user_id']?.toString(),
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      status: _statusFromString(json['status']?.toString()),
+      voteStartTime: _parseNullableDate(json['vote_start_time']),
+      voteEndTime: _parseNullableDate(json['vote_end_time']),
+      requiredQuorum: _parseDouble(json['required_quorum']),
+      proposalType: json['proposal_type']?.toString() ?? '',
+      details: (json['details'] as Map?)?.cast<String, dynamic>(),
+      createdAt: _parseDate(json['created_at']),
+      updatedAt: _parseDate(json['updated_at']),
     );
   }
 
@@ -91,6 +91,33 @@ class Proposal {
       default:
         return ProposalStatus.unknown;
     }
+  }
+
+  // Helper to parse DateTime with fallback
+  static DateTime _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  // Helper to parse nullable DateTime
+  static DateTime? _parseNullableDate(dynamic value) {
+    if (value == null) return null;
+    return _parseDate(value);
+  }
+
+  // Helper to parse double safely
+  static double _parseDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 }
 

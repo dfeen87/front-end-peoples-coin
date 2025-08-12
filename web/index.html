@@ -18,8 +18,12 @@
     <title>Bright Acts | A Goodwill Ledger</title>
     <link rel="manifest" href="manifest.json" />
 
-    <!-- Load Google reCAPTCHA v3 -->
-    <script src="https://www.google.com/recaptcha/api.js?render=6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F" async defer></script>
+    <!-- Load Google reCAPTCHA Enterprise v3 with your site key -->
+    <script
+      src="https://www.google.com/recaptcha/enterprise.js?render=6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F"
+      async
+      defer
+    ></script>
 
     <!-- Set serviceWorkerVersion to null to avoid JS errors -->
     <script>
@@ -29,6 +33,24 @@
 
   <body>
     <script src="flutter.js" defer></script>
+
+    <!-- This is the crucial new script block for reCAPTCHA Enterprise -->
+    <script>
+        // The Flutter app will call this function to get a reCAPTCHA token.
+        // It uses the Enterprise library and returns the token via a callback.
+        function runRecaptcha(action) {
+            grecaptcha.enterprise.ready(function() {
+                grecaptcha.enterprise.execute(
+                    '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F', { action: action }
+                ).then(function(token) {
+                    // Call the Dart callback function to return the token.
+                    if (window.onRecaptchaSuccess) {
+                        window.onRecaptchaSuccess(token);
+                    }
+                });
+            });
+        }
+    </script>
 
     <script>
       window.addEventListener('load', function () {

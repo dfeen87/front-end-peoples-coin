@@ -4,11 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:async';
+import 'dart:ui';
 
 import '../state/ledger_provider.dart';
 import '../state/user_provider.dart';
 import '../models/public_ledger_entry.dart';
-import '../widgets/dynamic_nebula_background.dart';
 
 class PublicLedgerPage extends StatefulWidget {
   const PublicLedgerPage({super.key});
@@ -53,13 +53,11 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
       context.read<LedgerProvider>().fetchPublicLedgerEntries();
     }
   }
-  
+
   void _onSearchChanged(String query) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      // The `search` method does not exist on your LedgerProvider.
-      // This is a placeholder for future implementation.
-      // context.read<LedgerProvider>().search(query);
+      context.read<LedgerProvider>().search(query);
     });
   }
 
@@ -89,7 +87,6 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: () {
-              // TODO: Implement filter dialog/bottom sheet
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Filter functionality coming soon!')),
               );
@@ -102,9 +99,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
           _buildSearchHeader(),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () async {
-                _fetchInitialData();
-              },
+              onRefresh: () async => _fetchInitialData(),
               color: Colors.amber,
               backgroundColor: Colors.grey[800],
               child: _buildBody(ledgerProvider, currentUserWalletId),
@@ -117,22 +112,30 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
 
   Widget _buildSearchHeader() {
     return Padding(
-      padding: EdgeInsets.only(top: kToolbarHeight + MediaQuery.of(context).padding.top, left: 16, right: 16, bottom: 8),
-      child: TextField(
-        controller: _searchController,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          hintText: 'Search by Wallet ID or Title...',
-          hintStyle: const TextStyle(color: Colors.white54),
-          prefixIcon: const Icon(Icons.search, color: Colors.white54),
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.1),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: BorderSide.none,
+      padding: EdgeInsets.only(
+        top: kToolbarHeight + MediaQuery.of(context).padding.top,
+        left: 16,
+        right: 16,
+        bottom: 8,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          child: TextField(
+            controller: _searchController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search by Wallet ID or Title...',
+              hintStyle: const TextStyle(color: Colors.white54),
+              prefixIcon: const Icon(Icons.search, color: Colors.white54),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.1),
+              border: InputBorder.none,
+            ),
+            onChanged: _onSearchChanged,
           ),
         ),
-        onChanged: _onSearchChanged,
       ),
     );
   }
@@ -143,11 +146,21 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
     }
 
     if (ledgerProvider.errorMessage != null) {
-      return Center(child: Text('Error: ${ledgerProvider.errorMessage}', style: const TextStyle(color: Colors.redAccent)));
+      return Center(
+        child: Text(
+          'Error: ${ledgerProvider.errorMessage}',
+          style: const TextStyle(color: Colors.redAccent),
+        ),
+      );
     }
 
     if (ledgerProvider.publicLedgerEntries.isEmpty) {
-      return const Center(child: Text('No public ledger entries found.', style: TextStyle(color: Colors.white70)));
+      return const Center(
+        child: Text(
+          'No public ledger entries found.',
+          style: TextStyle(color: Colors.white70),
+        ),
+      );
     }
 
     final itemCount = ledgerProvider.publicLedgerEntries.length + (ledgerProvider.isFetchingMore ? 1 : 0);
@@ -168,28 +181,37 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
 
         final entry = ledgerProvider.publicLedgerEntries[index];
         final entryCount = ledgerProvider.publicLedgerEntries.length;
-        
+
         final animation = Tween(begin: 0.0, end: 1.0).animate(
           CurvedAnimation(
             parent: _listAnimationController,
-            curve: Interval(entryCount > 0 ? (1 / entryCount) * index : 0.0, 1.0, curve: Curves.easeOut),
+            curve: Interval(
+              entryCount > 0 ? (1 / entryCount) * index : 0.0,
+              1.0,
+              curve: Curves.easeOut,
+            ),
           ),
         );
 
         return FadeTransition(
           opacity: animation,
           child: SlideTransition(
-            position: Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(animation),
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.3),
+              end: Offset.zero,
+            ).animate(animation),
             child: PublicActionCard(
               entry: entry,
               onSendLoves: (recipientWalletId, amount, memo) async {
                 if (currentUserWalletId == null || currentUserWalletId.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to send Loves.')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please sign in to send Loves.')),
+                  );
                   return;
                 }
                 await ledgerProvider.sendLoves(
-                  senderWalletId: currentUserWalletId,
-                  recipientWalletId: recipientWalletId,
+                  senderWallet: currentUserWalletId,
+                  recipientWallet: recipientWalletId,
                   amount: amount,
                   memo: memo,
                 );
@@ -294,32 +316,38 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      color: Colors.white.withOpacity(0.05),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
-        side: BorderSide(color: Colors.white.withOpacity(0.15)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 12),
-            _buildFooter(),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              child: _isExpanded
-                  ? FadeTransition(
-                      opacity: _formAnimationController,
-                      child: _buildExpansionForm(),
-                    )
-                  : const SizedBox.shrink(),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: Card(
+          color: Colors.white.withOpacity(0.05),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+            side: BorderSide(color: Colors.white.withOpacity(0.15)),
+          ),
+          margin: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 12),
+                _buildFooter(),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  child: _isExpanded
+                      ? FadeTransition(
+                          opacity: _formAnimationController,
+                          child: _buildExpansionForm(),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -390,7 +418,7 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
       ],
     );
   }
-  
+
   Widget _buildExpansionForm() {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -444,3 +472,4 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
     );
   }
 }
+

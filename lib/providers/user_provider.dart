@@ -53,7 +53,7 @@ class UserProvider with ChangeNotifier {
       onTimeout: () => throw TimeoutException('ID token fetch timed out'),
     );
 
-    if (token.isEmpty) {
+    if ((token ?? '').isEmpty) {
       throw Exception('Failed to get Firebase ID token.');
     }
 
@@ -61,7 +61,7 @@ class UserProvider with ChangeNotifier {
   }
 
   /// Fetches user account details securely from the API.
-  Future<void> fetchUser(String userId) async {
+  Future<void> fetchUser({required String userId}) async {
     _isLoadingUser = true;
     _userError = null;
     notifyListeners();
@@ -85,7 +85,7 @@ class UserProvider with ChangeNotifier {
   }
 
   /// Fetches goodwill actions for the specified user securely from the API.
-  Future<void> fetchUserActions(String userId) async {
+  Future<void> fetchUserActions({required String userId}) async {
     _isLoadingActions = true;
     _actionsError = null;
     notifyListeners();
@@ -105,6 +105,18 @@ class UserProvider with ChangeNotifier {
     } finally {
       _isLoadingActions = false;
       notifyListeners();
+    }
+  }
+
+  /// Updates a goodwill action in the local list by matching ID, then notifies listeners.
+  void updateGoodwillAction(GoodwillAction updatedAction) {
+    final index = _userActions.indexWhere((a) => a.id == updatedAction.id);
+    if (index != -1) {
+      _userActions[index] = updatedAction;
+      notifyListeners();
+      if (kDebugMode) {
+        print('[UserProvider] Updated goodwill action: ${updatedAction.id} with status: ${updatedAction.status}');
+      }
     }
   }
 

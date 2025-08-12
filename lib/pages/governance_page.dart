@@ -4,6 +4,7 @@ import 'package:shimmer/shimmer.dart';
 import 'dart:ui';
 
 import '../state/proposal_provider.dart';
+import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../widgets/proposal_card.dart';
 import 'create_proposal_page.dart';
 import '../widgets/dynamic_nebula_background.dart';
@@ -40,9 +41,15 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
     _listAnimationController.reset();
     // Use `mounted` check for safety in async operations
     if (mounted) {
-      await context.read<ProposalProvider>().fetchProposals(status: _selectedStatus);
-      if (mounted) {
-        _listAnimationController.forward();
+      // Get the ID token from the AuthProvider
+      final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
+      final idToken = await authProvider.user?.getIdToken();
+
+      if (idToken != null) {
+        await context.read<ProposalProvider>().fetchProposals(status: _selectedStatus, idToken: idToken);
+        if (mounted) {
+          _listAnimationController.forward();
+        }
       }
     }
   }
@@ -81,13 +88,13 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
         icon: const Icon(Icons.add, color: Colors.black),
         // FIX: Made the button translucent
         label: const Text('New Proposal', style: TextStyle(color: Colors.black)),
-        backgroundColor: Colors.amber[700]!.withOpacity(0.8), 
+        backgroundColor: Colors.amber[700]!.withOpacity(0.8),
       ),
       body: Stack(
         children: [
           // FIX: The background widget is now a child of AppShell, so we remove it here.
           // This is what prevents it from resetting and makes it continuous.
-          // const DynamicNebulaBackground(), 
+          // const DynamicNebulaBackground(),
           RefreshIndicator(
             onRefresh: _fetchProposals,
             color: Colors.amber,
@@ -179,65 +186,65 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
     );
   }
 
-Widget _buildProposalList() {
-  return Consumer<ProposalProvider>(
-    builder: (context, proposalProvider, child) {
-      // Show a loading shimmer ONLY if the list is empty and we are fetching.
-      // This prevents the screen from flashing when refreshing the list.
-      if (proposalProvider.isFetchingProposals && proposalProvider.proposals.isEmpty) {
-        return _buildLoadingShimmer();
-      }
+  Widget _buildProposalList() {
+    return Consumer<ProposalProvider>(
+      builder: (context, proposalProvider, child) {
+        // Show a loading shimmer ONLY if the list is empty and we are fetching.
+        // This prevents the screen from flashing when refreshing the list.
+        if (proposalProvider.isFetchingProposals && proposalProvider.proposals.isEmpty) {
+          return _buildLoadingShimmer();
+        }
 
-      // Use the CORRECT getter 'hasProposalsError'
-      if (proposalProvider.hasProposalsError) {
-        return SliverFillRemaining(
-          child: Center(
-            child: Text(proposalProvider.proposalsError ?? 'Failed to load proposals.'),
-          ),
-        );
-      }
+        // Use the CORRECT getter 'hasProposalsError'
+        if (proposalProvider.hasProposalsError) {
+          return SliverFillRemaining(
+            child: Center(
+              child: Text(proposalProvider.proposalsError ?? 'Failed to load proposals.'),
+            ),
+          );
+        }
 
-      // Handle the case where there are no proposals after loading.
-      if (proposalProvider.proposals.isEmpty) {
-        return const SliverFillRemaining(
-          child: Center(
-            child: Text("No proposals found for this status."),
-          ),
-        );
-      }
+        // Handle the case where there are no proposals after loading.
+        if (proposalProvider.proposals.isEmpty) {
+          return const SliverFillRemaining(
+            child: Center(
+              child: Text("No proposals found for this status."),
+            ),
+          );
+        }
 
-      // If we have proposals, display them in a list.
-      return SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0).copyWith(bottom: 100),
-        sliver: SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final proposal = proposalProvider.proposals[index];
-              final animation = Tween(begin: 0.0, end: 1.0).animate(
-                CurvedAnimation(
-                  parent: _listAnimationController,
-                  curve: Interval(
-                    (1 / proposalProvider.proposals.length) * index,
-                    1.0,
-                    curve: Curves.easeOut
+        // If we have proposals, display them in a list.
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0).copyWith(bottom: 100),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final proposal = proposalProvider.proposals[index];
+                final animation = Tween(begin: 0.0, end: 1.0).animate(
+                  CurvedAnimation(
+                    parent: _listAnimationController,
+                    curve: Interval(
+                      (1 / proposalProvider.proposals.length) * index,
+                      1.0,
+                      curve: Curves.easeOut
+                    ),
                   ),
-                ),
-              );
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(animation),
-                  child: ProposalCard(proposal: proposal),
-                ),
-              );
-            },
-            childCount: proposalProvider.proposals.length,
+                );
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(animation),
+                    child: ProposalCard(proposal: proposal),
+                  ),
+                );
+              },
+              childCount: proposalProvider.proposals.length,
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   Widget _buildLoadingShimmer() {
     return SliverPadding(
@@ -260,3 +267,4 @@ Widget _buildProposalList() {
     );
   }
 }
+

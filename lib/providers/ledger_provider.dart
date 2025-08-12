@@ -24,12 +24,15 @@ class LedgerProvider with ChangeNotifier {
 
   LedgerProvider(this._apiClient);
 
-  /// Fetches public ledger entries with optional refresh.
-  /// Supports pagination based on last fetched entry ID.
+  /// Fetch public ledger entries.
+  /// If [isRefresh] is true, clears existing entries and reloads from start.
+  /// Otherwise, fetches next page based on last entry ID.
   Future<void> fetchPublicLedgerEntries({bool isRefresh = false}) async {
+    // Prevent overlapping fetches
     if (_isInitialLoading || _isFetchingMore) return;
 
     _errorMessage = null;
+
     if (isRefresh) {
       _isInitialLoading = true;
       _publicLedgerEntries = [];
@@ -53,7 +56,9 @@ class LedgerProvider with ChangeNotifier {
       }
     } catch (e) {
       _errorMessage = 'Failed to fetch ledger entries: $e';
-      if (kDebugMode) print('Error fetching ledger entries: $e');
+      if (kDebugMode) {
+        print('Error fetching ledger entries: $e');
+      }
     } finally {
       _isInitialLoading = false;
       _isFetchingMore = false;
@@ -61,13 +66,14 @@ class LedgerProvider with ChangeNotifier {
     }
   }
 
-  /// Search ledger entries with query and refresh the list.
-  Future<void> search(String query) async {
-    _currentSearchQuery = query.isEmpty ? null : query;
+  /// Set search query and refresh ledger entries.
+  Future<void> search(String? query) async {
+    final cleanedQuery = (query ?? '').trim();
+    _currentSearchQuery = cleanedQuery.isEmpty ? null : cleanedQuery;
     await fetchPublicLedgerEntries(isRefresh: true);
   }
 
-  /// Sends loves transaction and refreshes ledger after success.
+  /// Send loves transaction and refresh ledger on success.
   Future<void> sendLoves({
     required String senderWalletId,
     required String recipientWalletId,
@@ -89,7 +95,9 @@ class LedgerProvider with ChangeNotifier {
       await fetchPublicLedgerEntries(isRefresh: true);
     } catch (e) {
       _errorMessage = 'Failed to send loves: $e';
-      if (kDebugMode) print('Error sending loves: $e');
+      if (kDebugMode) {
+        print('Error sending loves: $e');
+      }
     } finally {
       _isSendingLoves = false;
       notifyListeners();

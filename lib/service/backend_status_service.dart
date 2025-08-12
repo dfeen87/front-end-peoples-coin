@@ -1,0 +1,81 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import '../service/api_client.dart';
+
+class BackendStatus {
+  final bool metabolicActive;
+  final bool nervousActive;
+  final bool endocrineActive;
+  final bool immuneActive;
+  final String nodeVersion;
+  final List<String> recentEvents;
+
+  BackendStatus({
+    required this.metabolicActive,
+    required this.nervousActive,
+    required this.endocrineActive,
+    required this.immuneActive,
+    required this.nodeVersion,
+    required this.recentEvents,
+  });
+}
+
+class BackendStatusService extends ChangeNotifier {
+  final PeoplesCoinApiClient apiClient;
+  BackendStatus? _currentStatus;
+
+  BackendStatus? get currentStatus => _currentStatus;
+  bool _loading = false;
+  bool get isLoading => _loading;
+  String? _error;
+  String? get error => _error;
+
+  StreamSubscription? _eventsSubscription;
+
+  BackendStatusService(this.apiClient) {
+    _fetchStatus();
+    _subscribeToEvents();
+  }
+
+  Future<void> _fetchStatus() async {
+    _loading = true;
+    notifyListeners();
+
+    try {
+      final statusJson = await apiClient.fetchBackendStatus();
+      _currentStatus = BackendStatus(
+        metabolicActive: statusJson['metabolicActive'] ?? false,
+        nervousActive: statusJson['nervousActive'] ?? false,
+        endocrineActive: statusJson['endocrineActive'] ?? false,
+        immuneActive: statusJson['immuneActive'] ?? false,
+        nodeVersion: statusJson['nodeVersion'] ?? 'unknown',
+        recentEvents: List<String>.from(statusJson['recentEvents'] ?? []),
+      );
+      _error = null;
+    } catch (e) {
+      _error = 'Failed to fetch backend status: $e';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  void _subscribeToEvents() {
+    _eventsSubscription = apiClient.backendEventsStream.listen((event) {
+      if (event is String) {
+        _currentStatus?.recentEvents.insert(0, event);
+        if (_currentStatus!.recentEvents.length > 50) {
+          _currentStatus!.recentEvents.removeLast();
+        }
+        notifyListeners();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _eventsSubscription?.cancel();
+    super.dispose();
+  }
+}
+

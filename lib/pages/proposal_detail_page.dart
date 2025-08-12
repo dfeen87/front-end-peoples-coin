@@ -9,7 +9,6 @@ import '../models/vote_to_send.dart';
 import '../state/proposal_provider.dart';
 import '../state/auth_provider.dart' as MyAppAuthProvider;
 import '../widgets/voting_results_bar.dart';
-import '../widgets/dynamic_nebula_background.dart';
 
 class ProposalDetailPage extends StatefulWidget {
   final String proposalId;
@@ -29,12 +28,17 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProposalProvider>().fetchProposalDetails(widget.proposalId).then((_) {
-        if (mounted) {
-          _animationController.forward();
-        }
-      });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
+      final idToken = await authProvider.user?.getIdToken();
+
+      if (idToken != null) {
+        context.read<ProposalProvider>().fetchProposalDetails(widget.proposalId, idToken: idToken).then((_) {
+          if (mounted) {
+            _animationController.forward();
+          }
+        });
+      }
     });
   }
 
@@ -124,9 +128,7 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
   }
 
   Widget _buildContent(Proposal proposal) {
-    // FIX: Reverted to hardcoded values.
-    // The error log indicates that forVotesCount and againstVotesCount do not exist on the Proposal model.
-    // This is a placeholder for when your model is updated to include them.
+    // Placeholder vote counts — update when your Proposal model supports it
     const int forVotes = 620;
     const int againstVotes = 210;
 
@@ -214,7 +216,7 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -333,3 +335,4 @@ class _VoteSuccessDialogState extends State<_VoteSuccessDialog> with SingleTicke
     );
   }
 }
+
