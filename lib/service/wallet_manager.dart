@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod/riverpod.dart';
@@ -85,8 +86,7 @@ class WalletManager extends StateNotifier<AsyncValue<List<Wallet>>> {
     }
   }
 
-  /// Attempts to unlock the wallet by ID using provided PIN.
-  /// Returns the wallet with PIN in memory if successful, else null.
+  /// Unlocks wallet by ID using PIN. Returns unlocked Wallet in memory.
   Future<Wallet?> unlockWallet({required String id, required String pin}) async {
     loadingStatus = WalletLoadingStatus.unlocking;
     lastError = null;
@@ -96,10 +96,9 @@ class WalletManager extends StateNotifier<AsyncValue<List<Wallet>>> {
       if (walletJson == null) throw Exception('Wallet not found');
 
       final Map<String, dynamic> walletMap = jsonDecode(walletJson);
-
       final keys = WalletKeys.fromJson(walletMap);
 
-      // Verify PIN by trying to decrypt private key
+      // Verify PIN by attempting private key decryption
       await _walletService.decryptPrivateKey(
         encryptedPrivateKeyBase64: keys.encryptedPrivateKeyBase64,
         encryptionPassword: pin,
@@ -107,7 +106,6 @@ class WalletManager extends StateNotifier<AsyncValue<List<Wallet>>> {
         ivBase64: keys.ivBase64,
       );
 
-      // Replace wallet with unlocked version (PIN in memory only)
       final unlockedWallet = Wallet(id: id, keys: keys, pin: pin);
       final updatedWallets = wallets.where((w) => w.id != id).toList()..add(unlockedWallet);
 
@@ -122,12 +120,6 @@ class WalletManager extends StateNotifier<AsyncValue<List<Wallet>>> {
     }
   }
 
-  /// Securely saves the wallet keys to storage (never store PIN).
-  Future<void> _saveWalletToStorage(Wallet wallet) async {
-    final walletJson = jsonEncode(wallet.keys.toJson());
-    await _secureStorage.write(key: 'wallet_${wallet.id}', value: walletJson);
-  }
-
   /// Deletes wallet from secure storage and updates state.
   Future<void> deleteWallet(String id) async {
     await _secureStorage.delete(key: 'wallet_$id');
@@ -135,18 +127,22 @@ class WalletManager extends StateNotifier<AsyncValue<List<Wallet>>> {
     state = AsyncValue.data(updatedWallets);
   }
 
-  /// Loads all wallets from secure storage (without PINs).
+  /// Securely saves wallet keys (never store PIN).
+  Future<void> _saveWalletToStorage(Wallet wallet) async {
+    final walletJson = jsonEncode(wallet.keys.toJson());
+    await _secureStorage.write(key: 'wallet_${wallet.id}', value: walletJson);
+  }
+
+  /// Loads wallets from secure storage (without PINs).
   Future<void> _loadWalletsFromStorage() async {
     try {
       final allData = await _secureStorage.readAll();
       final walletEntries = allData.entries.where((e) => e.key.startsWith('wallet_'));
 
       final loadedWallets = <Wallet>[];
-
       for (final entry in walletEntries) {
         final keysJson = jsonDecode(entry.value);
         final keys = WalletKeys.fromJson(keysJson);
-
         loadedWallets.add(Wallet(id: entry.key.substring(7), keys: keys, pin: null));
       }
 
@@ -157,12 +153,58 @@ class WalletManager extends StateNotifier<AsyncValue<List<Wallet>>> {
     }
   }
 
-  /// Starts a periodic sync timer for balance/transactions (stub).
+  /// Signs transaction data using the wallet's private key (PIN in memory required)
+  /// Returns Base64-encoded signature.
+  Future<String> signTransaction(String walletId, String dataToSign) async {
+    loadingStatus = WalletLoadingStatus.sending;
+    lastError = null;
+
+    try {
+      final wallet = wallets.firstWhere((w) => w.id == walletId, orElse: () => throw Exception('Wallet not found'));
+      if (wallet.pin == null) throw Exception('Wallet is locked. Unlock with PIN first.');
+
+      final privateKeyBytes = await _walletService.decryptPrivateKey(
+        encryptedPrivateKeyBase64: wallet.keys.encryptedPrivateKeyBase64,
+        encryptionPassword: wallet.pin!,
+        saltBase64: wallet.keys.saltBase64,
+        ivBase64: wallet.keys.ivBase64,
+      );
+
+      final signatureBase64 = await _walletService.signTransactionBase64(
+        privateKeyBytes: privateKeyBytes,
+        data: dataToSign,
+      );
+
+      loadingStatus = WalletLoadingStatus.idle;
+      return signatureBase64;
+    } catch (e, st) {
+      loadingStatus = WalletLoadingStatus.error;
+      lastError = WalletError('Failed to sign transaction: $e');
+      return '';
+    }
+  }
+
+  /// Placeholder for sending a transaction (stub).
+  Future<bool> sendTransaction(String walletId, String dataToSend) async {
+    try {
+      final signature = await signTransaction(walletId, dataToSend);
+      if (signature.isEmpty) return false;
+
+      // TODO: Replace with actual backend/blockchain transaction submission
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Periodic sync for balances or transactions (stub for now)
   void _startBalanceSync() {
     _syncTimer?.cancel();
     _syncTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       loadingStatus = WalletLoadingStatus.syncing;
-      // TODO: Implement actual sync logic with backend here.
+      // TODO: Fetch balances or transactions from backend/blockchain
       await Future.delayed(const Duration(milliseconds: 500));
       loadingStatus = WalletLoadingStatus.idle;
     });
@@ -173,15 +215,9 @@ class WalletManager extends StateNotifier<AsyncValue<List<Wallet>>> {
     _syncTimer?.cancel();
     super.dispose();
   }
-
-  /// Signs transaction data with private key (stub).
-  Future<String> signTransaction(String walletId, String dataToSign) async {
-    // TODO: Replace with real cryptographic signing using private key and WalletService
-    await Future.delayed(const Duration(milliseconds: 300));
-    return 'signed_data_placeholder';
-  }
 }
 
+/// Riverpod provider for WalletManager
 final walletManagerProvider = StateNotifierProvider<WalletManager, AsyncValue<List<Wallet>>>(
   (ref) => WalletManager(WalletService(), const FlutterSecureStorage()),
 );

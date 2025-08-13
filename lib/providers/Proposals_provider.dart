@@ -1,113 +1,130 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/proposal.dart';
 import '../models/proposal_to_send.dart';
 import '../models/vote_to_send.dart';
 import '../service/api_client.dart';
+import 'app_state_providers.dart';
 
-class ProposalProvider with ChangeNotifier {
+// --- State ---
+class ProposalState {
+  final List<Proposal> proposals;
+  final bool isFetchingProposals;
+  final String? proposalsError;
+
+  final Proposal? selectedProposal;
+  final bool isFetchingDetails;
+  final String? detailsError;
+
+  final bool isCreatingProposal;
+  final String? createProposalError;
+
+  final bool isSubmittingVote;
+  final String? submitVoteError;
+
+  const ProposalState({
+    this.proposals = const [],
+    this.isFetchingProposals = false,
+    this.proposalsError,
+    this.selectedProposal,
+    this.isFetchingDetails = false,
+    this.detailsError,
+    this.isCreatingProposal = false,
+    this.createProposalError,
+    this.isSubmittingVote = false,
+    this.submitVoteError,
+  });
+
+  ProposalState copyWith({
+    List<Proposal>? proposals,
+    bool? isFetchingProposals,
+    String? proposalsError,
+    Proposal? selectedProposal,
+    bool? isFetchingDetails,
+    String? detailsError,
+    bool? isCreatingProposal,
+    String? createProposalError,
+    bool? isSubmittingVote,
+    String? submitVoteError,
+  }) {
+    return ProposalState(
+      proposals: proposals ?? this.proposals,
+      isFetchingProposals: isFetchingProposals ?? this.isFetchingProposals,
+      proposalsError: proposalsError,
+      selectedProposal: selectedProposal ?? this.selectedProposal,
+      isFetchingDetails: isFetchingDetails ?? this.isFetchingDetails,
+      detailsError: detailsError,
+      isCreatingProposal: isCreatingProposal ?? this.isCreatingProposal,
+      createProposalError: createProposalError,
+      isSubmittingVote: isSubmittingVote ?? this.isSubmittingVote,
+      submitVoteError: submitVoteError,
+    );
+  }
+
+  factory ProposalState.initial() => const ProposalState();
+}
+
+// --- Notifier ---
+class ProposalNotifier extends StateNotifier<ProposalState> {
   final PeoplesCoinApiClient _apiClient;
 
-  List<Proposal> _proposals = [];
-  bool _isFetchingProposals = false;
-  String? _proposalsError;
+  ProposalNotifier(this._apiClient) : super(ProposalState.initial());
 
-  Proposal? _selectedProposal;
-  bool _isFetchingDetails = false;
-  String? _detailsError;
-
-  bool _isCreatingProposal = false;
-  String? _createProposalError;
-
-  bool _isSubmittingVote = false;
-  String? _submitVoteError;
-
-  List<Proposal> get proposals => _proposals;
-  bool get isFetchingProposals => _isFetchingProposals;
-  String? get proposalsError => _proposalsError;
-
-  Proposal? get selectedProposal => _selectedProposal;
-  bool get isFetchingDetails => _isFetchingDetails;
-  String? get detailsError => _detailsError;
-
-  bool get isCreatingProposal => _isCreatingProposal;
-  String? get createProposalError => _createProposalError;
-
-  bool get isSubmittingVote => _isSubmittingVote;
-  String? get submitVoteError => _submitVoteError;
-
-  ProposalProvider(this._apiClient);
-
-  /// Fetch proposals, optionally filtered by status
   Future<void> fetchProposals({String? status}) async {
-    _isFetchingProposals = true;
-    _proposalsError = null;
-    notifyListeners();
-
+    state = state.copyWith(isFetchingProposals: true, proposalsError: null);
     try {
       final rawList = await _apiClient.getProposals(status: status);
-      _proposals = rawList.map((json) => Proposal.fromJson(json)).toList();
+      final proposals = rawList.map((json) => Proposal.fromJson(json)).toList();
+      state = state.copyWith(proposals: proposals);
     } catch (e) {
-      _proposalsError = 'Failed to fetch proposals: $e';
-      _proposals = [];
+      state = state.copyWith(proposals: [], proposalsError: 'Failed to fetch proposals: $e');
     } finally {
-      _isFetchingProposals = false;
-      notifyListeners();
+      state = state.copyWith(isFetchingProposals: false);
     }
   }
 
-  /// Fetch detailed info about a specific proposal
   Future<void> fetchProposalDetails(String proposalId) async {
-    _isFetchingDetails = true;
-    _detailsError = null;
-    notifyListeners();
-
+    state = state.copyWith(isFetchingDetails: true, detailsError: null);
     try {
       final json = await _apiClient.getProposalDetails(proposalId: proposalId);
-      _selectedProposal = Proposal.fromJson(json);
+      state = state.copyWith(selectedProposal: Proposal.fromJson(json));
     } catch (e) {
-      _detailsError = 'Failed to fetch proposal details: $e';
-      _selectedProposal = null;
+      state = state.copyWith(selectedProposal: null, detailsError: 'Failed to fetch proposal details: $e');
     } finally {
-      _isFetchingDetails = false;
-      notifyListeners();
+      state = state.copyWith(isFetchingDetails: false);
     }
   }
 
-  /// Create a new proposal and refresh the list on success
   Future<void> createProposal(ProposalToSend proposal) async {
-    _isCreatingProposal = true;
-    _createProposalError = null;
-    notifyListeners();
-
+    state = state.copyWith(isCreatingProposal: true, createProposalError: null);
     try {
       await _apiClient.createProposal(proposal.toJson());
-      // Refresh proposals after creation
-      await fetchProposals();
+      await fetchProposals(); // refresh proposals
     } catch (e) {
-      _createProposalError = 'Failed to create proposal: $e';
+      state = state.copyWith(createProposalError: 'Failed to create proposal: $e');
     } finally {
-      _isCreatingProposal = false;
-      notifyListeners();
+      state = state.copyWith(isCreatingProposal: false);
     }
   }
 
-  /// Submit a vote and refresh proposal details on success
   Future<void> submitVote(VoteToSend vote) async {
-    _isSubmittingVote = true;
-    _submitVoteError = null;
-    notifyListeners();
-
+    state = state.copyWith(isSubmittingVote: true, submitVoteError: null);
     try {
       await _apiClient.submitVote(vote.toJson());
-      if (_selectedProposal != null) {
-        await fetchProposalDetails(_selectedProposal!.id);
+      if (state.selectedProposal != null) {
+        await fetchProposalDetails(state.selectedProposal!.id);
       }
     } catch (e) {
-      _submitVoteError = 'Failed to submit vote: $e';
+      state = state.copyWith(submitVoteError: 'Failed to submit vote: $e');
     } finally {
-      _isSubmittingVote = false;
-      notifyListeners();
+      state = state.copyWith(isSubmittingVote: false);
     }
   }
 }
+
+// --- Provider ---
+final proposalProviderNotifier =
+    StateNotifierProvider<ProposalNotifier, ProposalState>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return ProposalNotifier(apiClient);
+});
 

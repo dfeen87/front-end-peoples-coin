@@ -1,39 +1,44 @@
+// lib/main.dart
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
-
-import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
+import 'service/api_client.dart';
 import 'models/tech_system.dart';
 import 'models/user_account.dart';
+
 import 'pages/governance_page.dart';
 import 'pages/my_portfolio_page.dart';
 import 'pages/my_wallet_page.dart';
 import 'pages/public_ledger_page.dart';
 import 'pages/submit_goodwill_page.dart';
+
 import 'screens/code_display_page.dart';
 import 'screens/sign_in_screen.dart' as sign_in;
 import 'screens/sign_up_screen.dart' as sign_up;
 import 'screens/welcome_screen.dart';
-import 'service/api_client.dart';
-import 'state/auth_provider.dart' as MyAppAuthProvider;
-import 'state/goodwill_processing_provider.dart';
-import 'state/ledger_provider.dart';
-import 'state/proposal_provider.dart';
+
+import 'state/auth_provider.dart';
 import 'state/user_provider.dart';
+import 'state/proposal_provider.dart';
+import 'state/ledger_provider.dart';
+import 'state/goodwill_processing_provider.dart';
+
 import 'widgets/dynamic_nebula_background.dart';
 import 'widgets/navigation_card.dart';
 
-// Routes definition for easy navigation
+/// ------------------------
+/// App Routes
+/// ------------------------
 class AppRoutes {
   static const String startup = '/';
   static const String welcome = '/welcome';
@@ -43,7 +48,9 @@ class AppRoutes {
   static const String codeViewer = '/code-viewer';
 }
 
-// Theme setup for dark mode, consistent UI
+/// ------------------------
+/// Theme Setup
+/// ------------------------
 class AppTheme {
   static ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
@@ -65,7 +72,9 @@ class AppTheme {
   );
 }
 
-// Utility constants for durations, colors, and breakpoints
+/// ------------------------
+/// Constants
+/// ------------------------
 class AppDurations {
   static const fast = Duration(milliseconds: 300);
   static const medium = Duration(milliseconds: 400);
@@ -77,7 +86,6 @@ class AppColors {
   static const recordAct = Color(0xFFDA70D6);
   static const ledger = Color(0xFF00BFFF);
   static const wallet = Color(0xFF6A5ACD);
-
   static final buttonPrimary = Colors.amber[800]!;
   static final translucentGovernance = governance.withOpacity(0.2);
   static final translucentPortfolio = portfolio.withOpacity(0.2);
@@ -91,9 +99,15 @@ class AppBreakpoints {
   static const double desktop = 1200;
 }
 
+/// ------------------------
+/// Global router
+/// ------------------------
 late final GoRouter router;
 
-void initializeRouter(MyAppAuthProvider.AuthProvider authProvider) {
+/// ------------------------
+/// Router Initialization
+/// ------------------------
+void initializeRouter(AuthProvider authProvider) {
   router = GoRouter(
     initialLocation: AppRoutes.startup,
     routes: [
@@ -128,8 +142,7 @@ void initializeRouter(MyAppAuthProvider.AuthProvider authProvider) {
                 return CodeDisplayPage(title: 'Code Viewer', system: system);
               }
               return const Scaffold(
-                body: Center(child: Text('Error: No system data provided.')),
-              );
+                  body: Center(child: Text('Error: No system data provided.')));
             },
           ),
         ],
@@ -139,16 +152,8 @@ void initializeRouter(MyAppAuthProvider.AuthProvider authProvider) {
       final loggedIn = authProvider.user != null;
       final isInitializing = authProvider.isInitializing;
 
-      if (kDebugMode) {
-        print("[BrightActs] Redirect check → loggedIn=$loggedIn, isInitializing=$isInitializing, current=${state.matchedLocation}");
-      }
-
       if (isInitializing) {
-        if (state.matchedLocation == AppRoutes.startup) {
-          return null;
-        } else {
-          return AppRoutes.startup;
-        }
+        return state.matchedLocation == AppRoutes.startup ? null : AppRoutes.startup;
       }
 
       final onAuthRoute = [
@@ -171,14 +176,17 @@ void initializeRouter(MyAppAuthProvider.AuthProvider authProvider) {
   );
 }
 
+/// ------------------------
+/// Main Entry Point
+/// ------------------------
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: 'config.env');
 
   try {
-    // Load and validate environment variables
+    // Validate env variables
     final firebaseApiKey = dotenv.env['FIREBASE_API_KEY'];
-    final recaptchaSiteKey = dotenv.env['RECAPTCHA_SITE_KEY_PROD'];
+    final recaptchaSiteKey = dotenv.env['RECAPTCHA_SITE_KEY'];
     final firebaseProjectId = dotenv.env['FIREBASE_PROJECT_ID'];
     final firebaseAppId = dotenv.env['FIREBASE_APP_ID'];
 
@@ -186,7 +194,7 @@ Future<void> main() async {
       throw Exception('FIREBASE_API_KEY is missing from .env file');
     }
     if (recaptchaSiteKey == null || recaptchaSiteKey.isEmpty) {
-      throw Exception('RECAPTCHA_SITE_KEY_PROD is missing from .env file');
+      throw Exception('RECAPTCHA_SITE_KEY is missing from .env file');
     }
     if (firebaseProjectId == null || firebaseProjectId.isEmpty) {
       throw Exception('FIREBASE_PROJECT_ID is missing from .env file');
@@ -199,7 +207,7 @@ Future<void> main() async {
       apiKey: firebaseApiKey,
       authDomain: "$firebaseProjectId.firebaseapp.com",
       projectId: firebaseProjectId,
-      storageBucket: "$firebaseProjectId.firebasestorage.app",
+      storageBucket: "$firebaseProjectId.appspot.com",
       messagingSenderId: "289762069070",
       appId: firebaseAppId,
     );
@@ -209,25 +217,21 @@ Future<void> main() async {
       webProvider: ReCaptchaEnterpriseProvider(recaptchaSiteKey),
     );
 
-    if (kDebugMode) {
-      print("[BrightActs] ✅ Firebase initialized & App Check activated");
-    }
+    if (kDebugMode) print("[BrightActs] ✅ Firebase initialized & App Check activated");
 
     final apiClient = PeoplesCoinApiClient();
-    final authProvider = MyAppAuthProvider.AuthProvider(apiClient);
-
+    final authProvider = AuthProvider(apiClient);
     initializeRouter(authProvider);
 
     runApp(
       ProviderScope(
         child: RootProviderScope(
-        apiClient: apiClient,
-        authProvider: authProvider,
-        child: const BrightActsApp(),
+          apiClient: apiClient,
+          authProvider: authProvider,
+          child: const BrightActsApp(),
+        ),
       ),
-   ),
-);
-
+    );
   } catch (error, stackTrace) {
     if (kDebugMode) {
       print('[BrightActs] FATAL ERROR DURING BOOTSTRAP: $error');
@@ -237,6 +241,9 @@ Future<void> main() async {
   }
 }
 
+/// ------------------------
+/// Error Display App
+/// ------------------------
 class ErrorDisplayApp extends StatelessWidget {
   final String error;
   const ErrorDisplayApp({super.key, required this.error});
@@ -261,9 +268,12 @@ class ErrorDisplayApp extends StatelessWidget {
   }
 }
 
+/// ------------------------
+/// RootProviderScope
+/// ------------------------
 class RootProviderScope extends StatelessWidget {
   final PeoplesCoinApiClient apiClient;
-  final MyAppAuthProvider.AuthProvider authProvider;
+  final AuthProvider authProvider;
   final Widget child;
 
   const RootProviderScope({
@@ -289,11 +299,14 @@ class RootProviderScope extends StatelessWidget {
   }
 }
 
-class BrightActsApp extends StatelessWidget {
+/// ------------------------
+/// BrightActsApp
+/// ------------------------
+class BrightActsApp extends ConsumerWidget {
   const BrightActsApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'Bright Acts | A Goodwill Ledger',
       debugShowCheckedModeBanner: false,
@@ -305,6 +318,9 @@ class BrightActsApp extends StatelessWidget {
   }
 }
 
+/// ------------------------
+/// App Shell
+/// ------------------------
 class AppShell extends StatelessWidget {
   final Widget child;
   const AppShell({required this.child, super.key});
@@ -320,6 +336,9 @@ class AppShell extends StatelessWidget {
   }
 }
 
+/// ------------------------
+/// StartupScreen
+/// ------------------------
 class StartupScreen extends StatelessWidget {
   const StartupScreen({super.key});
 
@@ -333,7 +352,10 @@ class StartupScreen extends StatelessWidget {
           children: [
             CircularProgressIndicator(color: Colors.white),
             SizedBox(height: 20),
-            Text("Loading BrightActs...", style: TextStyle(color: Colors.white70)),
+            Text(
+              "Loading BrightActs...",
+              style: TextStyle(color: Colors.white70),
+            ),
           ],
         ),
       ),
@@ -341,13 +363,17 @@ class StartupScreen extends StatelessWidget {
   }
 }
 
-class HomePage extends StatefulWidget {
+/// ------------------------
+/// HomePage
+/// ------------------------
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
+
   @override
-  State<HomePage> createState() => _HomePageState();
+  HomePageState createState() => HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixin {
   int selectedIndex = 2;
   late final PageController _pageController;
   late final List<Widget> _pages;
@@ -477,76 +503,69 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-Widget _buildWelcomeHeader() {
-  return Consumer(
-    builder: (context, ref, _) {
-      final walletState = ref.watch(walletFacilitatorProvider);
-      final authProvider = ref.watch(MyAppAuthProvider.authProviderNotifier);
-      final userProvider = ref.watch(userProviderNotifier);
+  Widget _buildWelcomeHeader() {
+    final walletState = ref.watch(walletFacilitatorProvider);
+    final authProvider = ref.watch(authProviderNotifier);
+    final userProvider = ref.watch(userProviderNotifier);
+    final authUser = authProvider.user;
 
-      final authUser = authProvider.user;
+    final welcomeText = authUser != null
+        ? 'Welcome, ${authUser.displayName ?? authUser.email ?? authUser.uid}'
+        : 'Connecting...';
 
-      // Determine welcome text
-      final welcomeText = authUser != null
-          ? 'Welcome, ${authUser.displayName ?? authUser.email ?? authUser.uid}'
-          : 'Connecting...';
+    String balanceText;
+    if (walletState.isLoading) {
+      balanceText = "Loading...";
+    } else if (walletState.errorMessage != null) {
+      balanceText = "Error";
+    } else {
+      balanceText = walletState.balance.toStringAsFixed(2);
+    }
 
-      // Show balance from wallet facilitator state
-      String balanceText;
-      if (walletState.isLoading) {
-        balanceText = "Loading...";
-      } else if (walletState.errorMessage != null) {
-        balanceText = "Error";
-      } else {
-        balanceText = walletState.balance.toStringAsFixed(2);
-      }
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          MatrixText(
-            targetText: welcomeText,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontSize: 24,
-                  fontFamily: 'monospace',
-                ),
-            isLoading: userProvider.isLoading,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                'Your Wallet Balance: ',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        MatrixText(
+          targetText: welcomeText,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontSize: 24,
+                fontFamily: 'monospace',
               ),
-              if (walletState.isLoading)
-                Text(
-                  "******",
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: 18,
-                        color: Colors.white,
-                      ),
-                )
-              else
-                SlotMachineBalance(
-                  balance: (walletState.balance).toInt(),
-                  textStyle: Theme.of(context).textTheme.titleLarge!.copyWith(
-                        fontSize: 18,
-                        color: Colors.amber,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
+          isLoading: userProvider.isLoading,
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              'Your Wallet Balance: ',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+            ),
+            if (walletState.isLoading)
               Text(
-                ' Loves',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+                "******",
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontSize: 18,
+                      color: Colors.white,
+                    ),
+              )
+            else
+              SlotMachineBalance(
+                balance: walletState.balance.toInt(),
+                textStyle: Theme.of(context).textTheme.titleLarge!.copyWith(
+                      fontSize: 18,
+                      color: Colors.amber,
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
-            ],
-          ),
-        ],
-      );
-    },
-  );
-}
+            Text(
+              ' Loves',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   Widget _buildPageView() {
     return AnimatedOpacity(
@@ -615,16 +634,14 @@ Widget _buildWelcomeHeader() {
         buttonText: buttonText,
         onPressed: () {
           HapticFeedback.selectionClick();
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => pageToOpen),
-          );
+          Navigator.of(context).push(MaterialPageRoute(builder: (context) => pageToOpen));
         },
       ),
     );
   }
 }
 
-// MatrixText and SlotMachineBalance widgets with animation
+// MatrixText widget for animated text effect
 class MatrixText extends StatefulWidget {
   final String targetText;
   final TextStyle? style;
@@ -675,20 +692,14 @@ class _MatrixTextState extends State<MatrixText> {
 
     if (widget.isLoading) {
       _timer = Timer.periodic(const Duration(milliseconds: 60), (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
-        }
+        if (!mounted) return timer.cancel();
         setState(() {
           _displayText = _generateRandomString(widget.targetText.length);
         });
       });
     } else {
       _timer = Timer.periodic(const Duration(milliseconds: 40), (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
-        }
+        if (!mounted) return timer.cancel();
         setState(() {
           if (_revealIndex >= widget.targetText.length) {
             _displayText = widget.targetText;
@@ -698,10 +709,7 @@ class _MatrixTextState extends State<MatrixText> {
           final scramblingPart = _generateRandomString(widget.targetText.length - _revealIndex);
           final revealedPart = widget.targetText.substring(0, _revealIndex);
           _displayText = revealedPart + scramblingPart;
-
-          if (timer.tick % 2 == 0) {
-            _revealIndex++;
-          }
+          if (timer.tick % 2 == 0) _revealIndex++;
         });
       });
     }
@@ -710,7 +718,9 @@ class _MatrixTextState extends State<MatrixText> {
   String _generateRandomString(int length) {
     if (length <= 0) return '';
     return String.fromCharCodes(Iterable.generate(
-        length, (_) => _chars.codeUnitAt(_random.nextInt(_chars.length))));
+      length,
+      (_) => _chars.codeUnitAt(_random.nextInt(_chars.length)),
+    ));
   }
 
   @override
@@ -719,6 +729,7 @@ class _MatrixTextState extends State<MatrixText> {
   }
 }
 
+// SlotMachineBalance widget for animated numeric balance
 class SlotMachineBalance extends StatefulWidget {
   final int balance;
   final TextStyle textStyle;
@@ -769,7 +780,6 @@ class _SlotMachineBalanceState extends State<SlotMachineBalance> with SingleTick
           _displayBalance = _animation.value.round();
         });
       });
-
     _controller.reset();
     _controller.forward();
   }
@@ -780,7 +790,7 @@ class _SlotMachineBalanceState extends State<SlotMachineBalance> with SingleTick
   }
 }
 
-// Settings Bottom Sheet with useful links and sign out button
+// Settings Bottom Sheet with useful links and sign out
 class SettingsBottomSheet extends StatelessWidget {
   const SettingsBottomSheet({super.key});
 
@@ -869,7 +879,6 @@ class SettingsBottomSheet extends StatelessWidget {
       path: 'support@brightacts.com',
       queryParameters: {'subject': 'Bright Acts Support Request'},
     );
-
     try {
       if (!await url_launcher.launchUrl(emailLaunchUri)) {
         if (context.mounted) {
@@ -912,7 +921,9 @@ class SettingsBottomSheet extends StatelessWidget {
                   final uri = Uri.parse(url);
                   if (!await url_launcher.launchUrl(uri, mode: url_launcher.LaunchMode.externalApplication)) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not launch $url')));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Could not launch $url')),
+                      );
                     }
                   }
                 }

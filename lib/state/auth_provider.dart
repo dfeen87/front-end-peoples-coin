@@ -1,169 +1,152 @@
 // lib/state/auth_provider.dart
-
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-
-import '../models/user_account.dart';
 import '../service/api_client.dart';
+import '../models/user_account.dart';
 
-/// Manages user authentication state using Firebase Auth and integrates with backend user data.
-class AuthProvider with ChangeNotifier {
-  final fb_auth.FirebaseAuth _auth = fb_auth.FirebaseAuth.instance;
+/// --- Auth State ---
+enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
+
+class AuthState {
+  final fb_auth.User? firebaseUser;
+  final UserAccount? userAccount;
+  final AuthStatus status;
+  final String? error;
+
+  const AuthState({
+    this.firebaseUser,
+    this.userAccount,
+    this.status = AuthStatus.initial,
+    this.error,
+  });
+
+  AuthState copyWith({
+    fb_auth.User? firebaseUser,
+    UserAccount? userAccount,
+    AuthStatus? status,
+    String? error,
+  }) {
+    return AuthState(
+      firebaseUser: firebaseUser ?? this.firebaseUser,
+      userAccount: userAccount ?? this.userAccount,
+      status: status ?? this.status,
+      error: error,
+    );
+  }
+
+  factory AuthState.initial() => const AuthState(status: AuthStatus.initial);
+}
+
+/// --- Auth Notifier ---
+class AuthNotifier extends StateNotifier<AuthState> {
   final PeoplesCoinApiClient _apiClient;
+  final fb_auth.FirebaseAuth _auth = fb_auth.FirebaseAuth.instance;
+  StreamSubscription<fb_auth.User?>? _authSub;
 
-  fb_auth.User? _user;
-  UserAccount? _userAccount;
-  String? _error;
+  // Dev user credentials for quick local testing
+  static const _devEmail = 'dfeen87@brightacts.com';
+  static const _devPassword = 'bleigh1!';
 
-  // `_isLoading` is for actions like the sign-in button press.
-  bool _isLoading = false;
-
-  // `_isInitializing` is ONLY for the initial app startup authentication check.
-  bool _isInitializing = true;
-
-  // --- Public Getters ---
-  fb_auth.User? get user => _user;
-  UserAccount? get userAccount => _userAccount;
-  String? get error => _error;
-  bool get isLoading => _isLoading;
-  bool get isInitializing => _isInitializing; // The router will use this.
-
-  AuthProvider(this._apiClient) {
-    // Listen to auth state changes and let a single handler manage the logic.
-    _auth.authStateChanges().listen(_onAuthStateChanged);
+  AuthNotifier(this._apiClient) : super(AuthState.initial()) {
+    _authSub = _auth.authStateChanges().listen(_onAuthStateChanged);
   }
 
-  /// This is the single source of truth for handling auth changes.
-  /// It runs on app startup and after any sign-in/sign-out event.
+  /// Handle Firebase auth changes
   Future<void> _onAuthStateChanged(fb_auth.User? firebaseUser) async {
-    // If the user object is the same, no need to do anything.
-    if (firebaseUser?.uid == _user?.uid && !_isInitializing) return;
-
-    _user = firebaseUser;
-
-    if (firebaseUser != null) {
-      // If a user is logged in, get their ID token and fetch their profile.
-      try {
-        final idToken = await firebaseUser.getIdToken();
-        if (idToken != null) {
-          _userAccount = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
-        } else {
-          // If ID token is null, we can't authenticate with backend
-          _userAccount = null;
-          _user = null;
-        }
-      } catch (e) {
-        if (kDebugMode) print('Error fetching user account: $e');
-        // If the backend profile is missing, we treat it as a failed login.
-        _userAccount = null;
-        _user = null; // Force sign out.
-      }
-    } else {
-      // If no user from Firebase, clear the local user profile.
-      _userAccount = null;
+    if (firebaseUser == null) {
+      state = state.copyWith(
+        firebaseUser: null,
+        userAccount: null,
+        status: AuthStatus.unauthenticated,
+        error: null,
+      );
+      return;
     }
 
-    // This check ensures we only flip the `isInitializing` flag once on app startup.
-    if (_isInitializing) {
-      _isInitializing = false;
-    }
-
-    // Ensure loading indicators from sign-in/sign-up are turned off.
-    _isLoading = false;
-
-    // Notify all listeners that the final, complete state is ready.
-    notifyListeners();
-  }
-
-  /// Sign in with email and password.
-  Future<Map<String, dynamic>> signInWithEmailAndPassword(String email, String password) async {
-    // Dev user credentials for quick local testing
-    const devEmail = "dfeen87@brightacts.com";
-    const devPassword = "bleigh1!";
-
-    if (email == devEmail && password == devPassword) {
-      return _signInWithMockUser(email);
-    }
-
-    // --- Standard Firebase Sign In ---
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    state = state.copyWith(status: AuthStatus.loading, firebaseUser: firebaseUser);
 
     try {
-      // This call will trigger the `_onAuthStateChanged` listener, which handles the rest.
+      final idToken = await firebaseUser.getIdToken();
+      final account = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
+      state = state.copyWith(
+        firebaseUser: firebaseUser,
+        userAccount: account,
+        status: AuthStatus.authenticated,
+        error: null,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        firebaseUser: null,
+        userAccount: null,
+        status: AuthStatus.error,
+        error: 'Failed to fetch user profile: $e',
+      );
+    }
+  }
+
+  /// Sign in with email/password
+  Future<void> signIn(String email, String password) async {
+    state = state.copyWith(status: AuthStatus.loading, error: null);
+
+    if (email == _devEmail && password == _devPassword) {
+      await _signInWithDevUser();
+      return;
+    }
+
+    try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-      return {'success': true, 'message': 'Signed in successfully!'};
+      // `_onAuthStateChanged` handles backend fetch
     } on fb_auth.FirebaseAuthException catch (e) {
-      _error = _firebaseErrorMessage(e);
-      _isLoading = false;
-      notifyListeners(); // Notify to show the error.
-      return {'success': false, 'error': _error};
+      state = state.copyWith(status: AuthStatus.error, error: _firebaseErrorMessage(e));
     } catch (e) {
-      _error = 'An unexpected error occurred: $e';
-      _isLoading = false;
-      notifyListeners(); // Notify to show the error.
-      return {'success': false, 'error': _error};
+      state = state.copyWith(status: AuthStatus.error, error: 'Unexpected error: $e');
     }
   }
 
-  /// Special handler for the mock developer user.
-  /// This does not trigger the Firebase listener, so it manages its own state.
-  Future<Map<String, dynamic>> _signInWithMockUser(String email) async {
-    _isLoading = true;
-    notifyListeners();
-
-    _user = UserMock(email: email);
+  /// Sign up new user
+  Future<void> signUp(String email, String password) async {
+    state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
-      // Pass a mock ID token for the backend call
-      _userAccount = await _apiClient.getAuthenticatedUserProfile(idToken: 'mock_id_token');
-    } catch (e) {
-      if (kDebugMode) print('Error fetching mock user account: $e');
-      _userAccount = null;
-      _user = null; // Failed to get profile, so fail the login.
-    }
-
-    if (_isInitializing) {
-      _isInitializing = false;
-    }
-    _isLoading = false;
-    notifyListeners();
-    return {'success': true, 'message': 'Dev user signed in successfully!'};
-  }
-
-  /// Register new user with email and password.
-  Future<Map<String, dynamic>> signUpWithEmailAndPassword(String email, String password) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      // This call will trigger the `_onAuthStateChanged` listener.
       await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      // NOTE: If you create a backend user profile here, the listener will fetch it.
-      return {'success': true, 'message': 'Account created successfully!'};
     } on fb_auth.FirebaseAuthException catch (e) {
-      _error = _firebaseErrorMessage(e);
-      _isLoading = false;
-      notifyListeners(); // Notify to show the error.
-      return {'success': false, 'error': _error};
+      state = state.copyWith(status: AuthStatus.error, error: _firebaseErrorMessage(e));
     } catch (e) {
-      _error = 'An unexpected error occurred: $e';
-      _isLoading = false;
-      notifyListeners(); // Notify to show the error.
-      return {'success': false, 'error': _error};
+      state = state.copyWith(status: AuthStatus.error, error: 'Unexpected error: $e');
     }
   }
 
-  /// Sign out current user.
+  /// Sign out
   Future<void> signOut() async {
-    // The `_onAuthStateChanged` listener will handle clearing the state
-    // when it receives the `null` user from Firebase.
     await _auth.signOut();
   }
 
-  /// Helper to convert Firebase error codes to user-friendly messages.
+  /// Dev/mock user sign in
+  Future<void> _signInWithDevUser() async {
+    state = state.copyWith(status: AuthStatus.loading, error: null);
+
+    final mockUser = _MockUser(email: _devEmail);
+    state = state.copyWith(firebaseUser: mockUser);
+
+    try {
+      final account = await _apiClient.getAuthenticatedUserProfile(idToken: 'mock_id_token');
+      state = state.copyWith(
+        firebaseUser: mockUser,
+        userAccount: account,
+        status: AuthStatus.authenticated,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        firebaseUser: null,
+        userAccount: null,
+        status: AuthStatus.error,
+        error: 'Failed to fetch mock user profile: $e',
+      );
+    }
+  }
+
+  /// Convert FirebaseAuthException codes to user-friendly messages
   String _firebaseErrorMessage(fb_auth.FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-email': return 'The email address is badly formatted.';
@@ -176,86 +159,50 @@ class AuthProvider with ChangeNotifier {
       default: return e.message ?? 'Authentication error occurred.';
     }
   }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
 }
 
-// --- Your Mock Classes (Unchanged) ---
-class UserMock implements fb_auth.User {
+/// --- Provider ---
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return AuthNotifier(apiClient);
+});
+
+/// --- Mock user for dev/testing ---
+class _MockUser implements fb_auth.User {
   @override
   final String email;
 
-  UserMock({required this.email});
+  _MockUser({required this.email});
 
   @override
   String get uid => 'mock_uid_${email.hashCode}';
-
   @override
-  String? get displayName => 'Mock User';
-
+  String? get displayName => 'Dev User';
   @override
   bool get isAnonymous => false;
-
   @override
   bool get isEmailVerified => true;
-
   @override
-  fb_auth.UserMetadata get metadata => UserMetadata(
-        creationTime: DateTime.now(),
-        lastSignInTime: DateTime.now(),
-      );
-
-  // --- All other required overrides for fb_auth.User ---
-  @override
-  String? get phoneNumber => null;
-  @override
-  String? get photoURL => null;
+  fb_auth.UserMetadata get metadata => _MockUserMetadata();
   @override
   List<fb_auth.UserInfo> get providerData => [];
   @override
-  String? get refreshToken => null;
-  @override
-  String? get tenantId => null;
-  @override
-  Future<void> sendEmailVerification([fb_auth.ActionCodeSettings? actionCodeSettings]) async {}
-  @override
-  Future<fb_auth.User> unlink(String providerId) async {throw UnimplementedError();}
-  @override
-  Future<fb_auth.UserCredential> linkWithProvider(fb_auth.AuthProvider provider) async {throw UnimplementedError();}
-  @override
-  Future<fb_auth.UserCredential> reauthenticateWithProvider(fb_auth.AuthProvider provider) async {throw UnimplementedError();}
-  @override
-  Future<fb_auth.UserCredential> linkWithPopup(fb_auth.AuthProvider provider) async {throw UnimplementedError();}
-  @override
-  Future<void> linkWithRedirect(fb_auth.AuthProvider provider) async {throw UnimplementedError();}
-  @override
-  Future<String> getIdToken([bool forceRefresh = false]) async {return 'mock_id_token';}
-  @override
-  Future<void> reload() async {}
-  @override
-  Future<fb_auth.UserCredential> linkWithCredential(fb_auth.AuthCredential credential) {throw UnimplementedError();}
-  @override
-  Future<void> delete() {throw UnimplementedError();}
-  @override
-  Future<void> updateEmail(String newEmail) {throw UnimplementedError();}
-  @override
-  Future<void> updatePassword(String newPassword) {throw UnimplementedError();}
-  @override
-  Future<void> updateProfile({String? displayName, String? photoURL}) {throw UnimplementedError();}
-  @override
-  Future<void> updateDisplayName(String? displayName) {throw UnimplementedError();}
-  @override
-  Future<void> updatePhotoURL(String? photoURL) {throw UnimplementedError();}
-  @override
-  Future<void> updatePhoneNumber(fb_auth.PhoneAuthCredential credential) {throw UnimplementedError();}
-  @override
-  Future<void> verifyBeforeUpdateEmail(String newEmail, [fb_auth.ActionCodeSettings? actionCodeSettings]) {throw UnimplementedError();}
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  Future<String> getIdToken([bool forceRefresh = false]) async => 'mock_id_token';
+
+  // --- All other methods throw unimplemented ---
+  @override dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class UserMetadata implements fb_auth.UserMetadata {
+class _MockUserMetadata implements fb_auth.UserMetadata {
   @override
-  final DateTime creationTime;
+  DateTime get creationTime => DateTime.now();
   @override
-  final DateTime lastSignInTime;
-  UserMetadata({required this.creationTime, required this.lastSignInTime});
+  DateTime get lastSignInTime => DateTime.now();
 }
+

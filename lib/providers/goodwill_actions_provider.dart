@@ -1,82 +1,100 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/goodwill_action.dart';
 import '../service/api_client.dart';
+import 'app_state_providers.dart';
 
-class GoodwillActionsProvider with ChangeNotifier {
+class GoodwillActionsState {
+  final List<GoodwillAction> actions;
+  final bool isLoading;
+  final String? error;
+  final bool isSubmitting;
+  final String? submitError;
+
+  const GoodwillActionsState({
+    this.actions = const [],
+    this.isLoading = false,
+    this.error,
+    this.isSubmitting = false,
+    this.submitError,
+  });
+
+  GoodwillActionsState copyWith({
+    List<GoodwillAction>? actions,
+    bool? isLoading,
+    String? error,
+    bool? isSubmitting,
+    String? submitError,
+  }) {
+    return GoodwillActionsState(
+      actions: actions ?? this.actions,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      submitError: submitError,
+    );
+  }
+
+  factory GoodwillActionsState.initial() => const GoodwillActionsState();
+}
+
+class GoodwillActionsNotifier extends StateNotifier<GoodwillActionsState> {
   final PeoplesCoinApiClient _apiClient;
 
-  List<GoodwillAction> _actions = [];
-  bool _isLoading = false;
-  String? _error;
+  GoodwillActionsNotifier(this._apiClient) : super(GoodwillActionsState.initial());
 
-  String? _submitError;
-  bool _isSubmitting = false;
-
-  List<GoodwillAction> get actions => _actions;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-
-  bool get isSubmitting => _isSubmitting;
-  String? get submitError => _submitError;
-
-  GoodwillActionsProvider(this._apiClient);
-
-  /// Fetch all goodwill actions for a given user
-  Future<void> fetchUserActions({required String userId, required String idToken}) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  Future<void> fetchUserActions({
+    required String userId,
+    required String idToken,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final rawList = await _apiClient.getUserGoodwillActions(userId: userId, idToken: idToken);
-      _actions = rawList.map((json) => GoodwillAction.fromJson(json)).toList();
+      final rawList = await _apiClient.getUserGoodwillActions(
+        userId: userId,
+        idToken: idToken,
+      );
+      final actions = rawList.map((json) => GoodwillAction.fromJson(json)).toList();
+      state = state.copyWith(actions: actions);
     } catch (e) {
-      _error = 'Failed to fetch goodwill actions: $e';
-      _actions = [];
+      state = state.copyWith(actions: [], error: 'Failed to fetch goodwill actions: $e');
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      state = state.copyWith(isLoading: false);
     }
   }
 
-  /// Submit a new goodwill action and start polling for its verification status
   Future<void> submitGoodwill({
     required Map<String, dynamic> actionToSend,
     required String idToken,
   }) async {
-    _isSubmitting = true;
-    _submitError = null;
-    notifyListeners();
+    state = state.copyWith(isSubmitting: true, submitError: null);
 
     try {
-      final response = await _apiClient.submitGoodwill(goodwillAction: actionToSend, idToken: idToken);
+      final response = await _apiClient.submitGoodwill(
+        goodwillAction: actionToSend,
+        idToken: idToken,
+      );
 
       final String actionId = response['id'] as String;
 
-      // Add new action locally with initial PENDING_VERIFICATION status
       final newAction = GoodwillAction.fromJson({
         ...actionToSend,
         'id': actionId,
         'status': 'PENDING_VERIFICATION',
       });
-      _actions.insert(0, newAction);
-      notifyListeners();
 
-      // Start polling for status updates until terminal state reached
+      state = state.copyWith(actions: [newAction, ...state.actions]);
+
       await _pollGoodwillStatus(actionId, idToken);
     } catch (e) {
-      _submitError = 'Failed to submit goodwill action: $e';
-      notifyListeners();
+      state = state.copyWith(submitError: 'Failed to submit goodwill action: $e');
       rethrow;
     } finally {
-      _isSubmitting = false;
-      notifyListeners();
+      state = state.copyWith(isSubmitting: false);
     }
   }
 
-  /// Internal polling loop to update goodwill action status
   Future<void> _pollGoodwillStatus(String actionId, String idToken) async {
     bool done = false;
     const pollInterval = Duration(seconds: 5);
@@ -92,23 +110,27 @@ class GoodwillActionsProvider with ChangeNotifier {
         }
 
         final status = GoodwillAction._statusFromString(statusString);
+        final index = state.actions.indexWhere((a) => a.id == actionId);
 
-        final index = _actions.indexWhere((a) => a.id == actionId);
         if (index != -1) {
-          final updatedAction = _actions[index].copyWith(status: status);
-          _actions[index] = updatedAction;
-          notifyListeners();
+          final updatedActions = [...state.actions];
+          updatedActions[index] = updatedActions[index].copyWith(status: status);
+          state = state.copyWith(actions: updatedActions);
         }
 
-        // Stop polling on terminal states
         if (status == GoodwillStatus.verified || status == GoodwillStatus.rejected) {
           done = true;
         }
       } catch (_) {
-        // Stop polling on error; could add retry logic here if desired
         done = true;
       }
     }
   }
 }
+
+final goodwillActionsProviderNotifier =
+    StateNotifierProvider<GoodwillActionsNotifier, GoodwillActionsState>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return GoodwillActionsNotifier(apiClient);
+});
 

@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_account.dart';
 import '../models/goodwill_action.dart';
 import '../service/api_client.dart';
-import 'app_state_providers.dart'; // <-- contains apiClientProvider
 
 // --- State ---
 class UserState {
@@ -96,10 +95,8 @@ class UserNotifier extends StateNotifier<UserState> {
     state = state.copyWith(isLoadingActions: true, actionsError: null);
     try {
       final idToken = await _getIdToken();
-      final actions = await _apiClient.getUserGoodwillActions(
-        userId: userId,
-        idToken: idToken,
-      );
+      final actions =
+          await _apiClient.getUserGoodwillActions(userId: userId, idToken: idToken);
       state = state.copyWith(userActions: actions, isLoadingActions: false);
     } catch (e) {
       state = state.copyWith(
@@ -127,7 +124,7 @@ class UserNotifier extends StateNotifier<UserState> {
 // --- Provider ---
 final userProviderNotifier =
     StateNotifierProvider<UserNotifier, UserState>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
+  final apiClient = PeoplesCoinApiClient();
   return UserNotifier(apiClient);
 });
 
