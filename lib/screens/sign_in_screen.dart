@@ -1,10 +1,10 @@
+// lib/screens/sign_in_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/auth_provider.dart';
-import '../service/wallet_manager.dart';
 import '../widgets/dynamic_nebula_background.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
@@ -33,33 +33,30 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     // Unfocus text fields
     FocusScope.of(context).unfocus();
 
-    final authProvider = ref.read(authProviderProvider.notifier);
-    final walletManager = ref.read(walletManagerProvider.notifier);
+    // Use the correct provider name
+    final authService = ref.read(authServiceProvider.notifier);
 
-    final result = await authProvider.signInWithEmailAndPassword(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
-
-    if (result['success'] == false && mounted) {
+    try {
+      // Call the signIn method. The wallet logic is now handled automatically.
+      await authService.signIn(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+      
+      // Navigate to the home screen. The AuthStatus provider will handle
+      // the routing to the correct screen (e.g., if there's an error).
+      if (mounted) context.go('/home');
+      
+    } catch (e) {
+      if (!mounted) return;
       _passwordController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['error'] ?? 'An unknown error occurred.'),
+          content: Text(e.toString()),
           backgroundColor: Colors.redAccent,
         ),
       );
-      return;
     }
-
-    // Unlock existing wallet if present
-    final wallets = walletManager.wallets;
-    if (wallets.isNotEmpty) {
-      await walletManager.unlockWallet(id: wallets.first.id);
-    }
-
-    // Navigate to home/dashboard after sign-in
-    if (mounted) context.go('/home');
   }
 
   InputDecoration _buildInputDecoration(String label, IconData icon,
@@ -92,7 +89,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = ref.watch(authProviderProvider).isLoading;
+    // Watch the auth status to handle loading state.
+    final authStatus = ref.watch(authStatusProvider);
+    final isLoading = authStatus == AuthStatus.loading;
 
     final passwordVisibilityToggle = IconButton(
       icon: Icon(
@@ -246,4 +245,3 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     );
   }
 }
-

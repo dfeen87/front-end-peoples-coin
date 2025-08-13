@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+
+@immutable
 class LedgerEntry {
   final String id;
   final String senderWalletId;
@@ -6,7 +9,7 @@ class LedgerEntry {
   final String? memo;
   final DateTime timestamp;
 
-  LedgerEntry({
+  const LedgerEntry({
     required this.id,
     required this.senderWalletId,
     required this.recipientWalletId,
@@ -14,6 +17,25 @@ class LedgerEntry {
     this.memo,
     required this.timestamp,
   });
+
+  /// Creates a new instance of [LedgerEntry] with optional new values.
+  LedgerEntry copyWith({
+    String? id,
+    String? senderWalletId,
+    String? recipientWalletId,
+    int? amount,
+    String? memo,
+    DateTime? timestamp,
+  }) {
+    return LedgerEntry(
+      id: id ?? this.id,
+      senderWalletId: senderWalletId ?? this.senderWalletId,
+      recipientWalletId: recipientWalletId ?? this.recipientWalletId,
+      amount: amount ?? this.amount,
+      memo: memo ?? this.memo,
+      timestamp: timestamp ?? this.timestamp,
+    );
+  }
 
   /// Creates a LedgerEntry instance from a JSON map.
   factory LedgerEntry.fromJson(Map<String, dynamic> json) {
@@ -27,7 +49,7 @@ class LedgerEntry {
     );
   }
 
-  /// Converts the LedgerEntry instance to JSON map.
+  /// Converts the LedgerEntry instance to a JSON map.
   Map<String, dynamic> toJson() {
     return {
       'id': id,

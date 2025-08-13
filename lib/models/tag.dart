@@ -10,6 +10,17 @@ class Tag {
     required this.name,
   });
 
+  /// Creates a new instance of [Tag] with optional new values.
+  Tag copyWith({
+    String? id,
+    String? name,
+  }) {
+    return Tag(
+      id: id ?? this.id,
+      name: name ?? this.name,
+    );
+  }
+
   factory Tag.fromJson(Map<String, dynamic> json) {
     return Tag(
       id: json['id'] as String,

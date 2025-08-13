@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+/// A data model for a technical system, including visual and descriptive data.
+@immutable
 class TechSystem {
   final IconData icon;
   final String title;
@@ -15,6 +18,7 @@ class TechSystem {
     required this.code,
   });
 
+  /// Creates a new instance of [TechSystem] with optional new values.
   TechSystem copyWith({
     IconData? icon,
     String? title,
@@ -31,6 +35,7 @@ class TechSystem {
     );
   }
 
+  /// Converts this model into a JSON map.
   Map<String, dynamic> toJson() {
     return {
       'icon_code_point': icon.codePoint,
@@ -44,18 +49,19 @@ class TechSystem {
     };
   }
 
+  /// Creates a [TechSystem] instance from a JSON map.
   factory TechSystem.fromJson(Map<String, dynamic> json) {
     return TechSystem(
       icon: IconData(
-        json['icon_code_point'],
-        fontFamily: json['icon_font_family'],
-        fontPackage: json['icon_font_package'],
-        matchTextDirection: json['icon_match_text_direction'] ?? false,
+        json['icon_code_point'] as int,
+        fontFamily: json['icon_font_family'] as String?,
+        fontPackage: json['icon_font_package'] as String?,
+        matchTextDirection: json['icon_match_text_direction'] as bool? ?? false,
       ),
-      title: json['title'],
-      description: json['description'],
-      color: Color(json['color']),
-      code: json['code'],
+      title: json['title'] as String,
+      description: json['description'] as String,
+      color: Color(json['color'] as int),
+      code: json['code'] as String,
     );
   }
 

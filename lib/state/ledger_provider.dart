@@ -1,43 +1,55 @@
 import 'dart:async';
-
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/public_ledger_entry.dart';
 import '../service/api_client.dart';
 
-class LedgerProvider with ChangeNotifier {
+// 1. A provider to hold the PeoplesCoinApiClient dependency.
+// This is a simple provider that can be overridden for testing.
+final apiClientProvider = Provider<PeoplesCoinApiClient>((ref) {
+  // Replace with your actual initialization logic for the API client.
+  return PeoplesCoinApiClient();
+});
+
+// 2. A StateProvider to manage the search query.
+// StateProvider is great for simple, single-value state like a String.
+final ledgerSearchQueryProvider = StateProvider<String>((ref) => '');
+
+// 3. A StateNotifier that holds the core logic and state.
+// We use AsyncValue to automatically handle loading, data, and error states.
+// PublicLedgerNotifier will manage the list of entries, pagination, and polling.
+class PublicLedgerNotifier extends StateNotifier<AsyncValue<List<PublicLedgerEntry>>> {
+  final Ref ref;
   final PeoplesCoinApiClient _apiClient;
   String? _currentSearchQuery;
   int _currentPage = 1;
   bool _hasMorePages = true;
-
-  List<PublicLedgerEntry> _publicLedgerEntries = [];
-  bool _isInitialLoading = false;
-  bool _isFetchingMore = false;
-  String? _errorMessage;
-
+  
   Timer? _pollingTimer;
 
-  // --- Getters ---
-  List<PublicLedgerEntry> get publicLedgerEntries => _publicLedgerEntries;
-  bool get isInitialLoading => _isInitialLoading;
-  bool get isFetchingMore => _isFetchingMore;
-  String? get errorMessage => _errorMessage;
-
-  LedgerProvider(this._apiClient) {
-    // Load ledger on creation
+  PublicLedgerNotifier(this.ref, this._apiClient) : super(const AsyncValue.loading()) {
+    // Watch for changes in the search query. This will automatically
+    // trigger a rebuild of this provider, effectively running the build
+    // method of the provider below and re-fetching data.
+    _currentSearchQuery = ref.watch(ledgerSearchQueryProvider);
+    
+    // Fetch initial data
     fetchPublicLedgerEntries(isRefresh: true);
-
-    // Start polling backend for goodwill status changes
+    
+    // Start polling on creation
     _startPollingGoodwillStatus();
   }
 
   /// Helper to get ID token for secure API calls
   Future<String> _getIdToken() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('User is not signed in.');
+    if (user == null) {
+      throw Exception('User is not signed in.');
+    }
     final token = await user.getIdToken();
-    if (token.isEmpty) throw Exception('Failed to get Firebase ID token.');
+    if (token.isEmpty) {
+      throw Exception('Failed to get Firebase ID token.');
+    }
     return token;
   }
 
@@ -45,71 +57,108 @@ class LedgerProvider with ChangeNotifier {
   Future<void> fetchPublicLedgerEntries({bool isRefresh = false}) async {
     if (isRefresh) {
       _currentPage = 1;
-      _publicLedgerEntries = [];
       _hasMorePages = true;
     } else if (!_hasMorePages) {
       return;
     }
 
-    if (_isInitialLoading || _isFetchingMore) return;
-
+    // Set loading state only if it's an initial fetch or refresh.
+    // Riverpod's AsyncValue handles this for us.
     if (isRefresh) {
-      _isInitialLoading = true;
-    } else {
-      _isFetchingMore = true;
+      state = const AsyncValue.loading();
     }
-    _errorMessage = null;
-    notifyListeners();
 
     try {
       final token = await _getIdToken();
-
-      final List<dynamic> rawEntries = (_currentSearchQuery == null || _currentSearchQuery!.isEmpty)
-          ? await _apiClient.getLedgerEntries(page: _currentPage, idToken: token)
-          : await _apiClient.searchLedger(query: _currentSearchQuery!, idToken: token);
+      final List<dynamic> rawEntries;
+      
+      if (_currentSearchQuery != null && _currentSearchQuery!.isNotEmpty) {
+        rawEntries = await _apiClient.searchLedger(
+          query: _currentSearchQuery!, 
+          idToken: token,
+        );
+      } else {
+        rawEntries = await _apiClient.getLedgerEntries(
+          page: _currentPage, 
+          idToken: token,
+        );
+      }
 
       final newEntries = rawEntries.map((json) => PublicLedgerEntry.fromJson(json)).toList();
 
       if (newEntries.isEmpty) {
         _hasMorePages = false;
       }
+      
+      final currentData = state.value ?? [];
+      final updatedList = isRefresh ? newEntries : [...currentData, ...newEntries];
 
-      if (isRefresh) {
-        _publicLedgerEntries = newEntries;
-      } else {
-        _publicLedgerEntries.addAll(newEntries);
-      }
+      state = AsyncValue.data(updatedList);
 
       if (_hasMorePages) {
         _currentPage++;
       }
-    } catch (e) {
-      _errorMessage = 'Failed to fetch ledger entries: $e';
-      if (kDebugMode) print('Error fetching ledger entries: $e');
-    } finally {
-      _isInitialLoading = false;
-      _isFetchingMore = false;
-      notifyListeners();
+    } catch (e, st) {
+      // Riverpod's AsyncValue automatically handles errors.
+      state = AsyncValue.error(e, st);
     }
   }
 
-  /// Search the public ledger
-  Future<void> search(String query) async {
-    _currentSearchQuery = query.isEmpty ? null : query;
-    await fetchPublicLedgerEntries(isRefresh: true);
+  /// Poll backend every 30 seconds to check for goodwill status updates
+  void _startPollingGoodwillStatus() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      // We don't need to check for a user or token here. We can just
+      // re-fetch the data, and if the token is missing, the fetch method
+      // will handle the error.
+      fetchPublicLedgerEntries(isRefresh: true);
+    });
   }
 
-  /// Send loves and refresh ledger
-  Future<void> sendLoves({
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+}
+
+// 4. The main provider for the public ledger.
+// It uses StateNotifierProvider to expose the StateNotifier.
+// The .autoDispose modifier ensures the provider is cleaned up when no
+// longer used, which is great for resource management.
+final publicLedgerProvider = StateNotifierProvider.autoDispose<PublicLedgerNotifier, AsyncValue<List<PublicLedgerEntry>>>(
+  (ref) {
+    // We pass the ref and the apiClient dependency into the notifier.
+    final apiClient = ref.watch(apiClientProvider);
+    return PublicLedgerNotifier(ref, apiClient);
+  },
+);
+
+// 5. A separate provider for sending "Loves".
+// This is a good practice to keep side-effects separate from state.
+// This function will handle the API call and then invalidate the ledger
+// provider to trigger a refresh.
+final sendLovesProvider = Provider<Future<void> Function({
+  required String senderWallet,
+  required String recipientWallet,
+  required int amount,
+  String? memo,
+})>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return ({
     required String senderWallet,
     required String recipientWallet,
     required int amount,
     String? memo,
   }) async {
     try {
-      final token = await _getIdToken();
-
-      await _apiClient.sendLoves(
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User is not signed in.');
+      }
+      final token = await user.getIdToken();
+      
+      await apiClient.sendLoves(
         sendLovesData: {
           'senderWalletId': senderWallet,
           'recipientWalletId': recipientWallet,
@@ -118,45 +167,14 @@ class LedgerProvider with ChangeNotifier {
         },
         idToken: token,
       );
-
-      await fetchPublicLedgerEntries(isRefresh: true);
+      
+      // Invalidate the ledger provider to force a refresh.
+      ref.invalidate(publicLedgerProvider);
     } catch (e) {
-      _errorMessage = 'Failed to send loves: $e';
-      if (kDebugMode) print('Error sending loves: $e');
-      notifyListeners();
+      // It's up to the UI to catch this error, as the provider
+      // itself doesn't hold the state for this action.
       rethrow;
     }
-  }
-
-  /// Poll backend every 30 seconds to check for goodwill status updates
-  void _startPollingGoodwillStatus() {
-    _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
-      try {
-        final token = await _getIdToken();
-
-        // Implement your API call to check if any goodwill actions changed status
-        // For example, you could fetch latest goodwill actions or a dedicated endpoint
-        // Here, just fetch ledger entries as a simple proxy to detect changes:
-        final entries = await _apiClient.getLedgerEntries(page: 1, idToken: token);
-
-        if (entries.isNotEmpty) {
-          if (kDebugMode) {
-            print('Polling: Goodwill status may have changed, refreshing ledger...');
-          }
-          await fetchPublicLedgerEntries(isRefresh: true);
-        }
-      } catch (e) {
-        if (kDebugMode) print('Polling error: $e');
-      }
-    });
-  }
-
-  /// Clean up timer when provider disposed
-  @override
-  void dispose() {
-    _pollingTimer?.cancel();
-    super.dispose();
-  }
-}
+  };
+});
 

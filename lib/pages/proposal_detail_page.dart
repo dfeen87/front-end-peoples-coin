@@ -1,24 +1,156 @@
+// lib/pages/proposal_detail_page.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:ui';
+import 'dart:async';
 
-import '../models/proposal.dart';
-import '../models/vote_to_send.dart';
-import '../state/proposal_provider.dart';
-import '../state/auth_provider.dart' as MyAppAuthProvider;
-import '../widgets/voting_results_bar.dart';
+// --- MOCK DATA MODELS AND PROVIDERS (Refactored to use Riverpod) ---
 
-class ProposalDetailPage extends StatefulWidget {
+enum ProposalStatus { active, closed, rejected, draft, unknown }
+
+class Proposal {
+  final String id;
+  final String title;
+  final String description;
+  final ProposalStatus status;
+  final DateTime? voteEndTime;
+  final int forVotes;
+  final int againstVotes;
+  final bool userHasVoted;
+
+  Proposal({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.status,
+    this.voteEndTime,
+    this.forVotes = 0,
+    this.againstVotes = 0,
+    this.userHasVoted = false,
+  });
+
+  Proposal copyWith({
+    String? id,
+    String? title,
+    String? description,
+    ProposalStatus? status,
+    DateTime? voteEndTime,
+    int? forVotes,
+    int? againstVotes,
+    bool? userHasVoted,
+  }) {
+    return Proposal(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      status: status ?? this.status,
+      voteEndTime: voteEndTime ?? this.voteEndTime,
+      forVotes: forVotes ?? this.forVotes,
+      againstVotes: againstVotes ?? this.againstVotes,
+      userHasVoted: userHasVoted ?? this.userHasVoted,
+    );
+  }
+}
+
+class VoteToSend {
+  final String proposalId;
+  final String voterUserId;
+  final String voteValue;
+  VoteToSend({required this.proposalId, required this.voterUserId, required this.voteValue});
+}
+
+// A state class to represent the different states of the proposal detail page.
+class ProposalDetailState {
+  final Proposal? proposal;
+  final bool isSubmittingVote;
+  final bool isLoading;
+  final String? error;
+
+  ProposalDetailState({
+    this.proposal,
+    this.isSubmittingVote = false,
+    this.isLoading = false,
+    this.error,
+  });
+}
+
+// StateNotifier for proposal-related business logic.
+class ProposalNotifier extends StateNotifier<ProposalDetailState> {
+  ProposalNotifier() : super(ProposalDetailState());
+
+  Future<void> fetchProposalDetails(String proposalId, {required String idToken}) async {
+    state = ProposalDetailState(isLoading: true);
+    await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
+    try {
+      final mockProposal = Proposal(
+        id: proposalId,
+        title: 'Launch a community recycling program.',
+        description: 'This proposal aims to allocate community funds to a new recycling initiative. It will cover the cost of bins, collection services, and public education. The goal is to reduce waste by 20% over the next year.',
+        status: ProposalStatus.active,
+        voteEndTime: DateTime.now().add(const Duration(days: 7)),
+        forVotes: 620,
+        againstVotes: 210,
+        userHasVoted: false, // Initial state, assumes user hasn't voted
+      );
+      state = ProposalDetailState(proposal: mockProposal);
+    } catch (e) {
+      state = ProposalDetailState(error: 'Failed to fetch proposal details.');
+    }
+  }
+
+  Future<bool> submitVote({required VoteToSend vote, required String idToken}) async {
+    if (state.proposal == null) return false;
+
+    state = ProposalDetailState(proposal: state.proposal, isSubmittingVote: true);
+
+    await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
+    
+    try {
+      // Simulate successful vote
+      final newForVotes = vote.voteValue == 'FOR' ? state.proposal!.forVotes + 1 : state.proposal!.forVotes;
+      final newAgainstVotes = vote.voteValue == 'AGAINST' ? state.proposal!.againstVotes + 1 : state.proposal!.againstVotes;
+
+      state = ProposalDetailState(
+        proposal: state.proposal!.copyWith(
+          forVotes: newForVotes,
+          againstVotes: newAgainstVotes,
+          userHasVoted: true,
+        ),
+      );
+      return true;
+    } catch (e) {
+      state = ProposalDetailState(proposal: state.proposal, error: 'Failed to submit vote.');
+      return false;
+    }
+  }
+}
+
+// Use a family provider to manage a separate state for each proposal page.
+final proposalDetailProvider = StateNotifierProvider.family<ProposalNotifier, ProposalDetailState, String>((ref, proposalId) {
+  return ProposalNotifier();
+});
+
+// MOCK AUTH PROVIDER (to simulate user and idToken)
+class MockUser {
+  final String uid = 'user123';
+  Future<String> getIdToken() async => 'mock-id-token';
+}
+
+final authProvider = Provider<MockUser?>((ref) => MockUser());
+
+// --- APP-WIDE WIDGETS ---
+
+class ProposalDetailPage extends ConsumerStatefulWidget {
   final String proposalId;
   const ProposalDetailPage({super.key, required this.proposalId});
 
   @override
-  State<ProposalDetailPage> createState() => _ProposalDetailPageState();
+  ConsumerState<ProposalDetailPage> createState() => _ProposalDetailPageState();
 }
 
-class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProviderStateMixin {
+class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with TickerProviderStateMixin {
   late AnimationController _animationController;
 
   @override
@@ -28,18 +160,21 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-      final idToken = await authProvider.user?.getIdToken();
+    _fetchProposalData();
+  }
 
-      if (idToken != null) {
-        context.read<ProposalProvider>().fetchProposalDetails(widget.proposalId, idToken: idToken).then((_) {
-          if (mounted) {
-            _animationController.forward();
-          }
-        });
+  Future<void> _fetchProposalData() async {
+    final user = ref.read(authProvider);
+    if (user != null) {
+      final idToken = await user.getIdToken();
+      await ref.read(proposalDetailProvider(widget.proposalId).notifier).fetchProposalDetails(
+        widget.proposalId,
+        idToken: idToken,
+      );
+      if (mounted) {
+        _animationController.forward();
       }
-    });
+    }
   }
 
   @override
@@ -49,12 +184,11 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
   }
 
   void _onVotePressed(String voteValue) async {
-    final proposal = context.read<ProposalProvider>().selectedProposal;
-    final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-    final userId = authProvider.user?.uid;
-    final idToken = await authProvider.user?.getIdToken();
+    final state = ref.read(proposalDetailProvider(widget.proposalId));
+    final user = ref.read(authProvider);
+    final idToken = await user?.getIdToken();
 
-    if (proposal == null || userId == null || idToken == null) {
+    if (state.proposal == null || user?.uid == null || idToken == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error: User not authenticated or proposal not loaded.'), backgroundColor: Colors.redAccent),
       );
@@ -81,13 +215,17 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
               onPressed: () async {
                 Navigator.of(ctx).pop();
                 final vote = VoteToSend(
-                  proposalId: proposal.id,
-                  voterUserId: userId,
+                  proposalId: state.proposal!.id,
+                  voterUserId: user!.uid,
                   voteValue: voteValue,
                 );
-                final result = await context.read<ProposalProvider>().submitVote(vote: vote, idToken: idToken);
-                if (result['success'] == true && mounted) {
+                final success = await ref.read(proposalDetailProvider(widget.proposalId).notifier).submitVote(vote: vote, idToken: idToken);
+                if (success && mounted) {
                   _showVoteSuccessDialog();
+                } else if (mounted) {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to cast vote.'), backgroundColor: Colors.redAccent),
+                   );
                 }
               },
             ),
@@ -107,31 +245,26 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
 
   @override
   Widget build(BuildContext context) {
+    // Watch the provider to get the current state
+    final proposalState = ref.watch(proposalDetailProvider(widget.proposalId));
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          Consumer<ProposalProvider>(
-            builder: (context, provider, child) {
-              if (provider.isFetchingDetails || provider.selectedProposal == null) {
-                return _buildLoadingShimmer();
-              }
-              if (provider.hasDetailsError) {
-                return Center(child: Text(provider.detailsError!, style: const TextStyle(color: Colors.red)));
-              }
-              return _buildContent(provider.selectedProposal!);
-            },
-          ),
+          proposalState.isLoading
+              ? _buildLoadingShimmer()
+              : proposalState.error != null
+                  ? Center(child: Text(proposalState.error!, style: const TextStyle(color: Colors.red)))
+                  : proposalState.proposal != null
+                      ? _buildContent(proposalState.proposal!)
+                      : const Center(child: Text('No proposal found.', style: TextStyle(color: Colors.white))),
         ],
       ),
     );
   }
 
   Widget _buildContent(Proposal proposal) {
-    // Placeholder vote counts — update when your Proposal model supports it
-    const int forVotes = 620;
-    const int againstVotes = 210;
-
     return CustomScrollView(
       slivers: [
         SliverAppBar(
@@ -161,11 +294,11 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
               const SizedBox(height: 16),
               FadeTransition(
                 opacity: _animationController,
-                child: VotingResultsBar(forVotes: forVotes, againstVotes: againstVotes),
+                child: VotingResultsBar(forVotes: proposal.forVotes, againstVotes: proposal.againstVotes),
               ),
               const SizedBox(height: 32),
               if (proposal.status == ProposalStatus.active)
-                _buildVotingSection()
+                _buildVotingSection(proposal)
               else
                 Center(child: Text('Voting has ended for this proposal.', style: const TextStyle(color: Colors.white70, fontSize: 16, fontStyle: FontStyle.italic))),
             ]),
@@ -175,19 +308,24 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
     );
   }
 
-  Widget _buildVotingSection() {
-    final provider = context.watch<ProposalProvider>();
+  Widget _buildVotingSection(Proposal proposal) {
+    final state = ref.watch(proposalDetailProvider(widget.proposalId));
+    final bool canVote = !state.isSubmittingVote && !proposal.userHasVoted;
+
     return ScaleTransition(
       scale: CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Center(child: Text('Cost to Vote: 50 Loves', style: TextStyle(color: Colors.amber, fontStyle: FontStyle.italic))),
+          if (proposal.userHasVoted)
+            const Center(child: Text('You have already voted on this proposal.', style: TextStyle(color: Colors.amber, fontStyle: FontStyle.italic)))
+          else
+            const Center(child: Text('Cost to Vote: 50 Loves', style: TextStyle(color: Colors.amber, fontStyle: FontStyle.italic))),
           const SizedBox(height: 16),
           ElevatedButton.icon(
-            onPressed: provider.isSubmittingVote ? null : () => _onVotePressed('FOR'),
-            icon: const Icon(Icons.thumb_up_alt_rounded),
-            label: const Text('Vote FOR'),
+            onPressed: canVote ? () => _onVotePressed('FOR') : null,
+            icon: state.isSubmittingVote ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.thumb_up_alt_rounded),
+            label: Text(state.isSubmittingVote ? 'Submitting...' : 'Vote FOR'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade600,
               foregroundColor: Colors.white,
@@ -197,9 +335,9 @@ class _ProposalDetailPageState extends State<ProposalDetailPage> with TickerProv
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: provider.isSubmittingVote ? null : () => _onVotePressed('AGAINST'),
-            icon: const Icon(Icons.thumb_down_alt_rounded),
-            label: const Text('Vote AGAINST'),
+            onPressed: canVote ? () => _onVotePressed('AGAINST') : null,
+            icon: state.isSubmittingVote ? const SizedBox(height: 20, width: 20) : const Icon(Icons.thumb_down_alt_rounded), // Use a placeholder to keep alignment
+            label: Text(state.isSubmittingVote ? 'Submitting...' : 'Vote AGAINST'),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: Colors.red.shade400, width: 2),
               foregroundColor: Colors.red.shade400,
@@ -332,6 +470,83 @@ class _VoteSuccessDialogState extends State<_VoteSuccessDialog> with SingleTicke
           ],
         ),
       ),
+    );
+  }
+}
+
+// --- MOCK WIDGETS FROM ORIGINAL CODE ---
+
+class VotingResultsBar extends StatelessWidget {
+  final int forVotes;
+  final int againstVotes;
+
+  const VotingResultsBar({super.key, required this.forVotes, required this.againstVotes});
+
+  @override
+  Widget build(BuildContext context) {
+    final totalVotes = forVotes + againstVotes;
+    final forPercentage = totalVotes > 0 ? forVotes / totalVotes : 0.0;
+    final againstPercentage = totalVotes > 0 ? againstVotes / totalVotes : 0.0;
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('For: ${forVotes}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            Text('Against: ${againstVotes}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+            value: forPercentage,
+            backgroundColor: Colors.red.shade400,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade600),
+            minHeight: 12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('${(forPercentage * 100).toStringAsFixed(1)}%', style: const TextStyle(color: Colors.white70)),
+            Text('${(againstPercentage * 100).toStringAsFixed(1)}%', style: const TextStyle(color: Colors.white70)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// --- MAIN APP ENTRY POINT ---
+
+void main() {
+  runApp(const ProviderScope(child: MyApp()));
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Proposal App',
+      themeMode: ThemeMode.dark,
+      darkTheme: ThemeData.dark().copyWith(
+        colorScheme: ColorScheme.fromSwatch(
+          primarySwatch: Colors.deepPurple,
+          accentColor: Colors.amber,
+          backgroundColor: Colors.deepPurple.shade900,
+          brightness: Brightness.dark,
+        ).copyWith(
+          secondary: Colors.amber.shade400,
+        ),
+        scaffoldBackgroundColor: Colors.deepPurple.shade900,
+      ),
+      home: const ProposalDetailPage(proposalId: 'prop_123'),
     );
   }
 }

@@ -10,6 +10,17 @@ class ProposalTag {
     required this.tagId,
   });
 
+  /// Creates a new instance of [ProposalTag] with optional new values.
+  ProposalTag copyWith({
+    String? proposalId,
+    String? tagId,
+  }) {
+    return ProposalTag(
+      proposalId: proposalId ?? this.proposalId,
+      tagId: tagId ?? this.tagId,
+    );
+  }
+
   factory ProposalTag.fromJson(Map<String, dynamic> json) {
     return ProposalTag(
       proposalId: json['proposal_id'] as String,

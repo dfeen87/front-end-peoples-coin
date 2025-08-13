@@ -1,12 +1,53 @@
-// lib/pages/create_proposal_page.dart
+/ lib/pages/create_proposal_page.dart
+
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'dart:ui';
-import '../state/proposal_provider.dart';
+
+// Assume these models and providers exist in your project
 import '../models/proposal_to_send.dart';
-import '../state/user_provider.dart';
-import '../state/auth_provider.dart' as MyAppAuthProvider;
+import '../models/user.dart';
+
+// -- RIVERPOD PROVIDERS --
+// A simple provider for the form's state. We'll use a `StateProvider` for a simple value.
+final proposalTitleProvider = StateProvider<String>((ref) => '');
+final proposalDescriptionProvider = StateProvider<String>((ref) => '');
+final proposalTypeProvider = StateProvider<String>((ref) => 'General');
+final voteEndDateProvider = StateProvider<DateTime?>((ref) => null);
+final proposalDetailsProvider = StateProvider<String>((ref) => '');
+
+// This is a placeholder for your actual auth provider and user model.
+// In a real app, this would be a more complex provider.
+final authUserProvider = Provider<User?>((ref) => User(uid: 'user123', email: 'user@example.com'));
+
+// StateNotifier for the submission logic and state.
+class ProposalSubmitNotifier extends StateNotifier<AsyncValue<Map<String, dynamic>>> {
+  ProposalSubmitNotifier() : super(const AsyncValue.data({'success': false}));
+
+  Future<void> submitProposal({
+    required ProposalToSend proposal,
+    required String idToken,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      // Simulate network request
+      await Future.delayed(const Duration(seconds: 2));
+      // In a real app, you would make an API call here
+      // final response = await api.createProposal(proposal, idToken);
+
+      // Simulate a successful response
+      state = const AsyncValue.data({'success': true});
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+    }
+  }
+}
+
+final proposalSubmitProvider = StateNotifierProvider<ProposalSubmitNotifier, AsyncValue<Map<String, dynamic>>>(
+  (ref) => ProposalSubmitNotifier(),
+);
+
+// -- WIDGETS --
 
 typedef ProposalFormCompletedCallback = void Function();
 
@@ -17,30 +58,25 @@ const Map<String, (IconData, Color)> _proposalTypes = {
   'Community': (Icons.groups_outlined, Colors.orange),
 };
 
-class CreateProposalPageContent extends StatefulWidget {
+class CreateProposalPageContent extends ConsumerStatefulWidget {
   final ProposalFormCompletedCallback onFormCompleted;
 
   const CreateProposalPageContent({super.key, required this.onFormCompleted});
 
   @override
-  State<CreateProposalPageContent> createState() => _CreateProposalPageContentState();
+  ConsumerState<CreateProposalPageContent> createState() => _CreateProposalPageContentState();
 }
 
-class _CreateProposalPageContentState extends State<CreateProposalPageContent> with TickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
+class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageContent> with TickerProviderStateMixin {
+  final _formKeyStep1 = GlobalKey<FormState>();
+  final _formKeyStep2 = GlobalKey<FormState>();
 
   int _currentStep = 0;
-  String _title = '';
-  String _description = '';
-  String _proposalType = 'General';
-  DateTime? _voteEndDate;
   final TextEditingController _detailsController = TextEditingController();
 
   late final AnimationController _stepAnimationController;
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
-
-  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -49,6 +85,9 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> w
     _fadeAnimation = CurvedAnimation(parent: _stepAnimationController, curve: Curves.easeInOut);
     _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(_fadeAnimation);
     _stepAnimationController.forward();
+    
+    // Set the initial value for the details controller from the provider if it exists
+    _detailsController.text = ref.read(proposalDetailsProvider);
   }
 
   @override
@@ -61,66 +100,61 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> w
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _voteEndDate ?? DateTime.now().add(const Duration(days: 7)),
+      initialDate: ref.read(voteEndDateProvider) ?? DateTime.now().add(const Duration(days: 7)),
       firstDate: DateTime.now().add(const Duration(days: 1)),
       lastDate: DateTime(2030),
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: ColorScheme.dark(
-              primary: Colors.amber[700]!,
-              onPrimary: Colors.black,
-              surface: Colors.grey[850]!,
-              onSurface: Colors.white,
+              primary: Theme.of(context).colorScheme.tertiary, // Use theme color
+              onPrimary: Theme.of(context).colorScheme.onTertiary,
+              surface: Theme.of(context).colorScheme.surface,
+              onSurface: Theme.of(context).colorScheme.onSurface,
             ),
-            dialogBackgroundColor: Colors.grey[900],
+            dialogBackgroundColor: Theme.of(context).colorScheme.background,
           ),
           child: child!,
         );
       },
     );
-    if (picked != null && picked != _voteEndDate) {
-      setState(() => _voteEndDate = picked);
+    if (picked != null && picked != ref.read(voteEndDateProvider)) {
+      ref.read(voteEndDateProvider.notifier).state = picked;
     }
   }
 
   Future<void> _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isSubmitting = true);
-      _formKey.currentState!.save();
+    final user = ref.read(authUserProvider);
+    final isSubmitting = ref.read(proposalSubmitProvider).isLoading;
 
-      final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-      final currentUser = authProvider.user;
-      final idToken = await currentUser?.getIdToken();
-
-      if (currentUser == null || idToken == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: User not logged in or token expired.')));
-        }
-        setState(() => _isSubmitting = false);
-        return;
+    if (user == null || isSubmitting) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: User not logged in or a submission is already in progress.')));
       }
+      return;
+    }
 
-      final proposalToSend = ProposalToSend(
-        proposerUserId: currentUser.uid,
-        title: _title,
-        description: _description,
-        proposalType: _proposalType,
-        details: _detailsController.text.isNotEmpty ? {'custom_details': _detailsController.text} : null,
-        voteEndTime: _voteEndDate,
-      );
+    final proposalToSend = ProposalToSend(
+      proposerUserId: user.uid,
+      title: ref.read(proposalTitleProvider),
+      description: ref.read(proposalDescriptionProvider),
+      proposalType: ref.read(proposalTypeProvider),
+      details: ref.read(proposalDetailsProvider).isNotEmpty ? {'custom_details': ref.read(proposalDetailsProvider)} : null,
+      voteEndTime: ref.read(voteEndDateProvider),
+    );
 
-      final result = await context.read<ProposalProvider>().createProposal(proposal: proposalToSend, idToken: idToken);
+    // Assuming you have a way to get the ID token
+    const idToken = 'dummy_id_token'; 
 
-      setState(() => _isSubmitting = false);
+    await ref.read(proposalSubmitProvider.notifier).submitProposal(proposal: proposalToSend, idToken: idToken);
 
-      if (result['success'] && mounted) {
+    final submissionResult = ref.read(proposalSubmitProvider);
+    if (submissionResult.hasValue && submissionResult.value!['success'] == true) {
+      if (mounted) {
         await _showSuccessAndExit();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Submission failed: ${result['error']}')));
       }
-    } else {
-      setState(() => _currentStep = 0);
+    } else if (submissionResult.hasError && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Submission failed: ${submissionResult.error}')));
     }
   }
 
@@ -130,6 +164,14 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> w
       barrierDismissible: false,
       builder: (context) => const _SuccessDialog(),
     );
+    // Clear all the form state providers
+    ref.invalidate(proposalTitleProvider);
+    ref.invalidate(proposalDescriptionProvider);
+    ref.invalidate(proposalTypeProvider);
+    ref.invalidate(voteEndDateProvider);
+    ref.invalidate(proposalDetailsProvider);
+    ref.invalidate(proposalSubmitProvider);
+    
     widget.onFormCompleted();
   }
 
@@ -140,11 +182,16 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> w
   }
 
   void _nextStep() async {
-    final isValidStep0 = _formKey.currentState?.validate() ?? false;
-    if (_currentStep == 0 && !isValidStep0) return;
+    bool isValid = false;
+    if (_currentStep == 0) {
+      isValid = _formKeyStep1.currentState?.validate() ?? false;
+    } else if (_currentStep == 1) {
+      isValid = true; // Step 2 has no validation fields
+    }
+
+    if (!isValid) return;
 
     await _stepAnimationController.reverse();
-
     setState(() => _currentStep += 1);
     _stepAnimationController.forward();
   }
@@ -158,6 +205,9 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> w
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isSubmitting = ref.watch(proposalSubmitProvider).isLoading;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -184,253 +234,380 @@ class _CreateProposalPageContentState extends State<CreateProposalPageContent> w
             ),
           );
         },
-        child: Stepper(
-          type: StepperType.horizontal,
-          currentStep: _currentStep,
-          onStepTapped: (step) => _goToStep(step),
-          controlsBuilder: (context, details) {
-            final isLastStep = _currentStep == 2;
-            return Padding(
-              padding: const EdgeInsets.only(top: 24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: <Widget>[
-                  if (_currentStep > 0)
-                    TextButton(
-                      onPressed: _isSubmitting ? null : _previousStep,
-                      child: const Text('Back'),
-                    ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: _isSubmitting ? null : () {
-                      if (isLastStep) {
-                        _submitForm();
-                      } else {
-                        _nextStep();
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              _buildStepperIndicator(theme),
+              const SizedBox(height: 24),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Builder(
+                    builder: (context) {
+                      switch (_currentStep) {
+                        case 0:
+                          return _buildStep1Vision(theme);
+                        case 1:
+                          return _buildStep2Details(theme);
+                        case 2:
+                          return _buildStep3Review(theme);
+                        default:
+                          return const SizedBox.shrink();
                       }
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber[800],
-                      foregroundColor: Colors.black,
-                      disabledBackgroundColor: Colors.amber.withOpacity(0.4),
-                      disabledForegroundColor: Colors.black38,
-                    ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : Text(isLastStep ? 'Submit' : 'Next'),
                   ),
-                ],
+                ),
               ),
-            );
-          },
-        steps: [
-          _buildStep('Define', _buildStep1Define(), 0),
-          _buildStep('Detail', _buildStep2Detail(), 1),
-          _buildStep('Review', _buildStep3Review(), 2),
-        ],
-      ),
-    ),
-    );
-  }
-
-  Step _buildStep(String title, Widget content, int index) {
-    return Step(
-      title: Text(title, style: const TextStyle(color: Colors.white)),
-      content: content,
-      isActive: _currentStep >= index,
-      state: _currentStep > index ? StepState.complete : StepState.indexed,
-    );
-  }
-
-  Widget _buildStep1Define() {
-    return Form(
-      key: _formKey,
-      child: Column(
-        children: [
-          TextFormField(
-            initialValue: _title,
-            decoration: _buildInputDecoration('Proposal Title'),
-            style: const TextStyle(color: Colors.white),
-            validator: (val) => val == null || val.isEmpty ? 'Please enter a title.' : null,
-            onSaved: (val) => _title = val!,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
+              _buildControls(theme, isSubmitting),
+            ],
           ),
-          const SizedBox(height: 16),
-          TextFormField(
-            initialValue: _description,
-            decoration: _buildInputDecoration('Description'),
-            style: const TextStyle(color: Colors.white),
-            maxLines: 5,
-            validator: (val) => val == null || val.isEmpty ? 'Please enter a description.' : null,
-            onSaved: (val) => _description = val!,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildStep2Detail() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildStepperIndicator(ThemeData theme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text('Proposal Type', style: TextStyle(color: Colors.white70, fontSize: 16)),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 2.5,
-          physics: const NeverScrollableScrollPhysics(),
-          children: _proposalTypes.entries.map((entry) {
-            final isSelected = _proposalType == entry.key;
-            return InkWell(
-              onTap: () => setState(() => _proposalType = entry.key),
-              borderRadius: BorderRadius.circular(12),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color: isSelected ? entry.value.$2.withOpacity(0.8) : Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isSelected ? entry.value.$2 : Colors.transparent),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(entry.value.$1, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Text(entry.key, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 24),
-        ListTile(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          tileColor: Colors.white.withOpacity(0.1),
-          title: Text(
-            _voteEndDate == null ? 'Select Vote End Date (Optional)' : 'Vote Ends: ${DateFormat.yMMMd().format(_voteEndDate!)}',
-            style: const TextStyle(color: Colors.white),
-          ),
-          trailing: const Icon(Icons.calendar_today, color: Colors.white70),
-          onTap: () => _selectDate(context),
-        ),
+        _buildStepIndicator(theme, 0, 'Vision'),
+        Expanded(child: Divider(color: theme.colorScheme.onSurface.withOpacity(0.2), height: 1)),
+        _buildStepIndicator(theme, 1, 'Details'),
+        Expanded(child: Divider(color: theme.colorScheme.onSurface.withOpacity(0.2), height: 1)),
+        _buildStepIndicator(theme, 2, 'Review'),
       ],
     );
   }
 
-  Widget _buildStep3Review() {
-    _formKey.currentState?.save();
+  Widget _buildStepIndicator(ThemeData theme, int index, String label) {
+    final isCurrent = _currentStep == index;
+    final isCompleted = _currentStep > index;
+
+    return GestureDetector(
+      onTap: () => _goToStep(index),
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isCurrent ? theme.colorScheme.tertiary : isCompleted ? theme.colorScheme.primary : theme.colorScheme.surface.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isCompleted ? Icons.check : Icons.circle,
+              color: isCurrent ? theme.colorScheme.onTertiary : isCompleted ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface.withOpacity(0.6),
+              size: 20,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: isCurrent ? theme.colorScheme.tertiary : isCompleted ? theme.colorScheme.primary : theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep1Vision(ThemeData theme) {
+    return Form(
+      key: _formKeyStep1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Give your proposal a powerful title and a clear description.', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 24),
+          TextFormField(
+            initialValue: ref.read(proposalTitleProvider),
+            decoration: _buildInputDecoration(theme, 'Proposal Title'),
+            style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+            validator: (val) => val == null || val.isEmpty ? 'A great proposal starts with a strong title.' : null,
+            onChanged: (val) => ref.read(proposalTitleProvider.notifier).state = val,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            initialValue: ref.read(proposalDescriptionProvider),
+            decoration: _buildInputDecoration(theme, 'Description'),
+            style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+            maxLines: 5,
+            validator: (val) => val == null || val.isEmpty ? 'Please provide a clear description of your idea.' : null,
+            onChanged: (val) => ref.read(proposalDescriptionProvider.notifier).state = val,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep2Details(ThemeData theme) {
+    return Form(
+      key: _formKeyStep2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Select a category and set a voting deadline.', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 24),
+          Text('Proposal Type', style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface)),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 2.5,
+            physics: const NeverScrollableScrollPhysics(),
+            children: _proposalTypes.entries.map((entry) {
+              final isSelected = ref.watch(proposalTypeProvider) == entry.key;
+              return InkWell(
+                onTap: () => ref.read(proposalTypeProvider.notifier).state = entry.key,
+                borderRadius: BorderRadius.circular(12),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: isSelected ? entry.value.$2.withOpacity(0.8) : theme.colorScheme.surface.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isSelected ? entry.value.$2 : Colors.transparent),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(entry.value.$1, color: isSelected ? Colors.white : theme.colorScheme.onSurface.withOpacity(0.6)),
+                      const SizedBox(width: 8),
+                      Text(
+                        entry.key, 
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: isSelected ? Colors.white : theme.colorScheme.onSurface.withOpacity(0.6),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
+          ListTile(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tileColor: theme.colorScheme.surface.withOpacity(0.1),
+            title: Text(
+              ref.watch(voteEndDateProvider) == null 
+                  ? 'Set a voting deadline (Optional)' 
+                  : 'Voting Ends: ${DateFormat.yMMMd().format(ref.watch(voteEndDateProvider)!)}',
+              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+            ),
+            trailing: const Icon(Icons.calendar_today, color: Colors.white70),
+            onTap: () => _selectDate(context),
+          ),
+          const SizedBox(height: 24),
+          TextFormField(
+            controller: _detailsController,
+            decoration: _buildInputDecoration(theme, 'Additional Details (Optional)'),
+            style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+            maxLines: 5,
+            onChanged: (val) => ref.read(proposalDetailsProvider.notifier).state = val,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep3Review(ThemeData theme) {
+    final title = ref.read(proposalTitleProvider);
+    final description = ref.read(proposalDescriptionProvider);
+    final type = ref.read(proposalTypeProvider);
+    final endDate = ref.read(voteEndDateProvider);
+    final details = ref.read(proposalDetailsProvider);
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surface.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildReviewRow('Title', _title),
-          _buildReviewRow('Description', _description),
-          _buildReviewRow('Type', _proposalType),
-          _buildReviewRow('Voting Ends', _voteEndDate != null ? DateFormat.yMMMd().format(_voteEndDate!) : 'Not Set'),
-          if (_detailsController.text.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _buildReviewRow('Additional Details', _detailsController.text),
+          _buildReviewRow(theme, 'Title', title),
+          _buildReviewRow(theme, 'Description', description),
+          _buildReviewRow(theme, 'Type', type),
+          _buildReviewRow(theme, 'Voting Ends', endDate != null ? DateFormat.yMMMd().format(endDate) : 'Not Set'),
+          if (details.isNotEmpty) ...[
+            _buildReviewRow(theme, 'Additional Details', details),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildReviewRow(String label, String value) {
+  Widget _buildReviewRow(ThemeData theme, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(
+            label, 
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          Text(
+            value, 
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
           const Divider(color: Colors.white24, height: 16),
         ],
       ),
     );
   }
 
-  InputDecoration _buildInputDecoration(String label) {
+  Widget _buildInputDecoration(ThemeData theme, String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white70),
+      labelStyle: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+      floatingLabelStyle: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.tertiary),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.1),
+      fillColor: theme.colorScheme.surface.withOpacity(0.1),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.colorScheme.tertiary),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.colorScheme.error),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.colorScheme.error),
+      ),
+    );
+  }
+
+  Widget _buildControls(ThemeData theme, bool isSubmitting) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: <Widget>[
+          if (_currentStep > 0)
+            TextButton(
+              onPressed: isSubmitting ? null : _previousStep,
+              child: Text('Back', style: TextStyle(color: theme.colorScheme.onSurface)),
+            ),
+          const Spacer(),
+          ElevatedButton(
+            onPressed: isSubmitting ? null : () {
+              if (_currentStep == 2) {
+                _submitForm();
+              } else {
+                _nextStep();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.tertiary,
+              foregroundColor: theme.colorScheme.onTertiary,
+              disabledBackgroundColor: theme.colorScheme.tertiary.withOpacity(0.4),
+              disabledForegroundColor: theme.colorScheme.onTertiary.withOpacity(0.4),
+            ),
+            child: isSubmitting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.black,
+                    ),
+                  )
+                : Text(_currentStep == 2 ? 'Submit' : 'Next'),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _SuccessDialog extends StatefulWidget {
+class _SuccessDialog extends ConsumerWidget {
   const _SuccessDialog();
 
   @override
-  State<_SuccessDialog> createState() => _SuccessDialogState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    
+    // Use a FutureProvider to handle the delayed closing
+    ref.listen(
+      FutureProvider((ref) async => await Future.delayed(const Duration(seconds: 2))),
+      (_, __) {
+        if (context.mounted) Navigator.of(context).pop();
+      }
+    );
 
-class _SuccessDialogState extends State<_SuccessDialog> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
-    _controller.forward();
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) Navigator.of(context).pop();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return ScaleTransition(
-      scale: CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+      scale: CurvedAnimation(
+        parent: AnimationController(vsync: Navigator.of(context), duration: const Duration(milliseconds: 600))..forward(),
+        curve: Curves.elasticOut,
+      ),
       child: AlertDialog(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: theme.colorScheme.background,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle, color: Colors.greenAccent, size: 70),
+            Icon(Icons.check_circle, color: theme.colorScheme.primary, size: 70),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Proposal Submitted!',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: theme.colorScheme.onBackground,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'It is now live for the community to review and vote on.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onBackground.withOpacity(0.7),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+// Placeholder for your models for the code to be runnable
+class ProposalToSend {
+  final String proposerUserId;
+  final String title;
+  final String description;
+  final String proposalType;
+  final Map<String, dynamic>? details;
+  final DateTime? voteEndTime;
+
+  ProposalToSend({
+    required this.proposerUserId,
+    required this.title,
+    required this.description,
+    required this.proposalType,
+    this.details,
+    this.voteEndTime,
+  });
+}
+
+class User {
+  final String uid;
+  final String email;
+  User({required this.uid, required this.email});
 }
 

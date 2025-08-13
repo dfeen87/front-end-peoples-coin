@@ -1,3 +1,4 @@
+// lib/service/wallet_service.dart
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -18,23 +19,27 @@ class WalletKeys {
   final String publicKeyBase64; // base64 encoded public key
   final String encryptedPrivateKeyBase64; // base64 encrypted private key
   final String ivBase64; // base64 nonce/IV for AES-GCM
+  final String saltBase64; // base64 salt for HKDF
 
   WalletKeys({
     required this.publicKeyBase64,
     required this.encryptedPrivateKeyBase64,
     required this.ivBase64,
+    required this.saltBase64,
   });
 
   Map<String, dynamic> toJson() => {
         'publicKey': publicKeyBase64,
         'encryptedPrivateKey': encryptedPrivateKeyBase64,
         'ivBase64': ivBase64,
+        'saltBase64': saltBase64,
       };
 
   factory WalletKeys.fromJson(Map<String, dynamic> json) => WalletKeys(
         publicKeyBase64: json['publicKey'],
         encryptedPrivateKeyBase64: json['encryptedPrivateKey'],
         ivBase64: json['ivBase64'],
+        saltBase64: json['saltBase64'],
       );
 }
 
@@ -44,45 +49,43 @@ class WalletService {
   static const int _aesGcmNonceLength = 12;
 
   final Random _secureRandom = Random.secure();
-  final FlutterSecureStorage _secureStorage;
 
-  WalletService({FlutterSecureStorage? secureStorage})
-      : _secureStorage = secureStorage ?? const FlutterSecureStorage();
-
-  /// Generates a new Ed25519 key pair, encrypts the private key, and stores AES key securely.
-  Future<WalletKeys> generateWalletKeys({required String walletId}) async {
+  /// Generates a new Ed25519 key pair and encrypts the private key using a session key.
+  Future<WalletKeys> generateWalletKeys({
+    required String sessionToken,
+  }) async {
     final ed25519 = Ed25519();
     final keyPair = await ed25519.newKeyPair();
     final privateKeyBytes = await keyPair.extractPrivateKeyBytes();
     final publicKeyBytes = await keyPair.extractPublicKey().then((pub) => pub.bytes);
 
-    final aesKey = _generateRandomBytes(_aesKeyLength);
+    final salt = _generateRandomBytes(32); // Generate a fresh salt
+    final encryptionKey = await _deriveKeyFromSession(sessionToken, salt);
     final nonce = _generateRandomBytes(_aesGcmNonceLength);
 
-    final encryptedPrivateKeyBase64 = await _encryptPrivateKeyGcm(privateKeyBytes, aesKey, nonce);
-
-    // Store AES key securely in FlutterSecureStorage
-    await _secureStorage.write(key: 'wallet_key_$walletId', value: base64Encode(aesKey));
+    final encryptedPrivateKeyBase64 = await _encryptPrivateKeyGcm(
+        privateKeyBytes, encryptionKey, nonce);
 
     return WalletKeys(
       publicKeyBase64: base64Encode(publicKeyBytes),
       encryptedPrivateKeyBase64: encryptedPrivateKeyBase64,
       ivBase64: base64Encode(nonce),
+      saltBase64: base64Encode(salt),
     );
   }
 
-  /// Decrypts private key using AES key retrieved from secure storage.
-  Future<Uint8List> decryptPrivateKey({required String walletId, required WalletKeys keys}) async {
-    final aesKeyBase64 = await _secureStorage.read(key: 'wallet_key_$walletId');
-    if (aesKeyBase64 == null) {
-      throw WalletDecryptionException('AES key not found for wallet $walletId.');
-    }
-    final aesKey = base64Decode(aesKeyBase64);
+  /// Decrypts private key using a session-derived key.
+  Future<Uint8List> decryptPrivateKey({
+    required String sessionToken,
+    required WalletKeys keys,
+  }) async {
+    final salt = base64Decode(keys.saltBase64);
+    final encryptionKey = await _deriveKeyFromSession(sessionToken, salt);
     final nonce = base64Decode(keys.ivBase64);
     final encryptedBytes = base64Decode(keys.encryptedPrivateKeyBase64);
 
     try {
-      return await _decryptPrivateKeyGcm(encryptedBytes, aesKey, nonce);
+      return await _decryptPrivateKeyGcm(encryptedBytes, encryptionKey, nonce);
     } catch (_) {
       throw WalletDecryptionException('Failed to decrypt private key.');
     }
@@ -104,24 +107,28 @@ class WalletService {
     return base64Encode(signatureBytes);
   }
 
-  Future<String> _encryptPrivateKeyGcm(Uint8List privateKeyBytes, Uint8List aesKey, Uint8List nonce) async {
+  Future<SecretKey> _deriveKeyFromSession(String sessionToken, Uint8List salt) async {
+    final secretKey = SecretKey(utf8.encode(sessionToken));
+    final hkdf = Hkdf(hmac: Hmac.sha256(), outputLength: 32);
+    final newKey = await hkdf.deriveKey(secretKey: secretKey, nonce: salt);
+    return newKey;
+  }
+
+  Future<String> _encryptPrivateKeyGcm(Uint8List privateKeyBytes, SecretKey aesKey, Uint8List nonce) async {
     final algorithm = AesGcm.with256bits();
-    final secretKey = SecretKey(aesKey);
-    final secretBox = await algorithm.encrypt(privateKeyBytes, secretKey: secretKey, nonce: nonce);
+    final secretBox = await algorithm.encrypt(privateKeyBytes, secretKey: aesKey, nonce: nonce);
     return base64Encode(secretBox.cipherText + secretBox.mac.bytes);
   }
 
-  Future<Uint8List> _decryptPrivateKeyGcm(Uint8List encryptedBytes, Uint8List aesKey, Uint8List nonce) async {
+  Future<Uint8List> _decryptPrivateKeyGcm(Uint8List encryptedBytes, SecretKey aesKey, Uint8List nonce) async {
     if (encryptedBytes.length < 16) throw WalletDecryptionException('Invalid encrypted data length.');
     final macBytes = encryptedBytes.sublist(encryptedBytes.length - 16);
     final cipherTextBytes = encryptedBytes.sublist(0, encryptedBytes.length - 16);
     final secretBox = SecretBox(cipherTextBytes, nonce: nonce, mac: Mac(macBytes));
-    final secretKey = SecretKey(aesKey);
-    final decryptedBytes = await AesGcm.with256bits().decrypt(secretBox, secretKey: secretKey);
+    final decryptedBytes = await AesGcm.with256bits().decrypt(secretBox, secretKey: aesKey);
     return Uint8List.fromList(decryptedBytes);
   }
 
   Uint8List _generateRandomBytes(int length) =>
       Uint8List.fromList(List<int>.generate(length, (_) => _secureRandom.nextInt(256)));
 }
-

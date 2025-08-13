@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+/// An immutable data model for a governance vote.
 @immutable
 class Vote {
   final String id; // UUID
@@ -20,6 +21,7 @@ class Vote {
     required this.updatedAt,
   });
 
+  /// Factory constructor to create a Vote instance from a JSON map.
   factory Vote.fromJson(Map<String, dynamic> json) {
     return Vote(
       id: json['id']?.toString() ?? '',
@@ -32,6 +34,7 @@ class Vote {
     );
   }
 
+  /// Converts this model into a JSON map.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -44,6 +47,7 @@ class Vote {
     };
   }
 
+  /// Creates a new instance of [Vote] with optional new values.
   Vote copyWith({
     String? id,
     String? voterUserId,
@@ -64,6 +68,7 @@ class Vote {
     );
   }
 
+  /// Helper to safely parse DateTime values.
   static DateTime _parseDate(dynamic value) {
     if (value is DateTime) return value;
     if (value is String) {
@@ -74,6 +79,21 @@ class Vote {
       }
     }
     return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Vote &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() {
+    return 'Vote(id: $id, proposalId: $proposalId, voteValue: $voteValue)';
   }
 }
 

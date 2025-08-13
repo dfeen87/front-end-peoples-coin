@@ -12,6 +12,19 @@ class Follower {
     required this.createdAt,
   });
 
+  /// Creates a new instance of [Follower] with optional new values.
+  Follower copyWith({
+    String? followerUserId,
+    String? followedUserId,
+    DateTime? createdAt,
+  }) {
+    return Follower(
+      followerUserId: followerUserId ?? this.followerUserId,
+      followedUserId: followedUserId ?? this.followedUserId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   factory Follower.fromJson(Map<String, dynamic> json) {
     return Follower(
       followerUserId: json['follower_user_id'] as String,

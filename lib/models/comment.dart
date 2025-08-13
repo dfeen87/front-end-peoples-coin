@@ -24,6 +24,31 @@ class Comment {
     this.deletedAt,
   });
 
+  /// Creates a new instance of [Comment] with optional new values.
+  Comment copyWith({
+    String? id,
+    String? authorUserId,
+    String? proposalId,
+    String? goodwillActionId,
+    String? parentCommentId,
+    String? content,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? deletedAt,
+  }) {
+    return Comment(
+      id: id ?? this.id,
+      authorUserId: authorUserId ?? this.authorUserId,
+      proposalId: proposalId ?? this.proposalId,
+      goodwillActionId: goodwillActionId ?? this.goodwillActionId,
+      parentCommentId: parentCommentId ?? this.parentCommentId,
+      content: content ?? this.content,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+    );
+  }
+
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
       id: json['id'] as String,

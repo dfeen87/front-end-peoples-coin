@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/ledger_provider.dart';
+import '../../state/wallet_provider.dart';
 import '../../state/user_provider.dart';
 
-class SendLovesView extends StatefulWidget {
+class SendLovesView extends ConsumerStatefulWidget {
   final VoidCallback? onSendComplete;
 
   const SendLovesView({super.key, this.onSendComplete});
 
   @override
-  State<SendLovesView> createState() => _SendLovesViewState();
+  ConsumerState<SendLovesView> createState() => _SendLovesViewState();
 }
 
-class _SendLovesViewState extends State<SendLovesView> {
+class _SendLovesViewState extends ConsumerState<SendLovesView> {
   final _formKey = GlobalKey<FormState>();
   final _addressController = TextEditingController();
   final _amountController = TextEditingController();
@@ -50,13 +51,16 @@ class _SendLovesViewState extends State<SendLovesView> {
 
     if (confirmed != true) return;
 
-    final userProvider = context.read<UserProvider>();
-    final currentWallet = userProvider.currentUser?.walletId;
+    // Use ref.read() to get the current state of the providers at this moment.
+    final userAccount = ref.read(userAccountProvider);
+    final currentWallet = userAccount.value?.walletId;
 
     if (currentWallet == null || currentWallet.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to send Loves.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to send Loves.')),
+        );
+      }
       return;
     }
 
@@ -64,34 +68,39 @@ class _SendLovesViewState extends State<SendLovesView> {
     final amount = int.tryParse(_amountController.text.trim()) ?? 0;
 
     try {
-      await context.read<LedgerProvider>().sendLoves(
+      // Call the method on the ledgerProvider using ref.read
+      await ref.read(ledgerProvider).sendLoves(
             senderWallet: currentWallet,
             recipientWallet: recipient,
             amount: amount,
             memo: null,
           );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Successfully sent $amount Loves!')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully sent $amount Loves!')),
+        );
+      }
 
       _addressController.clear();
       _amountController.clear();
 
-      // Notify parent to refresh balance
+      // Notify parent to refresh balance (which now invalidates the provider)
       widget.onSendComplete?.call();
-
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send Loves: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send Loves: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final userBalanceStr = context.watch<UserProvider>().currentUser?.balance ?? '0';
-    final userBalance = double.tryParse(userBalanceStr) ?? 0;
+    // Watch the wallet provider to get the current balance for validation
+    final userBalanceAsync = ref.watch(walletProvider);
+    final userBalance = userBalanceAsync.value?.balance ?? 0.0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),

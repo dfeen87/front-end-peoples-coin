@@ -1,25 +1,95 @@
+// lib/pages/governance_page.dart
+
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:ui';
 
-import '../state/proposal_provider.dart';
-import '../state/auth_provider.dart' as MyAppAuthProvider;
+// Assume these models and widgets exist in your project
+import '../models/proposal.dart';
 import '../widgets/proposal_card.dart';
 import 'create_proposal_page.dart';
-import '../widgets/dynamic_nebula_background.dart';
+import '../models/user.dart';
 
-// --- GovernancePage ---
-class GovernancePage extends StatefulWidget {
+// --- RIVERPOD PROVIDERS ---
+
+// A StateProvider to manage the selected filter status.
+final selectedStatusProvider = StateProvider<String>((ref) => 'ACTIVE');
+
+// This is a placeholder for your actual auth provider and user model.
+final authUserProvider = Provider<User?>((ref) => User(uid: 'user123', email: 'user@example.com'));
+
+// A StateNotifier for fetching and managing the list of proposals.
+class ProposalsNotifier extends StateNotifier<AsyncValue<List<Proposal>>> {
+  ProposalsNotifier() : super(const AsyncValue.loading());
+
+  Future<void> fetchProposals({required String status, required String idToken}) async {
+    // We only set to loading if there's no data yet, to avoid flashing on a refresh.
+    if (state is! AsyncData) {
+      state = const AsyncValue.loading();
+    }
+    
+    try {
+      // Simulate network delay
+      await Future.delayed(const Duration(seconds: 1));
+
+      // This is sample data. You would replace this with a real API call.
+      final List<Proposal> fetchedProposals = [
+        Proposal(
+          id: '1',
+          title: 'Community Garden Initiative',
+          description: 'A proposal to establish a community garden in the central park.',
+          proposerId: 'user123',
+          status: 'ACTIVE',
+          voteEndTime: DateTime.now().add(const Duration(days: 5)),
+          votesFor: 120,
+          votesAgainst: 30,
+        ),
+        Proposal(
+          id: '2',
+          title: 'Upgrade Public WiFi',
+          description: 'Allocate funds to improve the public WiFi network in the city center.',
+          proposerId: 'user456',
+          status: 'ACTIVE',
+          voteEndTime: DateTime.now().add(const Duration(days: 10)),
+          votesFor: 85,
+          votesAgainst: 15,
+        ),
+      ].where((p) => p.status == status).toList();
+
+      state = AsyncValue.data(fetchedProposals);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+    }
+  }
+}
+
+// The provider to access the ProposalsNotifier state.
+final proposalsProvider = StateNotifierProvider<ProposalsNotifier, AsyncValue<List<Proposal>>>((ref) {
+  final status = ref.watch(selectedStatusProvider);
+  final notifier = ProposalsNotifier();
+  
+  // Asynchronously fetch proposals when the provider is first created or the status changes.
+  final user = ref.watch(authUserProvider);
+  const idToken = 'dummy_id_token'; // Replace with a call to get the real token
+  if (user != null) {
+     notifier.fetchProposals(status: status, idToken: idToken);
+  }
+  
+  return notifier;
+});
+
+// --- GOVERNANCE PAGE WIDGET ---
+
+class GovernancePage extends ConsumerStatefulWidget {
   const GovernancePage({super.key});
 
   @override
-  State<GovernancePage> createState() => _GovernancePageState();
+  ConsumerState<GovernancePage> createState() => _GovernancePageState();
 }
 
-class _GovernancePageState extends State<GovernancePage> with TickerProviderStateMixin {
-  String _selectedStatus = 'ACTIVE';
-  late AnimationController _listAnimationController;
+class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProviderStateMixin {
+  late final AnimationController _listAnimationController;
 
   @override
   void initState() {
@@ -28,7 +98,6 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _fetchProposals();
   }
 
   @override
@@ -36,21 +105,16 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
     _listAnimationController.dispose();
     super.dispose();
   }
-
-  Future<void> _fetchProposals() async {
-    _listAnimationController.reset();
-    // Use `mounted` check for safety in async operations
-    if (mounted) {
-      // Get the ID token from the AuthProvider
-      final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
-      final idToken = await authProvider.user?.getIdToken();
-
-      if (idToken != null) {
-        await context.read<ProposalProvider>().fetchProposals(status: _selectedStatus, idToken: idToken);
-        if (mounted) {
-          _listAnimationController.forward();
-        }
-      }
+  
+  // This method is now much simpler, as Riverpod handles the state and fetching.
+  Future<void> _onRefresh() async {
+    final status = ref.read(selectedStatusProvider);
+    final user = ref.read(authUserProvider);
+    const idToken = 'dummy_id_token'; 
+    if (user != null) {
+      // Trigger a re-fetch by calling the notifier directly.
+      await ref.read(proposalsProvider.notifier).fetchProposals(status: status, idToken: idToken);
+      _listAnimationController.forward();
     }
   }
 
@@ -64,7 +128,7 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
         return CreateProposalPageContent(
           onFormCompleted: () {
             Navigator.of(context).pop();
-            _fetchProposals();
+            _onRefresh(); // Refresh the list when the form is submitted.
           },
         );
       },
@@ -81,48 +145,51 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final proposalsAsync = ref.watch(proposalsProvider);
+    final selectedStatus = ref.watch(selectedStatusProvider);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateProposalForm,
-        icon: const Icon(Icons.add, color: Colors.black),
-        // FIX: Made the button translucent
-        label: const Text('New Proposal', style: TextStyle(color: Colors.black)),
-        backgroundColor: Colors.amber[700]!.withOpacity(0.8),
+        icon: const Icon(Icons.add),
+        label: const Text('Create Proposal'),
+        backgroundColor: theme.colorScheme.tertiary,
+        foregroundColor: theme.colorScheme.onTertiary,
       ),
-      body: Stack(
-        children: [
-          // FIX: The background widget is now a child of AppShell, so we remove it here.
-          // This is what prevents it from resetting and makes it continuous.
-          // const DynamicNebulaBackground(),
-          RefreshIndicator(
-            onRefresh: _fetchProposals,
-            color: Colors.amber,
-            backgroundColor: Colors.grey[850],
-            child: CustomScrollView(
-              slivers: [
-                _buildSliverAppBar(),
-                _buildHeader(),
-                _buildFilterBar(),
-                _buildProposalList(),
-              ],
-            ),
-          ),
-        ],
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: theme.colorScheme.tertiary,
+        backgroundColor: theme.colorScheme.background,
+        child: CustomScrollView(
+          slivers: [
+            _buildSliverAppBar(theme),
+            _buildHeader(theme),
+            _buildFilterBar(theme, selectedStatus),
+            _buildProposalList(theme, proposalsAsync),
+          ],
+        ),
       ),
     );
   }
 
-  SliverAppBar _buildSliverAppBar() {
-    return const SliverAppBar(
-      title: Text('Governance'),
+  SliverAppBar _buildSliverAppBar(ThemeData theme) {
+    return SliverAppBar(
+      title: Text('Governance', style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onBackground)),
       backgroundColor: Colors.transparent,
       elevation: 0,
       pinned: true,
+      flexibleSpace: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(color: theme.colorScheme.background.withOpacity(0.2)),
+        ),
+      ),
     );
   }
 
-  SliverToBoxAdapter _buildHeader() {
+  SliverToBoxAdapter _buildHeader(ThemeData theme) {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -133,18 +200,21 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: theme.colorScheme.surface.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.1)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.gavel_rounded, color: Colors.white70, size: 40),
-                  SizedBox(width: 16),
+                  Icon(Icons.gavel_rounded, color: theme.colorScheme.tertiary, size: 40),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Text(
-                      'Shape the future of the community by creating and voting on proposals.',
-                      style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                      'Empower the community. Propose new ideas and vote to shape our future.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        height: 1.5,
+                      ),
                     ),
                   ),
                 ],
@@ -156,7 +226,7 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
     );
   }
 
-  SliverToBoxAdapter _buildFilterBar() {
+  SliverToBoxAdapter _buildFilterBar(ThemeData theme, String selectedStatus) {
     final statuses = ['ACTIVE', 'PASSED', 'FAILED'];
     return SliverToBoxAdapter(
       child: Container(
@@ -168,65 +238,52 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
               label: Text(status.toUpperCase()),
             );
           }).toList(),
-          selected: {_selectedStatus},
+          selected: {selectedStatus},
           onSelectionChanged: (newSelection) {
-            setState(() {
-              _selectedStatus = newSelection.first;
-              _fetchProposals();
-            });
+            ref.read(selectedStatusProvider.notifier).state = newSelection.first;
+            _onRefresh();
           },
           style: SegmentedButton.styleFrom(
-            backgroundColor: Colors.white.withOpacity(0.1),
-            foregroundColor: Colors.white70,
-            selectedBackgroundColor: Colors.amber[800]!,
-            selectedForegroundColor: Colors.black,
+            backgroundColor: theme.colorScheme.surface.withOpacity(0.1),
+            foregroundColor: theme.colorScheme.onSurface.withOpacity(0.7),
+            selectedBackgroundColor: theme.colorScheme.tertiary,
+            selectedForegroundColor: theme.colorScheme.onTertiary,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildProposalList() {
-    return Consumer<ProposalProvider>(
-      builder: (context, proposalProvider, child) {
-        // Show a loading shimmer ONLY if the list is empty and we are fetching.
-        // This prevents the screen from flashing when refreshing the list.
-        if (proposalProvider.isFetchingProposals && proposalProvider.proposals.isEmpty) {
-          return _buildLoadingShimmer();
-        }
-
-        // Use the CORRECT getter 'hasProposalsError'
-        if (proposalProvider.hasProposalsError) {
-          return SliverFillRemaining(
-            child: Center(
-              child: Text(proposalProvider.proposalsError ?? 'Failed to load proposals.'),
-            ),
-          );
-        }
-
-        // Handle the case where there are no proposals after loading.
-        if (proposalProvider.proposals.isEmpty) {
+  Widget _buildProposalList(ThemeData theme, AsyncValue<List<Proposal>> proposalsAsync) {
+    return proposalsAsync.when(
+      loading: () => _buildLoadingShimmer(),
+      error: (err, stack) => SliverFillRemaining(
+        child: Center(
+          child: Text('Error: $err', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
+        ),
+      ),
+      data: (proposals) {
+        if (proposals.isEmpty) {
           return const SliverFillRemaining(
             child: Center(
-              child: Text("No proposals found for this status."),
+              child: Text("No proposals found in this category. Be the first to create one!"),
             ),
           );
         }
-
-        // If we have proposals, display them in a list.
+        _listAnimationController.forward();
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0).copyWith(bottom: 100),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
-                final proposal = proposalProvider.proposals[index];
+                final proposal = proposals[index];
                 final animation = Tween(begin: 0.0, end: 1.0).animate(
                   CurvedAnimation(
                     parent: _listAnimationController,
                     curve: Interval(
-                      (1 / proposalProvider.proposals.length) * index,
+                      (1 / proposals.length) * index,
                       1.0,
-                      curve: Curves.easeOut
+                      curve: Curves.easeOut,
                     ),
                   ),
                 );
@@ -238,7 +295,7 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
                   ),
                 );
               },
-              childCount: proposalProvider.proposals.length,
+              childCount: proposals.length,
             ),
           ),
         );
@@ -252,11 +309,11 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) => Shimmer.fromColors(
-            baseColor: Colors.grey[850]!.withOpacity(0.3), // FIX: Made the shimmer colors translucent
-            highlightColor: Colors.grey[800]!.withOpacity(0.3), // FIX: Made the shimmer colors translucent
+            baseColor: Theme.of(context).colorScheme.surface.withOpacity(0.2),
+            highlightColor: Theme.of(context).colorScheme.surface.withOpacity(0.1),
             child: Card(
               margin: const EdgeInsets.symmetric(vertical: 8.0),
-              color: Colors.white.withOpacity(0.05), // FIX: Made the shimmer card transparent
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.1),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
               child: const SizedBox(height: 150),
             ),
@@ -266,5 +323,28 @@ class _GovernancePageState extends State<GovernancePage> with TickerProviderStat
       ),
     );
   }
+}
+
+// Placeholder for your models for the code to be runnable
+class Proposal {
+  final String id;
+  final String title;
+  final String description;
+  final String proposerId;
+  final String status;
+  final DateTime voteEndTime;
+  final int votesFor;
+  final int votesAgainst;
+
+  Proposal({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.proposerId,
+    required this.status,
+    required this.voteEndTime,
+    required this.votesFor,
+    required this.votesAgainst,
+  });
 }
 

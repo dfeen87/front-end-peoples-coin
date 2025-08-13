@@ -1,166 +1,93 @@
+// lib/service/wallet_manager.dart
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../models/user_account.dart';
+import '../models/wallet_models.dart';
 import 'wallet_service.dart';
 
-/// Wallet representation
-class Wallet {
-  final String id; // UUID or unique identifier
-  final WalletKeys keys;
-
-  Wallet({required this.id, required this.keys});
-}
-
-/// Loading states for WalletManager
-enum WalletLoadingStatus {
-  idle,
-  creating,
-  sending,
-  syncing,
-  error,
-}
-
-/// Wallet error container
-class WalletError {
-  final String message;
-  WalletError(this.message);
-}
-
-/// WalletManager handles wallets lifecycle and transactions
-class WalletManager extends StateNotifier<AsyncValue<List<Wallet>>> {
+class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
   final WalletService _walletService;
   final FlutterSecureStorage _secureStorage;
   final Uuid _uuid = const Uuid();
 
+  static const _keyPrefix = 'wallet_keys_';
+  Timer? _balanceSyncTimer;
+
   WalletManager(this._walletService, this._secureStorage)
-      : super(const AsyncValue.data([])) {
-    _loadWalletsFromStorage();
-    _startBalanceSync();
-  }
+      : super(const AsyncValue.data(null));
 
-  WalletLoadingStatus loadingStatus = WalletLoadingStatus.idle;
-  WalletError? lastError;
-  Timer? _syncTimer;
+  Future<void> initializeWallet({
+    required UserAccount? userAccount,
+    required String? sessionToken,
+  }) async {
+    if (userAccount == null || sessionToken == null) {
+      state = const AsyncValue.data(null);
+      _balanceSyncTimer?.cancel();
+      return;
+    }
 
-  List<Wallet> get wallets => state.value ?? [];
-
-  /// Creates a new wallet and saves it securely
-  Future<void> createWallet() async {
-    loadingStatus = WalletLoadingStatus.creating;
-    lastError = null;
-    state = AsyncValue.loading();
+    state = const AsyncValue.loading();
 
     try {
-      final keys = await _walletService.generateWalletKeys(); // PINless
-      final id = _uuid.v4();
-      final newWallet = Wallet(id: id, keys: keys);
+      final existingWallet = await _loadWalletFromStorage(userAccount.id);
 
-      await _saveWalletToStorage(newWallet);
+      if (existingWallet != null) {
+        state = AsyncValue.data(existingWallet);
+      } else {
+        await _createAndSaveWallet(userAccount, sessionToken);
+      }
 
-      state = AsyncValue.data([...wallets, newWallet]);
-      loadingStatus = WalletLoadingStatus.idle;
+      _startBalanceSync(userAccount);
     } catch (e, st) {
-      loadingStatus = WalletLoadingStatus.error;
-      lastError = WalletError('Failed to create wallet: $e');
       state = AsyncValue.error(e, st);
     }
   }
 
-  /// Unlocks wallet (PIN removed)
-  Future<Wallet?> unlockWallet({required String id}) async {
-    loadingStatus = WalletLoadingStatus.idle;
-    lastError = null;
-
+  Future<void> _createAndSaveWallet(UserAccount userAccount, String sessionToken) async {
+    state = const AsyncValue.loading();
     try {
-      final walletJson = await _secureStorage.read(key: 'wallet_$id');
-      if (walletJson == null) throw Exception('Wallet not found');
+      final keys = await _walletService.generateWalletKeys(sessionToken: sessionToken);
+      final newWallet = Wallet(id: _uuid.v4(), userId: userAccount.id);
 
-      final keys = WalletKeys.fromJson(jsonDecode(walletJson));
-      final unlockedWallet = Wallet(id: id, keys: keys);
+      await _saveWalletKeysToStorage(newWallet.id, keys);
 
-      final updatedWallets = wallets.where((w) => w.id != id).toList()..add(unlockedWallet);
-      state = AsyncValue.data(updatedWallets);
-
-      return unlockedWallet;
+      state = AsyncValue.data(newWallet);
     } catch (e, st) {
-      loadingStatus = WalletLoadingStatus.error;
-      lastError = WalletError('Failed to unlock wallet: $e');
-      return null;
+      state = AsyncValue.error(e, st);
     }
   }
 
-  /// Deletes wallet
-  Future<void> deleteWallet(String id) async {
-    await _secureStorage.delete(key: 'wallet_$id');
-    state = AsyncValue.data(wallets.where((w) => w.id != id).toList());
-  }
+  Future<String> signTransaction({required String dataToSign, required String sessionToken}) async {
+    final wallet = state.value;
+    if (wallet == null) {
+      throw Exception('No active wallet found.');
+    }
 
-  /// Saves wallet to secure storage
-  Future<void> _saveWalletToStorage(Wallet wallet) async {
-    await _secureStorage.write(
-      key: 'wallet_${wallet.id}',
-      value: jsonEncode(wallet.keys.toJson()),
+    final walletKeysJson = await _secureStorage.read(key: '$_keyPrefix${wallet.id}');
+    if (walletKeysJson == null) {
+      throw Exception('Wallet keys not found for ID: ${wallet.id}');
+    }
+
+    final walletKeys = WalletKeys.fromJson(jsonDecode(walletKeysJson));
+
+    final privateKeyBytes = await _walletService.decryptPrivateKey(
+      sessionToken: sessionToken,
+      keys: walletKeys,
+    );
+
+    return await _walletService.signTransactionBase64(
+      privateKeyBytes: privateKeyBytes,
+      data: dataToSign,
     );
   }
 
-  /// Loads all wallets from secure storage
-  Future<void> _loadWalletsFromStorage() async {
+  Future<bool> sendTransaction(String dataToSend, String sessionToken) async {
     try {
-      final allData = await _secureStorage.readAll();
-      final walletEntries = allData.entries.where((e) => e.key.startsWith('wallet_'));
-
-      final loadedWallets = <Wallet>[];
-      for (final entry in walletEntries) {
-        final keys = WalletKeys.fromJson(jsonDecode(entry.value));
-        loadedWallets.add(Wallet(id: entry.key.substring(7), keys: keys));
-      }
-
-      state = AsyncValue.data(loadedWallets);
-    } catch (e, st) {
-      lastError = WalletError('Failed to load wallets: $e');
-      state = AsyncValue.error(e, st);
-    }
-  }
-
-  /// Signs transaction using wallet's private key
-  Future<String> signTransaction(String walletId, String dataToSign) async {
-    loadingStatus = WalletLoadingStatus.sending;
-    lastError = null;
-
-    try {
-      final wallet = wallets.firstWhere(
-        (w) => w.id == walletId,
-        orElse: () => throw Exception('Wallet not found'),
-      );
-
-      final privateKeyBytes = await _walletService.decryptPrivateKey(
-        encryptedPrivateKeyBase64: wallet.keys.encryptedPrivateKeyBase64,
-        saltBase64: wallet.keys.saltBase64,
-        ivBase64: wallet.keys.ivBase64,
-      );
-
-      final signatureBase64 = await _walletService.signTransactionBase64(
-        privateKeyBytes: privateKeyBytes,
-        data: dataToSign,
-      );
-
-      loadingStatus = WalletLoadingStatus.idle;
-      return signatureBase64;
-    } catch (e, st) {
-      loadingStatus = WalletLoadingStatus.error;
-      lastError = WalletError('Failed to sign transaction: $e');
-      return '';
-    }
-  }
-
-  /// Sends transaction (stub)
-  Future<bool> sendTransaction(String walletId, String dataToSend) async {
-    try {
-      final signature = await signTransaction(walletId, dataToSend);
+      final signature = await signTransaction(dataToSign: dataToSend, sessionToken: sessionToken);
       if (signature.isEmpty) return false;
 
       // TODO: Replace with actual blockchain/backend call
@@ -171,27 +98,40 @@ class WalletManager extends StateNotifier<AsyncValue<List<Wallet>>> {
     }
   }
 
-  /// Periodic balance sync (stub)
-  void _startBalanceSync() {
-    _syncTimer?.cancel();
-    _syncTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
-      loadingStatus = WalletLoadingStatus.syncing;
-      // TODO: fetch balances or transactions
-      await Future.delayed(const Duration(milliseconds: 500));
-      loadingStatus = WalletLoadingStatus.idle;
+  Future<Wallet?> _loadWalletFromStorage(String userId) async {
+      // TODO: Implement a mechanism to retrieve the wallet ID associated with the user ID
+      // For now, this is a placeholder. You may need to save this mapping on your backend.
+      return null;
+  }
+
+  Future<void> _saveWalletKeysToStorage(String walletId, WalletKeys keys) async {
+    final keyJson = jsonEncode({
+      'encryptedPrivateKeyBase64': keys.encryptedPrivateKeyBase64,
+      'ivBase64': keys.ivBase64,
+      'publicKeyBase64': keys.publicKeyBase64,
+      'saltBase64': keys.saltBase64,
     });
+    await _secureStorage.write(key: '$_keyPrefix$walletId', value: keyJson);
+  }
+
+  void _startBalanceSync(UserAccount userAccount) {
+    _balanceSyncTimer?.cancel();
+    _balanceSyncTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      // TODO: Implement actual balance sync with the backend/blockchain
+      if (state is! AsyncLoading) {
+        state = AsyncValue.data(state.value);
+      }
+    });
+  }
+
+  void clearWallet() {
+    state = const AsyncValue.data(null);
+    _balanceSyncTimer?.cancel();
   }
 
   @override
   void dispose() {
-    _syncTimer?.cancel();
+    _balanceSyncTimer?.cancel();
     super.dispose();
   }
 }
-
-/// Riverpod provider
-final walletManagerProvider =
-    StateNotifierProvider<WalletManager, AsyncValue<List<Wallet>>>(
-  (ref) => WalletManager(WalletService(), const FlutterSecureStorage()),
-);
-

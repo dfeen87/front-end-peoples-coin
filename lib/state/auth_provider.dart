@@ -3,161 +3,126 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
+
 import '../service/api_client.dart';
 import '../models/user_account.dart';
-import '../service/wallet_manager.dart'; 
+import '../service/wallet_manager.dart'; // We still need to import this.
 
-/// --- Auth State ---
-enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
-
-class AuthState {
-  final fb_auth.User? firebaseUser;
-  final UserAccount? userAccount;
-  final AuthStatus status;
-  final String? error;
-
-  const AuthState({
-    this.firebaseUser,
-    this.userAccount,
-    this.status = AuthStatus.initial,
-    this.error,
-  });
-
-  AuthState copyWith({
-    fb_auth.User? firebaseUser,
-    UserAccount? userAccount,
-    AuthStatus? status,
-    String? error,
-  }) {
-    return AuthState(
-      firebaseUser: firebaseUser ?? this.firebaseUser,
-      userAccount: userAccount ?? this.userAccount,
-      status: status ?? this.status,
-      error: error,
-    );
-  }
-
-  factory AuthState.initial() => const AuthState(status: AuthStatus.initial);
+/// Enum to represent the authentication status.
+enum AuthStatus {
+  loading,
+  authenticated,
+  unauthenticated,
+  error,
 }
 
-/// --- Auth Notifier ---
-class AuthNotifier extends StateNotifier<AuthState> {
-  final PeoplesCoinApiClient _apiClient;
-  final fb_auth.FirebaseAuth _auth = fb_auth.FirebaseAuth.instance;
-  StreamSubscription<fb_auth.User?>? _authSub;
+/// --- Providers ---
 
-  // Dev user credentials for quick local testing
-  static const _devEmail = 'dfeen87@brightacts.com';
-  static const _devPassword = 'bleigh1!';
+// Provides a stream of Firebase user authentication state changes.
+final firebaseAuthProvider = Provider<fb_auth.FirebaseAuth>((ref) {
+  return fb_auth.FirebaseAuth.instance;
+});
 
-  AuthNotifier(this._apiClient) : super(AuthState.initial()) {
-    _authSub = _auth.authStateChanges().listen(_onAuthStateChanged);
+final firebaseAuthStateChangesProvider = StreamProvider<fb_auth.User?>((ref) {
+  return ref.watch(firebaseAuthProvider).authStateChanges();
+});
+
+// Provides the current user's backend profile (UserAccount), or null if unauthenticated.
+final userAccountProvider = FutureProvider<UserAccount?>((ref) async {
+  final firebaseUser = await ref.watch(firebaseAuthStateChangesProvider.future);
+  if (firebaseUser == null) {
+    return null;
   }
 
-  /// Handle Firebase auth changes
-  Future<void> _onAuthStateChanged(fb_auth.User? firebaseUser) async {
-    if (firebaseUser == null) {
-      state = state.copyWith(
-        firebaseUser: null,
-        userAccount: null,
-        status: AuthStatus.unauthenticated,
-        error: null,
-      );
-      return;
+  final idToken = await firebaseUser.getIdToken();
+  final apiClient = ref.watch(apiClientProvider);
+
+  try {
+    final userAccount = await apiClient.getAuthenticatedUserProfile(idToken: idToken);
+    
+    // We no longer call the WalletManager directly here.
+    // The wallet initialization is now handled by a ref.listen in the wallet_provider.
+    // This decouples the auth and wallet logic.
+    
+    return userAccount;
+  } catch (e) {
+    if (kDebugMode) {
+      print('Error fetching user profile: $e');
     }
+    // We should log the user out here if their profile is not found.
+    ref.read(authServiceProvider.notifier).signOut();
+    return null;
+  }
+});
 
-    state = state.copyWith(status: AuthStatus.loading, firebaseUser: firebaseUser);
+// A provider that listens to the userAccountProvider and provides a simple AuthStatus.
+final authStatusProvider = Provider<AuthStatus>((ref) {
+  final firebaseAuthState = ref.watch(firebaseAuthStateChangesProvider);
+  final userAccountState = ref.watch(userAccountProvider);
 
-    try {
-      final idToken = await firebaseUser.getIdToken();
-      final account = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
-
-      // --- WALLET INTEGRATION ---
-      await WalletManager.instance.unlockOrCreateWallet(account);
-
-      state = state.copyWith(
-        firebaseUser: firebaseUser,
-        userAccount: account,
-        status: AuthStatus.authenticated,
-        error: null,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        firebaseUser: null,
-        userAccount: null,
-        status: AuthStatus.error,
-        error: 'Failed to fetch user profile or initialize wallet: $e',
-      );
-    }
+  if (firebaseAuthState.isLoading || userAccountState.isLoading) {
+    return AuthStatus.loading;
   }
 
-  /// Sign in with email/password
+  if (firebaseAuthState.hasError || userAccountState.hasError) {
+    return AuthStatus.error;
+  }
+
+  final firebaseUser = firebaseAuthState.value;
+  final userAccount = userAccountState.value;
+
+  if (firebaseUser != null && userAccount != null) {
+    return AuthStatus.authenticated;
+  } else {
+    return AuthStatus.unauthenticated;
+  }
+});
+
+/// --- Auth Service Notifier ---
+/// This notifier will handle the business logic of signing in and out.
+class AuthServiceNotifier extends StateNotifier<void> {
+  final Ref _ref;
+  final fb_auth.FirebaseAuth _auth;
+  final ApiClient _apiClient;
+
+  AuthServiceNotifier(this._ref, this._auth, this._apiClient) : super(null);
+
   Future<void> signIn(String email, String password) async {
-    state = state.copyWith(status: AuthStatus.loading, error: null);
-
-    if (email == _devEmail && password == _devPassword) {
-      await _signInWithDevUser();
-      return;
-    }
-
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-      // `_onAuthStateChanged` handles backend fetch and wallet initialization
     } on fb_auth.FirebaseAuthException catch (e) {
-      state = state.copyWith(status: AuthStatus.error, error: _firebaseErrorMessage(e));
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.error, error: 'Unexpected error: $e');
+      // Throw the specific exception so the UI can catch it.
+      throw _firebaseAuthException(e);
     }
   }
 
-  /// Sign up new user
-  Future<void> signUp(String email, String password) async {
-    state = state.copyWith(status: AuthStatus.loading, error: null);
+  Future<void> signUp(String email, String password, {required String username, required String recaptchaToken}) async {
     try {
-      await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      // `_onAuthStateChanged` handles wallet creation automatically
+      final userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      final idToken = await userCredential.user!.getIdToken();
+
+      // Call the backend to create the user account
+      // The backend should also create the wallet associated with this user ID.
+      await _apiClient.createUserAndWallet(
+        username: username,
+        recaptchaToken: recaptchaToken,
+        idToken: idToken,
+      );
+      
+      // The wallet initialization is now handled automatically by the wallet_provider
+      // when it sees a new user account has been created.
+      
     } on fb_auth.FirebaseAuthException catch (e) {
-      state = state.copyWith(status: AuthStatus.error, error: _firebaseErrorMessage(e));
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.error, error: 'Unexpected error: $e');
+      throw _firebaseAuthException(e);
     }
   }
 
-  /// Sign out
   Future<void> signOut() async {
     await _auth.signOut();
   }
 
-  /// Dev/mock user sign in
-  Future<void> _signInWithDevUser() async {
-    state = state.copyWith(status: AuthStatus.loading, error: null);
-
-    final mockUser = _MockUser(email: _devEmail);
-    state = state.copyWith(firebaseUser: mockUser);
-
-    try {
-      final account = await _apiClient.getAuthenticatedUserProfile(idToken: 'mock_id_token');
-      
-      // --- DEV WALLET ---
-      await WalletManager.instance.unlockOrCreateWallet(account);
-
-      state = state.copyWith(
-        firebaseUser: mockUser,
-        userAccount: account,
-        status: AuthStatus.authenticated,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        firebaseUser: null,
-        userAccount: null,
-        status: AuthStatus.error,
-        error: 'Failed to fetch mock user profile or initialize wallet: $e',
-      );
-    }
-  }
-
-  /// Convert FirebaseAuthException codes to user-friendly messages
-  String _firebaseErrorMessage(fb_auth.FirebaseAuthException e) {
+  // Helper method for friendly error messages
+  String _firebaseAuthException(fb_auth.FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-email': return 'The email address is badly formatted.';
       case 'user-disabled': return 'This user has been disabled.';
@@ -169,50 +134,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       default: return e.message ?? 'Authentication error occurred.';
     }
   }
-
-  @override
-  void dispose() {
-    _authSub?.cancel();
-    super.dispose();
-  }
 }
 
-/// --- Provider ---
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+final authServiceProvider = StateNotifierProvider<AuthServiceNotifier, void>((ref) {
+  final auth = ref.watch(firebaseAuthProvider);
   final apiClient = ref.watch(apiClientProvider);
-  return AuthNotifier(apiClient);
+  return AuthServiceNotifier(ref, auth, apiClient);
 });
-
-/// --- Mock user for dev/testing ---
-class _MockUser implements fb_auth.User {
-  @override
-  final String email;
-
-  _MockUser({required this.email});
-
-  @override
-  String get uid => 'mock_uid_${email.hashCode}';
-  @override
-  String? get displayName => 'Dev User';
-  @override
-  bool get isAnonymous => false;
-  @override
-  bool get isEmailVerified => true;
-  @override
-  fb_auth.UserMetadata get metadata => _MockUserMetadata();
-  @override
-  List<fb_auth.UserInfo> get providerData => [];
-  @override
-  Future<String> getIdToken([bool forceRefresh = false]) async => 'mock_id_token';
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _MockUserMetadata implements fb_auth.UserMetadata {
-  @override
-  DateTime get creationTime => DateTime.now();
-  @override
-  DateTime get lastSignInTime => DateTime.now();
-}
-

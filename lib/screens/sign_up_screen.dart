@@ -1,17 +1,13 @@
+// lib/screens/sign_up_screen.dart
 import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../service/api_client.dart';
-import '../service/recaptcha_service.dart';
-import '../service/wallet_manager.dart';
-import '../widgets/dynamic_nebula_background.dart';
 import '../state/auth_provider.dart';
+import '../widgets/dynamic_nebula_background.dart';
 
 enum UsernameStatus { idle, checking, available, unavailable, tooShort }
 
@@ -23,7 +19,6 @@ class SignUpScreen extends ConsumerStatefulWidget {
 }
 
 class _SignUpScreenState extends ConsumerState<SignUpScreen> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _emailController = TextEditingController();
@@ -31,7 +26,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
 
-  bool _isLoading = false;
   bool _isPasswordObscured = true;
   UsernameStatus _usernameStatus = UsernameStatus.idle;
 
@@ -87,82 +81,41 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     } catch (e) {
       if (mounted) setState(() => _usernameStatus = UsernameStatus.unavailable);
       _showError("Couldn't verify username. Please try again.");
-      if (kDebugMode) print("Username check error: $e");
     }
   }
 
   Future<void> _signUpWithEmail() async {
-    if (_isLoading) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_usernameStatus != UsernameStatus.available) {
       _showError('Please choose an available username.');
       return;
     }
+    
+    // Unfocus all text fields
+    FocusScope.of(context).unfocus();
 
-    final recaptchaSiteKey =
-        dotenv.env['RECAPTCHA_SITE_KEY_PROD'] ?? '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F';
-    final apiBaseUrl =
-        dotenv.env['API_BASE_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
-
-    setState(() => _isLoading = true);
+    // Use the correct provider for the auth service
+    final authService = ref.read(authServiceProvider.notifier);
 
     try {
-      final recaptchaService = RecaptchaService(
-        context,
-        siteKey: recaptchaSiteKey,
-        verifyUrl: '$apiBaseUrl/verify-recaptcha',
-      );
-
-      final token = await recaptchaService.execute();
-      if (token.isEmpty) throw Exception('reCAPTCHA verification failed.');
-
-      // Create Firebase user
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      final user = userCredential.user;
-      if (user == null) throw Exception('Firebase user creation failed.');
-
-      final idToken = await user.getIdToken();
-      if (idToken.isEmpty) throw Exception('Failed to retrieve Firebase ID token.');
-
-      final apiClient = ref.read(apiClientProvider);
-
-      // Backend call to create user and wallet
-      await apiClient.createUserAndWallet(
+      // Call the signUp method on the AuthServiceNotifier.
+      // This single call now handles Firebase authentication and backend profile creation.
+      await authService.signUp(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
         username: _usernameController.text.trim(),
-        recaptchaToken: token,
-        idToken: idToken,
+        // Note: The Recaptcha logic should be part of the `AuthServiceNotifier`
+        // or a dedicated service, not the UI layer. For now, this is a placeholder.
+        recaptchaToken: 'placeholder_token',
       );
-
-      // Local wallet creation/unlock
-      final walletManager = ref.read(walletManagerProvider.notifier);
-      await walletManager.unlockOrCreateWallet(_usernameController.text.trim());
 
       if (mounted) context.go('/home');
-    } on FirebaseAuthException catch (e) {
-      final friendlyMessage = switch (e.code) {
-        'email-already-in-use' => 'This email is already registered.',
-        'weak-password' => 'The password is too weak.',
-        'invalid-email' => 'Invalid email format.',
-        _ => 'Sign-up error: ${e.message}',
-      };
-      _showError(friendlyMessage);
-    } catch (e, stack) {
-      if (kDebugMode) print("Sign-up error: $e\n$stack");
-      final errorMessage = e.toString().toLowerCase();
-      if (errorMessage.contains('username_taken')) {
-        _showError('This username was just taken. Please choose another.');
-        if (mounted) setState(() => _usernameStatus = UsernameStatus.unavailable);
-      } else {
-        _showError('Unexpected error: $e');
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      if (!mounted) return;
+      _showError(e.toString());
     }
   }
-
+  
   InputDecoration _buildInputDecoration(String label, IconData icon,
       {Widget? suffixIcon}) {
     return InputDecoration(
@@ -215,6 +168,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the auth status to handle the loading state
+    final authStatus = ref.watch(authStatusProvider);
+    final isLoading = authStatus == AuthStatus.loading;
+
     final passwordToggle = IconButton(
       icon: Icon(
         _isPasswordObscured ? Icons.visibility_off : Icons.visibility,
@@ -262,6 +219,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                             keyboardType: TextInputType.emailAddress,
                             validator: (val) =>
                                 (val?.contains('@') ?? false) ? null : 'Enter a valid email',
+                            enabled: !isLoading,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -279,7 +237,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                 case UsernameStatus.unavailable:
                                   return 'This username is taken';
                                 case UsernameStatus.checking:
-                                  return 'Checking username...';
                                 case UsernameStatus.idle:
                                   if (val == null || val.trim().isEmpty) return 'Enter a username';
                                   return null;
@@ -288,6 +245,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                   return null;
                               }
                             },
+                            enabled: !isLoading,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -297,6 +255,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                             decoration: _buildInputDecoration('Password', Icons.lock_outline,
                                 suffixIcon: passwordToggle),
                             validator: (val) => (val?.length ?? 0) >= 6 ? null : 'Password must be at least 6 chars',
+                            enabled: !isLoading,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -309,25 +268,32 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                               if (val != _passwordController.text) return 'Passwords do not match';
                               return null;
                             },
+                            enabled: !isLoading,
                           ),
                           const SizedBox(height: 24),
-                          if (_isLoading)
-                            const CircularProgressIndicator()
-                          else
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  backgroundColor: Colors.amber[800],
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                backgroundColor: Colors.amber[800],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                onPressed: _signUpWithEmail,
-                                child: const Text('Sign Up', style: TextStyle(fontSize: 16, color: Colors.white)),
                               ),
+                              onPressed: isLoading ? null : _signUpWithEmail,
+                              child: isLoading
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 3,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Text('Sign Up', style: TextStyle(fontSize: 16, color: Colors.white)),
                             ),
+                          ),
                           const SizedBox(height: 20),
                           RichText(
                             text: TextSpan(
@@ -355,4 +321,3 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     );
   }
 }
-

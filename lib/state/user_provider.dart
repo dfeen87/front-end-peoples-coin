@@ -1,188 +1,109 @@
 // lib/providers/user_provider.dart
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../models/user_account.dart';
 import '../service/api_client.dart';
 import '../models/goodwill_action.dart';
 
-class UserProvider with ChangeNotifier {
+// -----------------------------------------------------------------------------
+// USER ACCOUNT PROVIDER
+// -----------------------------------------------------------------------------
+
+/// StateNotifier that manages a single UserAccount object.
+/// This is responsible for fetching the user's profile on startup or on demand.
+class UserAccountNotifier extends StateNotifier<AsyncValue<UserAccount?>> {
   final PeoplesCoinApiClient _apiClient;
 
-  UserAccount? _currentUser;
-  bool _isLoading = false;
-  String? _error;
+  UserAccountNotifier(this._apiClient) : super(const AsyncValue.data(null));
 
-  List<GoodwillAction> _userActions = [];
-  bool _isFetchingActions = false;
-  String? _actionsError;
-
-  // Wallet-specific state
-  bool _isFetchingWallet = false;
-  String? _walletError;
-
-  UserProvider(this._apiClient);
-
-  // User profile getters
-  UserAccount? get currentUser => _currentUser;
-  bool get isLoading => _isLoading;
-  bool get hasError => _error != null;
-  String? get error => _error;
-
-  // Goodwill actions getters
-  List<GoodwillAction> get userActions => _userActions;
-  bool get isFetchingActions => _isFetchingActions;
-  bool get hasActionsError => _actionsError != null;
-  String? get actionsError => _actionsError;
-
-  // Wallet getters (reading from currentUser fields)
-  bool get isFetchingWallet => _isFetchingWallet;
-  String? get walletError => _walletError;
-
-  String get walletAddress => _currentUser?.walletId ?? '';
-  String get walletPublicKey => _currentUser?.publicKey ?? '';
-  String get encryptedPrivateKey => _currentUser?.encryptedPrivateKey ?? '';
-  double get balance => _currentUser?.balance ?? 0.0;
-
-  /// Always get fresh Firebase ID token
-  Future<String> _getIdToken() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('User is not signed in.');
-    final token = await user.getIdToken();
-    if (token.isEmpty) throw Exception('Failed to get Firebase ID token.');
-    return token;
-  }
-
-  void setCurrentUser(UserAccount? user) {
-    _currentUser = user;
-    notifyListeners();
-  }
-
-  void clearUser() {
-    _currentUser = null;
-    notifyListeners();
-  }
-
-  /// Fetch authenticated user profile securely (includes wallet info)
+  /// Fetches the authenticated user profile securely.
   Future<void> fetchUser() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    state = const AsyncValue.loading();
 
     try {
-      final idToken = await _getIdToken();
-      _currentUser = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
-      if (kDebugMode) {
-        print('[UserProvider] Fetched user: ${_currentUser?.username}');
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        state = const AsyncValue.data(null);
+        return;
       }
-    } catch (e) {
-      _error = "Failed to fetch user data: $e";
-      _currentUser = null;
-      if (kDebugMode) {
-        print('[UserProvider] Error fetching user: $e');
+      
+      final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Failed to get Firebase ID token.');
       }
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+
+      final userAccount = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
+      state = AsyncValue.data(userAccount);
+      
+      if (kDebugMode) {
+        print('[UserAccountNotifier] Fetched user: ${userAccount.username}');
+      }
+    } catch (e, st) {
+      state = AsyncValue.error('Failed to fetch user data: $e', st);
+      if (kDebugMode) {
+        print('[UserAccountNotifier] Error fetching user: $e');
+      }
     }
   }
 
-  /// Fetch authenticated user's goodwill actions securely
-  Future<void> fetchUserActions() async {
-    if (_currentUser == null) return;
-
-    _isFetchingActions = true;
-    _actionsError = null;
-    notifyListeners();
-
-    try {
-      final idToken = await _getIdToken();
-      _userActions = await _apiClient.getUserGoodwillActions(userId: _currentUser!.id, idToken: idToken);
-      if (kDebugMode) {
-        print('[UserProvider] Fetched ${_userActions.length} user actions.');
-      }
-    } catch (e) {
-      _actionsError = "Failed to fetch your Bright Acts: $e";
-      if (kDebugMode) {
-        print('[UserProvider] Error fetching user actions: $e');
-      }
-    } finally {
-      _isFetchingActions = false;
-      notifyListeners();
-    }
-  }
-
-  /// Refresh wallet info separately if needed
-  Future<void> refreshWallet() async {
-    if (_currentUser == null) {
-      _walletError = "No user signed in.";
-      notifyListeners();
-      return;
-    }
-
-    _isFetchingWallet = true;
-    _walletError = null;
-    notifyListeners();
-
-    try {
-      final idToken = await _getIdToken();
-      final updatedUser = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
-      _currentUser = updatedUser;
-      if (kDebugMode) {
-        print('[UserProvider] Wallet info refreshed');
-      }
-    } catch (e) {
-      _walletError = "Failed to refresh wallet data: $e";
-      if (kDebugMode) {
-        print('[UserProvider] Error refreshing wallet: $e');
-      }
-    } finally {
-      _isFetchingWallet = false;
-      notifyListeners();
-    }
-  }
-
-  /// Update user's wallet keys (public + encrypted private) in backend
-  Future<void> updateWalletKeys({
-    required String publicKey,
-    required String encryptedPrivateKey,
-  }) async {
-    if (_currentUser == null) {
-      throw Exception("No user signed in.");
-    }
-
-    final idToken = await _getIdToken();
-
-    try {
-      // TODO: Implement your API client method that updates wallet keys and returns updated user
-      // final updatedUser = await _apiClient.updateUserWalletKeys(idToken, publicKey, encryptedPrivateKey);
-
-      // For now, just update locally (simulate success)
-      _currentUser = _currentUser!.copyWith(
-        publicKey: publicKey,
-        encryptedPrivateKey: encryptedPrivateKey,
-      );
-      notifyListeners();
-      if (kDebugMode) {
-        print('[UserProvider] Wallet keys updated locally');
-      }
-    } catch (e) {
-      throw Exception('Failed to update wallet keys: $e');
-    }
-  }
-
-  void clearError() {
-    _error = null;
-    notifyListeners();
-  }
-
-  void clearActionsError() {
-    _actionsError = null;
-    notifyListeners();
-  }
-
-  void clearWalletError() {
-    _walletError = null;
-    notifyListeners();
+  /// Clears the current user account state.
+  void clearUser() {
+    state = const AsyncValue.data(null);
   }
 }
+
+/// The main provider for the UserAccountNotifier.
+final userAccountProvider = StateNotifierProvider<UserAccountNotifier, AsyncValue<UserAccount?>>(
+  (ref) => UserAccountNotifier(ref.watch(apiClientProvider)),
+);
+
+// -----------------------------------------------------------------------------
+// USER GOODWILL ACTIONS PROVIDER
+// -----------------------------------------------------------------------------
+
+/// A FutureProvider that fetches the user's goodwill actions.
+/// This provider depends on the userAccountProvider to get the user's ID.
+/// It automatically refreshes if the userAccountProvider changes.
+final userActionsProvider = FutureProvider<List<GoodwillAction>>((ref) async {
+  final userAccountAsync = ref.watch(userAccountProvider);
+  
+  if (userAccountAsync.isLoading || userAccountAsync.value == null) {
+    // Return an empty list or throw an error if the user is not available yet.
+    // The UI will handle the loading state automatically.
+    return [];
+  }
+  
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    return [];
+  }
+  
+  try {
+    final idToken = await user.getIdToken();
+    if (idToken == null || idToken.isEmpty) {
+      return [];
+    }
+
+    final apiClient = ref.read(apiClientProvider);
+    final actions = await apiClient.getUserGoodwillActions(
+      userId: userAccountAsync.value!.id,
+      idToken: idToken,
+    );
+    
+    if (kDebugMode) {
+      print('[UserActionsProvider] Fetched ${actions.length} user actions.');
+    }
+    
+    return actions;
+  } catch (e, st) {
+    if (kDebugMode) {
+      print('[UserActionsProvider] Error fetching user actions: $e');
+    }
+    // Riverpod's FutureProvider handles the error state automatically.
+    // We can simply re-throw the error or return a handled state.
+    throw Exception('Failed to fetch user actions: $e');
+  }
+});
 

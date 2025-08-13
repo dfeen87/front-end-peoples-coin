@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+
+@immutable
 class PublicLedgerEntry {
   final String id;
   final String title;
@@ -5,7 +8,7 @@ class PublicLedgerEntry {
   final String walletId;
   final DateTime createdAt;
 
-  PublicLedgerEntry({
+  const PublicLedgerEntry({
     required this.id,
     required this.title,
     required this.lovesValue,

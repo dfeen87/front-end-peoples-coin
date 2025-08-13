@@ -1,3 +1,8 @@
+import 'package:flutter/foundation.dart';
+
+/// An immutable data model for a user's account, including sensitive details.
+/// This mirrors the `user_accounts` table in the database.
+@immutable
 class UserAccount {
   final String id;
   final String firebaseUid;
@@ -13,7 +18,7 @@ class UserAccount {
   final String encryptedPrivateKey;
   final String role;
 
-  UserAccount({
+  const UserAccount({
     required this.id,
     required this.firebaseUid,
     required this.email,
@@ -29,24 +34,26 @@ class UserAccount {
     required this.role,
   });
 
+  /// Creates a new instance of [UserAccount] from a JSON map.
   factory UserAccount.fromJson(Map<String, dynamic> json) {
     return UserAccount(
-      id: json['id'] as String,
-      firebaseUid: json['firebase_uid'] as String,
-      email: json['email'] as String,
-      username: json['username'] as String,
+      id: json['id']?.toString() ?? '',
+      firebaseUid: json['firebase_uid']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      username: json['username']?.toString() ?? '',
       balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
-      bio: json['bio'] as String? ?? '',
-      profileImageUrl: json['profile_image_url'] as String? ?? '',
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-      walletId: json['wallet_id'] as String? ?? '',
-      publicKey: json['public_key'] as String? ?? '',
-      encryptedPrivateKey: json['encrypted_private_key'] as String? ?? '',
-      role: json['role'] as String? ?? 'user',
+      bio: json['bio']?.toString() ?? '',
+      profileImageUrl: json['profile_image_url']?.toString() ?? '',
+      createdAt: _parseDate(json['created_at']),
+      updatedAt: _parseDate(json['updated_at']),
+      walletId: json['wallet_id']?.toString() ?? '',
+      publicKey: json['public_key']?.toString() ?? '',
+      encryptedPrivateKey: json['encrypted_private_key']?.toString() ?? '',
+      role: json['role']?.toString() ?? 'user',
     );
   }
 
+  /// Converts this model into a JSON map.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -65,6 +72,7 @@ class UserAccount {
     };
   }
 
+  /// Creates a new instance of [UserAccount] with optional new values.
   UserAccount copyWith({
     String? id,
     String? firebaseUid,
@@ -96,10 +104,38 @@ class UserAccount {
       role: role ?? this.role,
     );
   }
-
-  /// Helper to deserialize a list of user accounts from JSON array
+  
+  /// Helper to deserialize a list of user accounts from a JSON array.
   static List<UserAccount> fromJsonList(List<dynamic> jsonList) {
     return jsonList.map((json) => UserAccount.fromJson(json)).toList();
+  }
+
+  @override
+  String toString() {
+    return 'UserAccount(id: $id, username: $username, balance: $balance, role: $role)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserAccount &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  /// Helper to safely parse a DateTime.
+  static DateTime _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 }
 

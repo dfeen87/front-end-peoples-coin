@@ -20,6 +20,25 @@ class ProposalToSend {
     this.voteEndTime,
   });
 
+  /// Creates a new instance of [ProposalToSend] with optional new values.
+  ProposalToSend copyWith({
+    String? proposerUserId,
+    String? title,
+    String? description,
+    String? proposalType,
+    Map<String, dynamic>? details,
+    DateTime? voteEndTime,
+  }) {
+    return ProposalToSend(
+      proposerUserId: proposerUserId ?? this.proposerUserId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      proposalType: proposalType ?? this.proposalType,
+      details: details ?? this.details,
+      voteEndTime: voteEndTime ?? this.voteEndTime,
+    );
+  }
+
   /// Converts this object into a JSON map for the API request body.
   Map<String, dynamic> toJson() {
     return {

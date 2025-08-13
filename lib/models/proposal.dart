@@ -41,6 +41,37 @@ class Proposal {
     required this.updatedAt,
   });
 
+  /// Creates a new instance of [Proposal] with optional new values.
+  Proposal copyWith({
+    String? id,
+    String? proposerUserId,
+    String? title,
+    String? description,
+    ProposalStatus? status,
+    DateTime? voteStartTime,
+    DateTime? voteEndTime,
+    double? requiredQuorum,
+    String? proposalType,
+    Map<String, dynamic>? details,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Proposal(
+      id: id ?? this.id,
+      proposerUserId: proposerUserId ?? this.proposerUserId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      status: status ?? this.status,
+      voteStartTime: voteStartTime ?? this.voteStartTime,
+      voteEndTime: voteEndTime ?? this.voteEndTime,
+      requiredQuorum: requiredQuorum ?? this.requiredQuorum,
+      proposalType: proposalType ?? this.proposalType,
+      details: details ?? this.details,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   /// Factory constructor to create a Proposal instance from a JSON map.
   factory Proposal.fromJson(Map<String, dynamic> json) {
     return Proposal(
@@ -66,7 +97,7 @@ class Proposal {
       'proposer_user_id': proposerUserId,
       'title': title,
       'description': description,
-      'status': status.toString().split('.').last.toUpperCase(),
+      'status': status.name.toUpperCase(),
       'vote_start_time': voteStartTime?.toIso8601String(),
       'vote_end_time': voteEndTime?.toIso8601String(),
       'required_quorum': requiredQuorum,

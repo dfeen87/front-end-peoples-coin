@@ -22,19 +22,44 @@ class UserWallet {
     required this.updatedAt,
   });
 
+  /// Creates a new instance of [UserWallet] from a JSON map.
   factory UserWallet.fromJson(Map<String, dynamic> json) {
     return UserWallet(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      publicAddress: json['public_address'] as String,
-      blockchainNetwork: json['blockchain_network'] as String,
-      isPrimary: json['is_primary'] as bool,
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      publicAddress: json['public_address']?.toString() ?? '',
+      blockchainNetwork: json['blockchain_network']?.toString() ?? '',
+      isPrimary: json['is_primary'] as bool? ?? false,
       encryptedPrivateKey: json['encrypted_private_key'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: _safeDate(json['created_at']),
+      updatedAt: _safeDate(json['updated_at']),
     );
   }
 
+  /// Creates a new instance of [UserWallet] with optional new values.
+  UserWallet copyWith({
+    String? id,
+    String? userId,
+    String? publicAddress,
+    String? blockchainNetwork,
+    bool? isPrimary,
+    String? encryptedPrivateKey,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return UserWallet(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      publicAddress: publicAddress ?? this.publicAddress,
+      blockchainNetwork: blockchainNetwork ?? this.blockchainNetwork,
+      isPrimary: isPrimary ?? this.isPrimary,
+      encryptedPrivateKey: encryptedPrivateKey ?? this.encryptedPrivateKey,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  /// Converts this model into a JSON map.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -46,6 +71,19 @@ class UserWallet {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
+  }
+  
+  /// Helper to safely parse DateTime values.
+  static DateTime _safeDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 }
 

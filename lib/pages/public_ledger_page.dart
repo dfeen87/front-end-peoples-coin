@@ -1,23 +1,178 @@
+// lib/pages/public_ledger_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:async';
 import 'dart:ui';
 
-import '../state/ledger_provider.dart';
-import '../state/user_provider.dart';
-import '../models/public_ledger_entry.dart';
+// --- MOCK DATA MODELS AND PROVIDERS (Refactored to use Riverpod) ---
 
-class PublicLedgerPage extends StatefulWidget {
+class PublicLedgerEntry {
+  final String id;
+  final String walletId;
+  final String title;
+  final int lovesValue;
+  final DateTime createdAt;
+
+  PublicLedgerEntry({
+    required this.id,
+    required this.walletId,
+    required this.title,
+    required this.lovesValue,
+    required this.createdAt,
+  });
+}
+
+class User {
+  final String id;
+  final String walletId;
+  User({required this.id, required this.walletId});
+}
+
+// State class to hold all ledger-related data and status flags.
+class LedgerState {
+  final List<PublicLedgerEntry> publicLedgerEntries;
+  final bool isInitialLoading;
+  final bool isFetchingMore;
+  final String? errorMessage;
+  final String? lastDocumentId;
+  final String currentSearchQuery;
+
+  LedgerState({
+    required this.publicLedgerEntries,
+    this.isInitialLoading = false,
+    this.isFetchingMore = false,
+    this.errorMessage,
+    this.lastDocumentId,
+    this.currentSearchQuery = '',
+  });
+
+  LedgerState copyWith({
+    List<PublicLedgerEntry>? publicLedgerEntries,
+    bool? isInitialLoading,
+    bool? isFetchingMore,
+    String? errorMessage,
+    String? lastDocumentId,
+    String? currentSearchQuery,
+  }) {
+    return LedgerState(
+      publicLedgerEntries: publicLedgerEntries ?? this.publicLedgerEntries,
+      isInitialLoading: isInitialLoading ?? this.isInitialLoading,
+      isFetchingMore: isFetchingMore ?? this.isFetchingMore,
+      errorMessage: errorMessage,
+      lastDocumentId: lastDocumentId ?? this.lastDocumentId,
+      currentSearchQuery: currentSearchQuery ?? this.currentSearchQuery,
+    );
+  }
+}
+
+// StateNotifier to manage the state of the public ledger.
+class LedgerNotifier extends StateNotifier<LedgerState> {
+  LedgerNotifier() : super(LedgerState(publicLedgerEntries: []));
+
+  Future<void> fetchPublicLedgerEntries({bool isRefresh = false}) async {
+    if (state.isFetchingMore || state.isInitialLoading) return;
+
+    if (isRefresh) {
+      state = state.copyWith(isInitialLoading: true, publicLedgerEntries: [], lastDocumentId: null);
+    } else {
+      state = state.copyWith(isFetchingMore: true);
+    }
+
+    try {
+      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+
+      // Generate mock data for demonstration
+      final newEntries = List.generate(
+        10,
+        (i) => PublicLedgerEntry(
+          id: '${state.publicLedgerEntries.length + i}',
+          walletId: 'wallet_${state.publicLedgerEntries.length + i}',
+          title: 'Action ${state.publicLedgerEntries.length + i}',
+          lovesValue: 50 + (i * 10),
+          createdAt: DateTime.now().subtract(Duration(days: i)),
+        ),
+      );
+
+      state = state.copyWith(
+        publicLedgerEntries: [...state.publicLedgerEntries, ...newEntries],
+        isInitialLoading: false,
+        isFetchingMore: false,
+        errorMessage: null,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isInitialLoading: false,
+        isFetchingMore: false,
+        errorMessage: 'Failed to fetch ledger entries.',
+      );
+    }
+  }
+
+  Future<void> search(String query) async {
+    state = state.copyWith(
+      isInitialLoading: true,
+      publicLedgerEntries: [],
+      currentSearchQuery: query,
+    );
+    try {
+      await Future.delayed(const Duration(milliseconds: 800)); // Simulate search API call
+      final mockSearchResults = List.generate(
+        5,
+        (i) => PublicLedgerEntry(
+          id: 'search_$i',
+          walletId: 'search_wallet_$i',
+          title: 'Search Result for "$query" $i',
+          lovesValue: 100 + i,
+          createdAt: DateTime.now(),
+        ),
+      );
+      state = state.copyWith(
+        publicLedgerEntries: mockSearchResults,
+        isInitialLoading: false,
+        isFetchingMore: false,
+        errorMessage: null,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isInitialLoading: false,
+        isFetchingMore: false,
+        errorMessage: 'Failed to perform search.',
+      );
+    }
+  }
+
+  Future<bool> sendLoves({required String senderWallet, required String recipientWallet, required int amount, String? memo}) async {
+    try {
+      // Simulate sending Loves via an API
+      await Future.delayed(const Duration(seconds: 1));
+      print('Sending $amount Loves from $senderWallet to $recipientWallet with memo: $memo');
+      return true;
+    } catch (e) {
+      print('Error sending loves: $e');
+      return false;
+    }
+  }
+}
+
+// Riverpod providers for state management
+final userProvider = Provider<User?>((ref) => User(id: 'user123', walletId: 'wallet_user123'));
+final ledgerProvider = StateNotifierProvider<LedgerNotifier, LedgerState>((ref) {
+  return LedgerNotifier();
+});
+
+// --- WIDGETS ---
+
+class PublicLedgerPage extends ConsumerStatefulWidget {
   const PublicLedgerPage({super.key});
 
   @override
-  State<PublicLedgerPage> createState() => _PublicLedgerPageState();
+  ConsumerState<PublicLedgerPage> createState() => _PublicLedgerPageState();
 }
 
-class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProviderStateMixin {
+class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with TickerProviderStateMixin {
   late final AnimationController _listAnimationController;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
@@ -30,18 +185,13 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
-
     _scrollController.addListener(_onScroll);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchInitialData();
-    });
+    _fetchInitialData();
   }
 
   void _fetchInitialData() {
     _listAnimationController.reset();
-    final provider = Provider.of<LedgerProvider>(context, listen: false);
-    provider.fetchPublicLedgerEntries(isRefresh: true).then((_) {
+    ref.read(ledgerProvider.notifier).fetchPublicLedgerEntries(isRefresh: true).then((_) {
       if (mounted) {
         _listAnimationController.forward();
       }
@@ -50,14 +200,18 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
 
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
-      context.read<LedgerProvider>().fetchPublicLedgerEntries();
+      ref.read(ledgerProvider.notifier).fetchPublicLedgerEntries();
     }
   }
 
   void _onSearchChanged(String query) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      context.read<LedgerProvider>().search(query);
+      if (query.isEmpty) {
+        _fetchInitialData();
+      } else {
+        ref.read(ledgerProvider.notifier).search(query);
+      }
     });
   }
 
@@ -72,9 +226,10 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final ledgerProvider = context.watch<LedgerProvider>();
-    final userProvider = context.watch<UserProvider>();
-    final currentUserWalletId = userProvider.currentUser?.walletId;
+    // Watch the providers to get the current state
+    final ledgerState = ref.watch(ledgerProvider);
+    final user = ref.watch(userProvider);
+    final currentUserWalletId = user?.walletId;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -102,7 +257,7 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
               onRefresh: () async => _fetchInitialData(),
               color: Colors.amber,
               backgroundColor: Colors.grey[800],
-              child: _buildBody(ledgerProvider, currentUserWalletId),
+              child: _buildBody(ledgerState, currentUserWalletId),
             ),
           ),
         ],
@@ -140,37 +295,39 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
     );
   }
 
-  Widget _buildBody(LedgerProvider ledgerProvider, String? currentUserWalletId) {
-    if (ledgerProvider.isInitialLoading && ledgerProvider.publicLedgerEntries.isEmpty) {
+  Widget _buildBody(LedgerState ledgerState, String? currentUserWalletId) {
+    if (ledgerState.isInitialLoading) {
       return _buildLoadingShimmer();
     }
 
-    if (ledgerProvider.errorMessage != null) {
+    if (ledgerState.errorMessage != null) {
       return Center(
         child: Text(
-          'Error: ${ledgerProvider.errorMessage}',
+          'Error: ${ledgerState.errorMessage}',
           style: const TextStyle(color: Colors.redAccent),
         ),
       );
     }
 
-    if (ledgerProvider.publicLedgerEntries.isEmpty) {
-      return const Center(
+    if (ledgerState.publicLedgerEntries.isEmpty) {
+      return Center(
         child: Text(
-          'No public ledger entries found.',
-          style: TextStyle(color: Colors.white70),
+          ledgerState.currentSearchQuery.isNotEmpty
+              ? 'No results found for "${ledgerState.currentSearchQuery}".'
+              : 'No public ledger entries found.',
+          style: const TextStyle(color: Colors.white70),
         ),
       );
     }
 
-    final itemCount = ledgerProvider.publicLedgerEntries.length + (ledgerProvider.isFetchingMore ? 1 : 0);
+    final itemCount = ledgerState.publicLedgerEntries.length + (ledgerState.isFetchingMore ? 1 : 0);
 
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.only(left: 12, right: 12, bottom: 20),
       itemCount: itemCount,
       itemBuilder: (context, index) {
-        if (index >= ledgerProvider.publicLedgerEntries.length) {
+        if (index >= ledgerState.publicLedgerEntries.length) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(16.0),
@@ -179,8 +336,8 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
           );
         }
 
-        final entry = ledgerProvider.publicLedgerEntries[index];
-        final entryCount = ledgerProvider.publicLedgerEntries.length;
+        final entry = ledgerState.publicLedgerEntries[index];
+        final entryCount = ledgerState.publicLedgerEntries.length;
 
         final animation = Tween(begin: 0.0, end: 1.0).animate(
           CurvedAnimation(
@@ -207,9 +364,9 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Please sign in to send Loves.')),
                   );
-                  return;
+                  return false;
                 }
-                await ledgerProvider.sendLoves(
+                return ref.read(ledgerProvider.notifier).sendLoves(
                   senderWallet: currentUserWalletId,
                   recipientWallet: recipientWalletId,
                   amount: amount,
@@ -241,13 +398,13 @@ class _PublicLedgerPageState extends State<PublicLedgerPage> with TickerProvider
   }
 }
 
-typedef OnSendLovesCallback = Future<void> Function(String recipientWalletId, int amount, String? memo);
+typedef OnSendLovesCallback = Future<bool> Function(String recipientWalletId, int amount, String? memo);
 
 class PublicActionCard extends StatefulWidget {
   final PublicLedgerEntry entry;
-  final OnSendLovesCallback? onSendLoves;
+  final OnSendLovesCallback onSendLoves;
 
-  const PublicActionCard({super.key, required this.entry, this.onSendLoves});
+  const PublicActionCard({super.key, required this.entry, required this.onSendLoves});
 
   @override
   State<PublicActionCard> createState() => _PublicActionCardState();
@@ -297,8 +454,8 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
 
     setState(() => _isSending = true);
     try {
-      if (widget.onSendLoves != null) {
-        await widget.onSendLoves!(widget.entry.walletId, amount, memo);
+      final success = await widget.onSendLoves(widget.entry.walletId, amount, memo);
+      if (mounted && success) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully sent $amount Loves!')));
         _amountController.clear();
         _memoController.clear();
@@ -306,9 +463,13 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
           _isExpanded = false;
           _formAnimationController.reverse();
         });
+      } else if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error sending loves.')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error sending loves: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error sending loves: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -469,6 +630,37 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
       filled: true,
       fillColor: Colors.white.withOpacity(0.1),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+    );
+  }
+}
+
+// --- MAIN APP ENTRY POINT ---
+
+void main() {
+  runApp(const ProviderScope(child: MyApp()));
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Ledger App',
+      themeMode: ThemeMode.dark,
+      darkTheme: ThemeData.dark().copyWith(
+        colorScheme: ColorScheme.fromSwatch(
+          primarySwatch: Colors.deepPurple,
+          accentColor: Colors.amber,
+          backgroundColor: Colors.deepPurple.shade900,
+          brightness: Brightness.dark,
+        ).copyWith(
+          secondary: Colors.amber.shade400,
+        ),
+        scaffoldBackgroundColor: Colors.deepPurple.shade900,
+      ),
+      home: const PublicLedgerPage(),
     );
   }
 }

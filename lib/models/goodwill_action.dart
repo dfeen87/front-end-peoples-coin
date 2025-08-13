@@ -1,5 +1,7 @@
 import 'dart:collection';
+import 'package:flutter/foundation.dart';
 
+/// Defines the possible states of a GoodwillAction.
 enum GoodwillStatus {
   pendingVerification,
   verified,
@@ -7,6 +9,9 @@ enum GoodwillStatus {
   unknown, // Fallback for safety
 }
 
+/// A data model representing a single act of goodwill.
+/// It is immutable, meaning its state cannot change after it is created.
+@immutable
 class GoodwillAction {
   final String id;
   final String performerUserId;
@@ -56,7 +61,7 @@ class GoodwillAction {
     );
   }
 
-  /// Immutable copy with update support.
+  /// Creates a new instance of [GoodwillAction] with optional new values.
   GoodwillAction copyWith({
     String? id,
     String? performerUserId,
@@ -87,7 +92,7 @@ class GoodwillAction {
     );
   }
 
-  /// Safely convert a string to GoodwillStatus enum.
+  /// Safely converts a string to the GoodwillStatus enum.
   static GoodwillStatus _statusFromString(String status) {
     switch (status.trim().toUpperCase()) {
       case 'PENDING_VERIFICATION':

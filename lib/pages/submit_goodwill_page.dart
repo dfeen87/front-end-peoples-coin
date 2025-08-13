@@ -1,10 +1,157 @@
+// lib/pages/submit_goodwill_page.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math';
+import 'dart:ui';
 
-import '../state/goodwill_processing_provider.dart';
-import '../state/user_provider.dart';
-import '../service/backend_status_service.dart';
+// --- MOCK DATA MODELS AND PROVIDERS (Refactored to use Riverpod) ---
+
+class GoodwillAction {
+  final String performerUserId;
+  final String actionType;
+  final String description;
+  final int lovesValue;
+  final Map<String, dynamic> contextualData;
+
+  GoodwillAction({
+    required this.performerUserId,
+    required this.actionType,
+    required this.description,
+    required this.lovesValue,
+    required this.contextualData,
+  });
+}
+
+class GoodwillProcessingState {
+  final bool isProcessingGoodwill;
+  final String? error;
+  final List<GoodwillAction> pendingSubmissions;
+
+  GoodwillProcessingState({
+    this.isProcessingGoodwill = false,
+    this.error,
+    this.pendingSubmissions = const [],
+  });
+
+  GoodwillProcessingState copyWith({
+    bool? isProcessingGoodwill,
+    String? error,
+    List<GoodwillAction>? pendingSubmissions,
+  }) {
+    return GoodwillProcessingState(
+      isProcessingGoodwill: isProcessingGoodwill ?? this.isProcessingGoodwill,
+      error: error,
+      pendingSubmissions: pendingSubmissions ?? this.pendingSubmissions,
+    );
+  }
+}
+
+class BackendStatus {
+  final String nodeVersion;
+  final bool metabolicActive;
+  final bool nervousActive;
+  final bool endocrineActive;
+  final bool immuneActive;
+  final List<String> recentEvents;
+
+  BackendStatus({
+    required this.nodeVersion,
+    required this.metabolicActive,
+    required this.nervousActive,
+    required this.endocrineActive,
+    required this.immuneActive,
+    required this.recentEvents,
+  });
+}
+
+// State Notifier to manage the goodwill submission process.
+class GoodwillProcessingNotifier extends StateNotifier<GoodwillProcessingState> {
+  GoodwillProcessingNotifier() : super(GoodwillProcessingState());
+
+  Future<bool> submitGoodwill({
+    required String performerUserId,
+    required String actionType,
+    required String description,
+    required int lovesValue,
+    required Map<String, dynamic> contextualData,
+  }) async {
+    state = state.copyWith(isProcessingGoodwill: true, error: null);
+    final newSubmission = GoodwillAction(
+      performerUserId: performerUserId,
+      actionType: actionType,
+      description: description,
+      lovesValue: lovesValue,
+      contextualData: contextualData,
+    );
+    state = state.copyWith(
+      pendingSubmissions: [...state.pendingSubmissions, newSubmission],
+    );
+
+    try {
+      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      // On success, we would remove the item from the pending list and update the user's data.
+      final updatedPendingList = List<GoodwillAction>.from(state.pendingSubmissions);
+      updatedPendingList.remove(newSubmission);
+      state = state.copyWith(
+        isProcessingGoodwill: false,
+        pendingSubmissions: updatedPendingList,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isProcessingGoodwill: false,
+        error: 'Failed to submit goodwill: $e',
+      );
+      return false;
+    }
+  }
+}
+
+// State Notifier to manage the backend status.
+class BackendStatusNotifier extends StateNotifier<BackendStatus?> {
+  BackendStatusNotifier() : super(null) {
+    _fetchStatus();
+  }
+
+  Future<void> _fetchStatus() async {
+    try {
+      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+      state = BackendStatus(
+        nodeVersion: '1.2.3-alpha',
+        metabolicActive: true,
+        nervousActive: true,
+        endocrineActive: Random().nextBool(),
+        immuneActive: true,
+        recentEvents: const [
+          'Metabolic system processed new batch.',
+          'New goodwill act received.',
+          'Endocrine system experiencing minor latency.',
+        ],
+      );
+    } catch (e) {
+      // In a real app, handle errors gracefully.
+      state = null;
+    }
+  }
+}
+
+// MOCK User Provider for demonstration
+class User {
+  final String id;
+  User({required this.id});
+}
+final userProvider = Provider<User?>((ref) => User(id: 'user123'));
+
+// Riverpod providers
+final goodwillProcessingProvider = StateNotifierProvider<GoodwillProcessingNotifier, GoodwillProcessingState>((ref) {
+  return GoodwillProcessingNotifier();
+});
+
+final backendStatusProvider = StateNotifierProvider<BackendStatusNotifier, BackendStatus?>((ref) {
+  return BackendStatusNotifier();
+});
+
+// --- WIDGETS ---
 
 const Map<String, IconData> _actTypes = {
   'Mentorship': Icons.school_outlined,
@@ -17,14 +164,14 @@ const Map<String, IconData> _actTypes = {
   'Other': Icons.more_horiz,
 };
 
-class SubmitGoodwillPage extends StatefulWidget {
+class SubmitGoodwillPage extends ConsumerStatefulWidget {
   const SubmitGoodwillPage({super.key});
 
   @override
-  State<SubmitGoodwillPage> createState() => _SubmitGoodwillPageState();
+  ConsumerState<SubmitGoodwillPage> createState() => _SubmitGoodwillPageState();
 }
 
-class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProviderStateMixin, SingleTickerProviderStateMixin {
+class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
   int _currentStep = 0;
@@ -35,21 +182,19 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
   int _lovesValue = 25;
   int _durationMinutes = 0;
 
-  late final AnimationController _celebrationController;
-
   late final TabController _tabController;
+  OverlayEntry? _celebrationOverlay;
 
   @override
   void initState() {
     super.initState();
-    _celebrationController = AnimationController(vsync: this, duration: const Duration(seconds: 4));
     _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
-    _celebrationController.dispose();
     _tabController.dispose();
+    _celebrationOverlay?.remove();
     super.dispose();
   }
 
@@ -72,19 +217,21 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
   }
 
   void _showSuccessOverlay() {
-    final overlay = Overlay.of(context);
-    if (overlay == null) return;
-
-    final overlayEntry = OverlayEntry(
-      builder: (_) => CyclingCelebrationOverlay(controller: _celebrationController),
+    _celebrationOverlay = OverlayEntry(
+      builder: (_) => const CyclingCelebrationOverlay(
+        message: "Submission Successful!",
+      ),
     );
 
-    overlay.insert(overlayEntry);
-    _celebrationController.forward(from: 0.0);
+    Overlay.of(context).insert(_celebrationOverlay!);
 
-    Future.delayed(const Duration(seconds: 4), () {
-      overlayEntry.remove();
-      if (mounted) Navigator.of(context).pop();
+    // Schedule the removal of the overlay after the animation completes
+    Future.delayed(const Duration(seconds: 4 * 3), () { // 4 seconds per effect, 3 effects
+      _celebrationOverlay?.remove();
+      _celebrationOverlay = null;
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     });
   }
 
@@ -118,17 +265,19 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
     }
   }
 
-  Future<void> _submitForm(GoodwillProcessingProvider provider) async {
-    final currentUser = context.read<UserProvider>().currentUser;
+  Future<void> _submitForm() async {
+    final currentUser = ref.read(userProvider);
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error: User not found."), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Error: User not found."), backgroundColor: Colors.redAccent),
+        );
+      }
       return;
     }
 
-    final success = await provider.submitGoodwill(
-      performerUserId: currentUser.id!,
+    final success = await ref.read(goodwillProcessingProvider.notifier).submitGoodwill(
+      performerUserId: currentUser.id,
       actionType: _actionType,
       description: _description.trim(),
       lovesValue: _lovesValue,
@@ -140,8 +289,6 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
 
     if (success && mounted) {
       _showSuccessOverlay();
-
-      // Optionally: reset form and stepper
       setState(() {
         _currentStep = 0;
         _actionType = '';
@@ -150,16 +297,16 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
         _durationMinutes = 0;
         _lovesValue = 25;
       });
-
     } else if (mounted) {
+      final error = ref.read(goodwillProcessingProvider).error;
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit act: ${provider.error}')),
+        SnackBar(content: Text('Failed to submit act: ${error ?? "Unknown error"}')),
       );
     }
   }
 
-  VoidCallback _handleStepContinue(GoodwillProcessingProvider provider) {
+  VoidCallback _handleStepContinue() {
     return () async {
       final isStepValid = _validateAndSaveStep(_currentStep);
       if (!isStepValid) return;
@@ -167,7 +314,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
       if (_currentStep < 4) {
         setState(() => _currentStep += 1);
       } else {
-        await _submitForm(provider);
+        await _submitForm();
       }
     };
   }
@@ -353,8 +500,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    final goodwillProvider = context.watch<GoodwillProcessingProvider>();
-    final backendStatusService = context.watch<BackendStatusService>();
+    final goodwillState = ref.watch(goodwillProcessingProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -375,7 +521,7 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
           // Submit Act Form
           Stepper(
             currentStep: _currentStep,
-            onStepContinue: _handleStepContinue(goodwillProvider),
+            onStepContinue: _handleStepContinue(),
             onStepCancel: _currentStep == 0 ? null : () => setState(() => _currentStep -= 1),
             controlsBuilder: _buildControls,
             steps: _buildSteps(),
@@ -384,13 +530,10 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
           ),
 
           // Submission Status Tab
-          _BackendStatusTab(
-            backendStatusService: backendStatusService,
-            goodwillProvider: goodwillProvider,
-          ),
+          const _BackendStatusTab(),
         ],
       ),
-      floatingActionButton: goodwillProvider.isProcessingGoodwill
+      floatingActionButton: goodwillState.isProcessingGoodwill
           ? FloatingActionButton(
               onPressed: null,
               backgroundColor: Colors.amber,
@@ -402,28 +545,16 @@ class _SubmitGoodwillPageState extends State<SubmitGoodwillPage> with TickerProv
 }
 
 /// Widget to display backend status & pending submissions nicely
-class _BackendStatusTab extends StatelessWidget {
-  final BackendStatusService backendStatusService;
-  final GoodwillProcessingProvider goodwillProvider;
-
-  const _BackendStatusTab({
-    required this.backendStatusService,
-    required this.goodwillProvider,
-  });
+class _BackendStatusTab extends ConsumerWidget {
+  const _BackendStatusTab();
 
   @override
-  Widget build(BuildContext context) {
-    if (backendStatusService.isLoading) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final backendStatus = ref.watch(backendStatusProvider);
+    final goodwillState = ref.watch(goodwillProcessingProvider);
+
+    if (backendStatus == null) {
       return const Center(child: CircularProgressIndicator());
-    }
-
-    if (backendStatusService.error != null) {
-      return Center(child: Text('Error: ${backendStatusService.error}', style: const TextStyle(color: Colors.redAccent)));
-    }
-
-    final status = backendStatusService.currentStatus;
-    if (status == null) {
-      return const Center(child: Text('No backend status available.'));
     }
 
     return Padding(
@@ -431,24 +562,24 @@ class _BackendStatusTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Node Version: ${status.nodeVersion}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
+          Text('Node Version: ${backendStatus.nodeVersion}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
           const SizedBox(height: 12),
           Wrap(
             spacing: 12,
             children: [
-              _statusChip('Metabolic System', status.metabolicActive),
-              _statusChip('Nervous System', status.nervousActive),
-              _statusChip('Endocrine System', status.endocrineActive),
-              _statusChip('Immune System', status.immuneActive),
+              _statusChip('Metabolic System', backendStatus.metabolicActive),
+              _statusChip('Nervous System', backendStatus.nervousActive),
+              _statusChip('Endocrine System', backendStatus.endocrineActive),
+              _statusChip('Immune System', backendStatus.immuneActive),
             ],
           ),
           const Divider(height: 32, color: Colors.white24),
           const Text('Recent Events:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
           Expanded(
             child: ListView.builder(
-              itemCount: status.recentEvents.length,
+              itemCount: backendStatus.recentEvents.length,
               itemBuilder: (context, index) {
-                final event = status.recentEvents[index];
+                final event = backendStatus.recentEvents[index];
                 return ListTile(
                   dense: true,
                   leading: const Icon(Icons.bolt, color: Colors.amberAccent),
@@ -457,12 +588,10 @@ class _BackendStatusTab extends StatelessWidget {
               },
             ),
           ),
-
-          // Pending goodwill submissions (show from GoodwillProcessingProvider)
           const Divider(height: 32, color: Colors.white24),
           const Text('Pending Goodwill Submissions:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
           Expanded(
-            child: _PendingSubmissionsList(goodwillProvider: goodwillProvider),
+            child: _PendingSubmissionsList(pending: goodwillState.pendingSubmissions),
           ),
         ],
       ),
@@ -485,16 +614,12 @@ class _BackendStatusTab extends StatelessWidget {
 
 /// A simple list widget showing pending goodwill submissions
 class _PendingSubmissionsList extends StatelessWidget {
-  final GoodwillProcessingProvider goodwillProvider;
+  final List<GoodwillAction> pending;
 
-  const _PendingSubmissionsList({required this.goodwillProvider});
+  const _PendingSubmissionsList({required this.pending});
 
   @override
   Widget build(BuildContext context) {
-    // For this demo, let's assume goodwillProvider has a List<GoodwillAction> pendingSubmissions.
-    // You would need to add this pending queue tracking in your GoodwillProcessingProvider.
-    final pending = goodwillProvider.pendingSubmissions;
-
     if (pending.isEmpty) {
       return const Center(child: Text('No pending submissions.', style: TextStyle(color: Colors.white70)));
     }
@@ -507,11 +632,300 @@ class _PendingSubmissionsList extends StatelessWidget {
         return ListTile(
           leading: const Icon(Icons.hourglass_empty, color: Colors.amber),
           title: Text(submission.actionType, style: const TextStyle(color: Colors.amber)),
-          subtitle: Text(submission.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70)),
+          subtitle: Text(submission.description, maxLines: 2, overflow: Text.ellipsis, style: const TextStyle(color: Colors.white70)),
           trailing: const Text('Pending', style: TextStyle(color: Colors.amberAccent)),
         );
       },
     );
   }
+}
+
+// --- MAIN APP ENTRY POINT ---
+
+void main() {
+  runApp(const ProviderScope(child: MyApp()));
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Goodwill App',
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: Colors.grey[900],
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.amber,
+          brightness: Brightness.dark,
+        ),
+      ),
+      home: const SubmitGoodwillPage(),
+    );
+  }
+}
+
+// ==========================================================
+// COMBINED AND ENHANCED CELEBRATION OVERLAY
+// ==========================================================
+
+/// The main widget that cycles through multiple celebration effects.
+/// It also displays a success message.
+class CyclingCelebrationOverlay extends StatefulWidget {
+  final Duration cycleDuration;
+  final String message;
+
+  const CyclingCelebrationOverlay({
+    Key? key,
+    this.cycleDuration = const Duration(seconds: 4),
+    this.message = 'Submission Successful!',
+  }) : super(key: key);
+
+  @override
+  State<CyclingCelebrationOverlay> createState() => _CyclingCelebrationOverlayState();
+}
+
+class _CyclingCelebrationOverlayState extends State<CyclingCelebrationOverlay> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  final List<Widget Function(Animation<double>)> _effectsBuilders = [];
+
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _effectsBuilders.addAll([
+      (anim) => ConfettiOverlay(controller: anim),
+      (anim) => HeartsOverlay(controller: anim),
+      (anim) => SparklesOverlay(controller: anim),
+    ]);
+
+    _controller = AnimationController(vsync: this, duration: widget.cycleDuration);
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() {
+          _currentIndex = (_currentIndex + 1) % _effectsBuilders.length;
+        });
+        _controller.forward(from: 0.0);
+      }
+    });
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final builder = _effectsBuilders[_currentIndex];
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Stack(
+          children: [
+            // The cycling particle effects
+            builder(_controller),
+            
+            // The success message text
+            Align(
+              alignment: Alignment.center,
+              child: AnimatedOpacity(
+                opacity: _controller.value > 0.5 ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 500),
+                child: Text(
+                  widget.message,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [
+                      const Shadow(
+                        blurRadius: 8.0,
+                        color: Colors.black,
+                        offset: Offset(2, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- CONFETTI EFFECT ---
+
+class ConfettiOverlay extends StatelessWidget {
+  final Animation<double> controller;
+
+  const ConfettiOverlay({required this.controller, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) => CustomPaint(
+        painter: ConfettiPainter(progress: controller.value),
+      ),
+    );
+  }
+}
+
+class ConfettiPainter extends CustomPainter {
+  final double progress;
+  final Random _random = Random();
+
+  ConfettiPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    final int particleCount = (progress * 100).toInt();
+
+    for (int i = 0; i < particleCount; i++) {
+      final x = _random.nextDouble() * size.width;
+      final y = _random.nextDouble() * size.height * (1 - progress);
+      paint.color = Color.fromARGB(
+        (255 * (1 - progress)).toInt(),
+        _random.nextInt(256),
+        _random.nextInt(256),
+        _random.nextInt(256),
+      );
+
+      final radius = _random.nextDouble() * 4 + 2;
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant ConfettiPainter oldDelegate) => oldDelegate.progress != progress;
+}
+
+// --- HEARTS EFFECT ---
+
+class HeartsOverlay extends StatelessWidget {
+  final Animation<double> controller;
+
+  const HeartsOverlay({required this.controller, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) => CustomPaint(
+        painter: HeartsPainter(progress: controller.value),
+      ),
+    );
+  }
+}
+
+class HeartsPainter extends CustomPainter {
+  final double progress;
+  final Random _random = Random();
+
+  HeartsPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    int particleCount = (progress * 40).toInt();
+
+    for (int i = 0; i < particleCount; i++) {
+      final x = _random.nextDouble() * size.width;
+      final y = size.height - (_random.nextDouble() * size.height * progress);
+      final scale = 0.5 + _random.nextDouble();
+
+      paint.color = Colors.red.withOpacity(1 - progress);
+
+      _drawHeart(canvas, paint, Offset(x, y), 10 * scale);
+    }
+  }
+
+  void _drawHeart(Canvas canvas, Paint paint, Offset center, double size) {
+    final path = Path();
+
+    final double x = center.dx;
+    final double y = center.dy;
+    final double s = size / 2;
+
+    path.moveTo(x, y + s / 4);
+    path.cubicTo(x, y, x - s, y, x - s, y + s / 2);
+    path.cubicTo(x - s, y + s, x, y + s * 1.5, x, y + s * 2);
+    path.cubicTo(x, y + s * 1.5, x + s, y + s, x + s, y + s / 2);
+    path.cubicTo(x + s, y, x, y, x, y + s / 4);
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant HeartsPainter oldDelegate) => oldDelegate.progress != progress;
+}
+
+// --- SPARKLES EFFECT ---
+
+class SparklesOverlay extends StatelessWidget {
+  final Animation<double> controller;
+
+  const SparklesOverlay({required this.controller, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) => CustomPaint(
+        painter: SparklesPainter(progress: controller.value),
+      ),
+    );
+  }
+}
+
+class SparklesPainter extends CustomPainter {
+  final double progress;
+  final Random _random = Random();
+
+  SparklesPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    final int sparkleCount = (progress * 80).toInt();
+
+    for (int i = 0; i < sparkleCount; i++) {
+      final x = _random.nextDouble() * size.width;
+      final y = _random.nextDouble() * size.height;
+
+      paint.color = Colors.white.withOpacity(1 - progress);
+
+      _drawSparkle(canvas, paint, Offset(x, y), 3 + 2 * (1 - progress));
+    }
+  }
+
+  void _drawSparkle(Canvas canvas, Paint paint, Offset center, double size) {
+    final path = Path();
+    final s = size / 2;
+
+    path.moveTo(center.dx, center.dy - s);
+    path.lineTo(center.dx + s / 3, center.dy - s / 3);
+    path.lineTo(center.dx + s, center.dy);
+    path.lineTo(center.dx + s / 3, center.dy + s / 3);
+    path.lineTo(center.dx, center.dy + s);
+    path.lineTo(center.dx - s / 3, center.dy + s / 3);
+    path.lineTo(center.dx - s, center.dy);
+    path.lineTo(center.dx - s / 3, center.dy - s / 3);
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant SparklesPainter oldDelegate) => oldDelegate.progress != progress;
 }
 

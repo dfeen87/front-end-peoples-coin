@@ -14,26 +14,25 @@ import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
 import 'service/api_client.dart';
 import 'models/tech_system.dart';
-import 'models/user_account.dart';
-import 'api/wallet_api.dart';
 
-import 'pages/governance_page.dart';
-import 'pages/my_portfolio_page.dart';
-import 'pages/my_wallet_page.dart';
-import 'pages/public_ledger_page.dart';
-import 'pages/submit_goodwill_page.dart';
-
-import 'screens/code_display_page.dart';
-import 'screens/sign_in_screen.dart' as sign_in;
-import 'screens/sign_up_screen.dart' as sign_up;
-import 'screens/welcome_screen.dart';
-
+// --- Import all your refactored providers ---
 import 'state/auth_provider.dart';
 import 'state/user_provider.dart';
 import 'state/proposal_provider.dart';
 import 'state/ledger_provider.dart';
 import 'state/goodwill_processing_provider.dart';
+import 'state/wallet_provider.dart';
 
+// --- Import all your pages, screens, and widgets ---
+import 'pages/governance_page.dart';
+import 'pages/my_portfolio_page.dart';
+import 'pages/my_wallet_page.dart';
+import 'pages/public_ledger_page.dart';
+import 'pages/submit_goodwill_page.dart';
+import 'screens/code_display_page.dart';
+import 'screens/sign_in_screen.dart' as sign_in;
+import 'screens/sign_up_screen.dart' as sign_up;
+import 'screens/welcome_screen.dart';
 import 'widgets/dynamic_nebula_background.dart';
 import 'widgets/navigation_card.dart';
 
@@ -101,83 +100,6 @@ class AppBreakpoints {
 }
 
 /// ------------------------
-/// Global router
-/// ------------------------
-late final GoRouter router;
-
-/// ------------------------
-/// Router Initialization
-/// ------------------------
-void initializeRouter(AuthProvider authProvider) {
-  router = GoRouter(
-    initialLocation: AppRoutes.startup,
-    routes: [
-      GoRoute(
-        path: AppRoutes.startup,
-        builder: (context, state) => const StartupScreen(),
-      ),
-      ShellRoute(
-        builder: (context, state, child) => AppShell(child: child),
-        routes: [
-          GoRoute(
-            path: AppRoutes.welcome,
-            builder: (context, state) => const WelcomeScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.signIn,
-            builder: (context, state) => const sign_in.SignInScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.signUp,
-            builder: (context, state) => const sign_up.SignUpScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.home,
-            builder: (context, state) => const HomePage(),
-          ),
-          GoRoute(
-            path: AppRoutes.codeViewer,
-            builder: (context, state) {
-              final system = state.extra as TechSystem?;
-              if (system != null) {
-                return CodeDisplayPage(title: 'Code Viewer', system: system);
-              }
-              return const Scaffold(
-                  body: Center(child: Text('Error: No system data provided.')));
-            },
-          ),
-        ],
-      ),
-    ],
-    redirect: (BuildContext context, GoRouterState state) {
-      final loggedIn = authProvider.user != null;
-      final isInitializing = authProvider.isInitializing;
-
-      if (isInitializing) {
-        return state.matchedLocation == AppRoutes.startup ? null : AppRoutes.startup;
-      }
-
-      final onAuthRoute = [
-        AppRoutes.welcome,
-        AppRoutes.signIn,
-        AppRoutes.signUp,
-      ].contains(state.matchedLocation);
-
-      if (loggedIn && (onAuthRoute || state.matchedLocation == AppRoutes.startup)) {
-        return AppRoutes.home;
-      }
-
-      if (!loggedIn && !onAuthRoute) {
-        return AppRoutes.welcome;
-      }
-
-      return null;
-    },
-    refreshListenable: authProvider,
-  );
-}
-
-/// ------------------------
 /// Main Entry Point
 /// ------------------------
 Future<void> main() async {
@@ -185,23 +107,16 @@ Future<void> main() async {
   await dotenv.load(fileName: 'config.env');
 
   try {
-    // Validate env variables
     final firebaseApiKey = dotenv.env['FIREBASE_API_KEY'];
     final recaptchaSiteKey = dotenv.env['RECAPTCHA_SITE_KEY'];
     final firebaseProjectId = dotenv.env['FIREBASE_PROJECT_ID'];
     final firebaseAppId = dotenv.env['FIREBASE_APP_ID'];
 
-    if (firebaseApiKey == null || firebaseApiKey.isEmpty) {
-      throw Exception('FIREBASE_API_KEY is missing from .env file');
-    }
-    if (recaptchaSiteKey == null || recaptchaSiteKey.isEmpty) {
-      throw Exception('RECAPTCHA_SITE_KEY is missing from .env file');
-    }
-    if (firebaseProjectId == null || firebaseProjectId.isEmpty) {
-      throw Exception('FIREBASE_PROJECT_ID is missing from .env file');
-    }
-    if (firebaseAppId == null || firebaseAppId.isEmpty) {
-      throw Exception('FIREBASE_APP_ID is missing from .env file');
+    if (firebaseApiKey == null ||
+        recaptchaSiteKey == null ||
+        firebaseProjectId == null ||
+        firebaseAppId == null) {
+      throw Exception('One or more Firebase environment variables are missing.');
     }
 
     final firebaseOptions = FirebaseOptions(
@@ -218,19 +133,13 @@ Future<void> main() async {
       webProvider: ReCaptchaEnterpriseProvider(recaptchaSiteKey),
     );
 
-    if (kDebugMode) print("[BrightActs] ✅ Firebase initialized & App Check activated");
-
-    final apiClient = PeoplesCoinApiClient();
-    final authProvider = AuthProvider(apiClient);
-    initializeRouter(authProvider);
+    if (kDebugMode) {
+      print("[BrightActs] ✅ Firebase initialized & App Check activated");
+    }
 
     runApp(
-      ProviderScope(
-        child: RootProviderScope(
-          apiClient: apiClient,
-          authProvider: authProvider,
-          child: const BrightActsApp(),
-        ),
+      const ProviderScope(
+        child: BrightActsApp(),
       ),
     );
   } catch (error, stackTrace) {
@@ -270,33 +179,98 @@ class ErrorDisplayApp extends StatelessWidget {
 }
 
 /// ------------------------
-/// RootProviderScope
+/// Global Router Provider
 /// ------------------------
-class RootProviderScope extends StatelessWidget {
-  final PeoplesCoinApiClient apiClient;
-  final AuthProvider authProvider;
-  final Widget child;
+final goRouterProvider = Provider<GoRouter>((ref) {
+  final authStatus = ref.watch(authStatusProvider);
 
-  const RootProviderScope({
-    super.key,
-    required this.apiClient,
-    required this.authProvider,
-    required this.child,
-  });
+  return GoRouter(
+    initialLocation: AppRoutes.startup,
+    debugLogDiagnostics: kDebugMode,
+    refreshListenable:
+        GoRouterRefreshStream(ref.watch(firebaseAuthStateChangesProvider.stream)),
+    routes: [
+      GoRoute(
+        path: AppRoutes.startup,
+        builder: (context, state) => const StartupScreen(),
+      ),
+      ShellRoute(
+        builder: (context, state, child) => AppShell(child: child),
+        routes: [
+          GoRoute(
+            path: AppRoutes.welcome,
+            builder: (context, state) => const WelcomeScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.signIn,
+            builder: (context, state) => const sign_in.SignInScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.signUp,
+            builder: (context, state) => const sign_up.SignUpScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.home,
+            builder: (context, state) => const HomePage(),
+          ),
+          GoRoute(
+            path: AppRoutes.codeViewer,
+            builder: (context, state) {
+              final system = state.extra as TechSystem?;
+              if (system != null) {
+                return CodeDisplayPage(title: 'Code Viewer', system: system);
+              }
+              return const Scaffold(
+                  body: Center(child: Text('Error: No system data provided.')));
+            },
+          ),
+        ],
+      ),
+    ],
+    redirect: (BuildContext context, GoRouterState state) {
+      final loggedIn = authStatus == AuthStatus.authenticated;
+      final isInitializing = authStatus == AuthStatus.loading;
+
+      final onAuthRoute = [
+        AppRoutes.welcome,
+        AppRoutes.signIn,
+        AppRoutes.signUp,
+      ].contains(state.matchedLocation);
+
+      if (isInitializing) {
+        return state.matchedLocation == AppRoutes.startup
+            ? null
+            : AppRoutes.startup;
+      }
+
+      if (loggedIn && (onAuthRoute || state.matchedLocation == AppRoutes.startup)) {
+        return AppRoutes.home;
+      }
+
+      if (!loggedIn && !onAuthRoute) {
+        return AppRoutes.welcome;
+      }
+
+      return null;
+    },
+  );
+});
+
+/// ------------------------
+/// GoRouter Refresh Stream Helper
+/// ------------------------
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
+  }
+
+  late final StreamSubscription<dynamic> _subscription;
 
   @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        Provider<PeoplesCoinApiClient>.value(value: apiClient),
-        ChangeNotifierProvider.value(value: authProvider),
-        ChangeNotifierProvider(create: (_) => UserProvider(apiClient)),
-        ChangeNotifierProvider(create: (_) => ProposalProvider(apiClient)),
-        ChangeNotifierProvider(create: (_) => LedgerProvider(apiClient)),
-        ChangeNotifierProvider(create: (_) => GoodwillProcessingProvider(apiClient)),
-      ],
-      child: child,
-    );
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
   }
 }
 
@@ -308,6 +282,8 @@ class BrightActsApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(goRouterProvider);
+
     return MaterialApp.router(
       title: 'Bright Acts | A Goodwill Ledger',
       debugShowCheckedModeBanner: false,
@@ -374,7 +350,8 @@ class HomePage extends ConsumerStatefulWidget {
   HomePageState createState() => HomePageState();
 }
 
-class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixin {
+class HomePageState extends ConsumerState<HomePage>
+    with TickerProviderStateMixin {
   int selectedIndex = 2;
   late final PageController _pageController;
   late final List<Widget> _pages;
@@ -505,23 +482,20 @@ class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixi
   }
 
   Widget _buildWelcomeHeader() {
-    final walletState = ref.watch(walletFacilitatorProvider);
-    final authProvider = ref.watch(authProviderNotifier);
-    final userProvider = ref.watch(userProviderNotifier);
-    final authUser = authProvider.user;
+    // Watch both providers and get their combined loading state
+    final userAccountAsync = ref.watch(userAccountProvider);
+    final walletAsync = ref.watch(walletProvider);
 
-    final welcomeText = authUser != null
-        ? 'Welcome, ${authUser.displayName ?? authUser.email ?? authUser.uid}'
-        : 'Connecting...';
+    // This checks if EITHER provider is in a loading state.
+    final isLoading = userAccountAsync.isLoading || walletAsync.isLoading;
 
-    String balanceText;
-    if (walletState.isLoading) {
-      balanceText = "Loading...";
-    } else if (walletState.errorMessage != null) {
-      balanceText = "Error";
-    } else {
-      balanceText = walletState.balance.toStringAsFixed(2);
-    }
+    final welcomeText = userAccountAsync.when(
+      data: (userAccount) => userAccount?.username != null
+          ? 'Welcome, ${userAccount!.username}'
+          : 'Connecting...',
+      loading: () => 'Connecting...',
+      error: (e, st) => 'Error',
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,7 +506,7 @@ class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixi
                 fontSize: 24,
                 fontFamily: 'monospace',
               ),
-          isLoading: userProvider.isLoading,
+          isLoading: isLoading, // Use the new combined loading state
         ),
         const SizedBox(height: 8),
         Row(
@@ -541,7 +515,7 @@ class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixi
               'Your Wallet Balance: ',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
             ),
-            if (walletState.isLoading)
+            if (isLoading)
               Text(
                 "******",
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -551,7 +525,7 @@ class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixi
               )
             else
               SlotMachineBalance(
-                balance: walletState.balance.toInt(),
+                balance: walletAsync.value?.balance.toInt() ?? 0,
                 textStyle: Theme.of(context).textTheme.titleLarge!.copyWith(
                       fontSize: 18,
                       color: Colors.amber,
@@ -567,6 +541,7 @@ class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixi
       ],
     );
   }
+}
 
   Widget _buildPageView() {
     return AnimatedOpacity(
@@ -596,7 +571,8 @@ class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixi
       child: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'Governance'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Portfolio'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet), label: 'Portfolio'),
           BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Record'),
           BottomNavigationBarItem(icon: Icon(Icons.public), label: 'Ledger'),
           BottomNavigationBarItem(icon: Icon(Icons.wallet), label: 'Wallet'),
@@ -615,7 +591,8 @@ class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixi
 
   void _onItemTapped(int index) {
     HapticFeedback.lightImpact();
-    _pageController.animateToPage(index, duration: AppDurations.fast, curve: Curves.ease);
+    _pageController.animateToPage(index,
+        duration: AppDurations.fast, curve: Curves.ease);
   }
 
   Widget _buildNavigationPage({
@@ -635,7 +612,8 @@ class HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixi
         buttonText: buttonText,
         onPressed: () {
           HapticFeedback.selectionClick();
-          Navigator.of(context).push(MaterialPageRoute(builder: (context) => pageToOpen));
+          Navigator.of(context)
+              .push(MaterialPageRoute(builder: (context) => pageToOpen));
         },
       ),
     );
@@ -675,7 +653,8 @@ class _MatrixTextState extends State<MatrixText> {
   @override
   void didUpdateWidget(covariant MatrixText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.targetText != oldWidget.targetText || widget.isLoading != oldWidget.isLoading) {
+    if (widget.targetText != oldWidget.targetText ||
+        widget.isLoading != oldWidget.isLoading) {
       _startAnimation();
     }
   }
@@ -707,7 +686,8 @@ class _MatrixTextState extends State<MatrixText> {
             timer.cancel();
             return;
           }
-          final scramblingPart = _generateRandomString(widget.targetText.length - _revealIndex);
+          final scramblingPart =
+              _generateRandomString(widget.targetText.length - _revealIndex);
           final revealedPart = widget.targetText.substring(0, _revealIndex);
           _displayText = revealedPart + scramblingPart;
           if (timer.tick % 2 == 0) _revealIndex++;
@@ -747,7 +727,8 @@ class SlotMachineBalance extends StatefulWidget {
   State<SlotMachineBalance> createState() => _SlotMachineBalanceState();
 }
 
-class _SlotMachineBalanceState extends State<SlotMachineBalance> with SingleTickerProviderStateMixin {
+class _SlotMachineBalanceState extends State<SlotMachineBalance>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   int _displayBalance = 0;
@@ -792,11 +773,11 @@ class _SlotMachineBalanceState extends State<SlotMachineBalance> with SingleTick
 }
 
 // Settings Bottom Sheet with useful links and sign out
-class SettingsBottomSheet extends StatelessWidget {
+class SettingsBottomSheet extends ConsumerWidget {
   const SettingsBottomSheet({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
       child: Container(
@@ -823,7 +804,10 @@ class SettingsBottomSheet extends StatelessWidget {
             const SizedBox(height: 20),
             const Text(
               'Settings & Info',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             _buildLinkButton(
@@ -860,11 +844,12 @@ class SettingsBottomSheet extends StatelessWidget {
             const SizedBox(height: 10),
             TextButton.icon(
               icon: const Icon(Icons.logout, color: Colors.redAccent),
-              label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
+              label: const Text('Sign Out',
+                  style: TextStyle(color: Colors.redAccent, fontSize: 16)),
               onPressed: () async {
                 HapticFeedback.heavyImpact();
                 Navigator.of(context).pop();
-                await context.read<MyAppAuthProvider.AuthProvider>().signOut();
+                await ref.read(authServiceProvider.notifier).signOut();
               },
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom),
@@ -913,14 +898,16 @@ class SettingsBottomSheet extends StatelessWidget {
       icon: Icon(icon, color: isEnabled ? enabledColor : disabledColor),
       label: Text(
         text,
-        style: TextStyle(color: isEnabled ? Colors.white : disabledColor, fontSize: 16),
+        style:
+            TextStyle(color: isEnabled ? Colors.white : disabledColor, fontSize: 16),
       ),
       onPressed: isEnabled
           ? (onPressed ??
               () async {
                 if (url != null) {
                   final uri = Uri.parse(url);
-                  if (!await url_launcher.launchUrl(uri, mode: url_launcher.LaunchMode.externalApplication)) {
+                  if (!await url_launcher.launchUrl(uri,
+                      mode: url_launcher.LaunchMode.externalApplication)) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Could not launch $url')),
@@ -933,4 +920,3 @@ class SettingsBottomSheet extends StatelessWidget {
     );
   }
 }
-

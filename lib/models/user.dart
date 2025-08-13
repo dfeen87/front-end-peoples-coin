@@ -31,7 +31,7 @@ class User {
       avatarUrl: json['avatar_url'] as String?,
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),
-      isActive: json['is_active'] == null ? true : (json['is_active'] == true || json['is_active'] == 'true'),
+      isActive: json['is_active'] as bool? ?? true,
     );
   }
 

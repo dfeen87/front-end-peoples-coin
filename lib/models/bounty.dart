@@ -1,5 +1,14 @@
 import 'package:flutter/foundation.dart';
 
+/// Defines the possible states of a Bounty.
+/// Using an enum provides type safety and prevents errors from typos.
+enum BountyStatus {
+  active,
+  completed,
+  cancelled,
+  expired,
+}
+
 @immutable
 class Bounty {
   final String id;
@@ -7,7 +16,7 @@ class Bounty {
   final String? relatedProposalId;
   final String title;
   final String description;
-  final String status; // 'ACTIVE', etc. (could be enum)
+  final BountyStatus status;
   final double rewardAmount;
   final String rewardTokenSymbol;
   final DateTime? expiresAt;
@@ -30,6 +39,37 @@ class Bounty {
     required this.updatedAt,
   });
 
+  /// Creates a new instance of [Bounty] with optional new values.
+  Bounty copyWith({
+    String? id,
+    String? createdByUserId,
+    String? relatedProposalId,
+    String? title,
+    String? description,
+    BountyStatus? status,
+    double? rewardAmount,
+    String? rewardTokenSymbol,
+    DateTime? expiresAt,
+    int? maxParticipants,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Bounty(
+      id: id ?? this.id,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
+      relatedProposalId: relatedProposalId ?? this.relatedProposalId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      status: status ?? this.status,
+      rewardAmount: rewardAmount ?? this.rewardAmount,
+      rewardTokenSymbol: rewardTokenSymbol ?? this.rewardTokenSymbol,
+      expiresAt: expiresAt ?? this.expiresAt,
+      maxParticipants: maxParticipants ?? this.maxParticipants,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   factory Bounty.fromJson(Map<String, dynamic> json) {
     return Bounty(
       id: json['id'] as String,
@@ -37,7 +77,7 @@ class Bounty {
       relatedProposalId: json['related_proposal_id'] as String?,
       title: json['title'] as String,
       description: json['description'] as String,
-      status: json['status'] as String,
+      status: BountyStatus.values.firstWhere((e) => e.toString() == 'BountyStatus.${json['status'].toString().toLowerCase()}'),
       rewardAmount: double.parse(json['reward_amount'].toString()),
       rewardTokenSymbol: json['reward_token_symbol'] as String,
       expiresAt: json['expires_at'] != null ? DateTime.parse(json['expires_at']) : null,
@@ -54,7 +94,7 @@ class Bounty {
       'related_proposal_id': relatedProposalId,
       'title': title,
       'description': description,
-      'status': status,
+      'status': status.name,
       'reward_amount': rewardAmount,
       'reward_token_symbol': rewardTokenSymbol,
       'expires_at': expiresAt?.toIso8601String(),

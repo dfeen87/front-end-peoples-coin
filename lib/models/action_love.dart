@@ -14,6 +14,21 @@ class ActionLove {
     required this.createdAt,
   });
 
+  /// Creates a new instance of [ActionLove] with optional new values.
+  ActionLove copyWith({
+    String? id,
+    String? userId,
+    String? goodwillActionId,
+    DateTime? createdAt,
+  }) {
+    return ActionLove(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      goodwillActionId: goodwillActionId ?? this.goodwillActionId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   factory ActionLove.fromJson(Map<String, dynamic> json) {
     return ActionLove(
       id: json['id'] as String,
