@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'service/api_client.dart';
 import 'models/tech_system.dart';
 import 'models/user_account.dart';
+import 'api/wallet_api.dart';
 
 import 'pages/governance_page.dart';
 import 'pages/my_portfolio_page.dart';

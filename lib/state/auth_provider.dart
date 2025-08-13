@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import '../service/api_client.dart';
 import '../models/user_account.dart';
+import '../service/wallet_manager.dart'; 
 
 /// --- Auth State ---
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
@@ -70,6 +71,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final idToken = await firebaseUser.getIdToken();
       final account = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
+
+      // --- WALLET INTEGRATION ---
+      await WalletManager.instance.unlockOrCreateWallet(account);
+
       state = state.copyWith(
         firebaseUser: firebaseUser,
         userAccount: account,
@@ -81,7 +86,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         firebaseUser: null,
         userAccount: null,
         status: AuthStatus.error,
-        error: 'Failed to fetch user profile: $e',
+        error: 'Failed to fetch user profile or initialize wallet: $e',
       );
     }
   }
@@ -97,7 +102,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-      // `_onAuthStateChanged` handles backend fetch
+      // `_onAuthStateChanged` handles backend fetch and wallet initialization
     } on fb_auth.FirebaseAuthException catch (e) {
       state = state.copyWith(status: AuthStatus.error, error: _firebaseErrorMessage(e));
     } catch (e) {
@@ -110,6 +115,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
       await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      // `_onAuthStateChanged` handles wallet creation automatically
     } on fb_auth.FirebaseAuthException catch (e) {
       state = state.copyWith(status: AuthStatus.error, error: _firebaseErrorMessage(e));
     } catch (e) {
@@ -131,6 +137,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       final account = await _apiClient.getAuthenticatedUserProfile(idToken: 'mock_id_token');
+      
+      // --- DEV WALLET ---
+      await WalletManager.instance.unlockOrCreateWallet(account);
+
       state = state.copyWith(
         firebaseUser: mockUser,
         userAccount: account,
@@ -141,7 +151,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         firebaseUser: null,
         userAccount: null,
         status: AuthStatus.error,
-        error: 'Failed to fetch mock user profile: $e',
+        error: 'Failed to fetch mock user profile or initialize wallet: $e',
       );
     }
   }
@@ -195,8 +205,8 @@ class _MockUser implements fb_auth.User {
   @override
   Future<String> getIdToken([bool forceRefresh = false]) async => 'mock_id_token';
 
-  // --- All other methods throw unimplemented ---
-  @override dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _MockUserMetadata implements fb_auth.UserMetadata {

@@ -3,32 +3,33 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import dotenv
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../service/api_client.dart';
 import '../service/recaptcha_service.dart';
+import '../service/wallet_manager.dart';
 import '../widgets/dynamic_nebula_background.dart';
+import '../state/auth_provider.dart';
 
 enum UsernameStatus { idle, checking, available, unavailable, tooShort }
 
-class SignUpScreen extends StatefulWidget {
+class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   bool _isLoading = false;
   bool _isPasswordObscured = true;
@@ -64,15 +65,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _onUsernameChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(_debounceDuration, () {
-      if (!mounted) return;
-      _checkUsernameAvailability();
-    });
+    _debounce = Timer(_debounceDuration, _checkUsernameAvailability);
   }
 
   Future<void> _checkUsernameAvailability() async {
     final username = _usernameController.text.trim();
-
     if (username.length < _minUsernameLength) {
       if (mounted) setState(() => _usernameStatus = UsernameStatus.tooShort);
       return;
@@ -81,36 +78,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (mounted) setState(() => _usernameStatus = UsernameStatus.checking);
 
     try {
-      final apiClient = context.read<PeoplesCoinApiClient>();
+      final apiClient = ref.read(apiClientProvider);
       final isAvailable = await apiClient.checkUsernameAvailability(username);
-
       if (mounted) {
-        setState(() {
-          _usernameStatus =
-              isAvailable ? UsernameStatus.available : UsernameStatus.unavailable;
-        });
+        setState(() => _usernameStatus =
+            isAvailable ? UsernameStatus.available : UsernameStatus.unavailable);
       }
     } catch (e) {
       if (mounted) setState(() => _usernameStatus = UsernameStatus.unavailable);
       _showError("Couldn't verify username. Please try again.");
-      if (kDebugMode) {
-        print("Error checking username: $e");
-      }
+      if (kDebugMode) print("Username check error: $e");
     }
   }
 
   Future<void> _signUpWithEmail() async {
     if (_isLoading) return;
-
     if (!(_formKey.currentState?.validate() ?? false)) return;
-
     if (_usernameStatus != UsernameStatus.available) {
       _showError('Please choose an available username.');
       return;
     }
 
-    final recaptchaSiteKey = dotenv.env['RECAPTCHA_SITE_KEY_PROD'] ?? '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F';
-    final apiBaseUrl = dotenv.env['API_BASE_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
+    final recaptchaSiteKey =
+        dotenv.env['RECAPTCHA_SITE_KEY_PROD'] ?? '6LeE0pQrAAAAAML8x8JqtfryKhZ9bpvLRacQzH1F';
+    final apiBaseUrl =
+        dotenv.env['API_BASE_URL'] ?? 'https://peoples-coin-service-105378934751.us-central1.run.app';
 
     setState(() => _isLoading = true);
 
@@ -122,35 +114,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
 
       final token = await recaptchaService.execute();
-      if (token.isEmpty) {
-        throw Exception('reCAPTCHA process was canceled.');
-      }
+      if (token.isEmpty) throw Exception('reCAPTCHA verification failed.');
 
+      // Create Firebase user
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-
       final user = userCredential.user;
       if (user == null) throw Exception('Firebase user creation failed.');
 
       final idToken = await user.getIdToken();
-      if (idToken == null || idToken.isEmpty)
-        throw Exception('Failed to get Firebase ID token.');
+      if (idToken.isEmpty) throw Exception('Failed to retrieve Firebase ID token.');
 
-      final apiClient = context.read<PeoplesCoinApiClient>();
+      final apiClient = ref.read(apiClientProvider);
 
-      // TODO: Replace these placeholders with actual keys or key generation
-      const publicKey = 'TODO_public_key';
-      const encryptedPrivateKey = 'TODO_encrypted_private_key';
-
+      // Backend call to create user and wallet
       await apiClient.createUserAndWallet(
         username: _usernameController.text.trim(),
         recaptchaToken: token,
         idToken: idToken,
-        publicKey: publicKey,
-        encryptedPrivateKey: encryptedPrivateKey,
       );
+
+      // Local wallet creation/unlock
+      final walletManager = ref.read(walletManagerProvider.notifier);
+      await walletManager.unlockOrCreateWallet(_usernameController.text.trim());
 
       if (mounted) context.go('/home');
     } on FirebaseAuthException catch (e) {
@@ -162,18 +150,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
       };
       _showError(friendlyMessage);
     } catch (e, stack) {
-      if (kDebugMode) {
-        print("Error in sign-up flow: $e\n$stack");
-      }
+      if (kDebugMode) print("Sign-up error: $e\n$stack");
       final errorMessage = e.toString().toLowerCase();
       if (errorMessage.contains('username_taken')) {
-        _showError('This username was just taken. Please choose another one.');
-        if (mounted) {
-          setState(() {
-            _usernameStatus = UsernameStatus.unavailable;
-            _formKey.currentState?.validate();
-          });
-        }
+        _showError('This username was just taken. Please choose another.');
+        if (mounted) setState(() => _usernameStatus = UsernameStatus.unavailable);
       } else {
         _showError('Unexpected error: $e');
       }
@@ -218,8 +199,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           child: SizedBox(
             width: 20,
             height: 20,
-            child:
-                CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
           ),
         );
       case UsernameStatus.available:
@@ -235,32 +215,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final passwordVisibilityToggle = IconButton(
+    final passwordToggle = IconButton(
       icon: Icon(
         _isPasswordObscured ? Icons.visibility_off : Icons.visibility,
         color: Colors.blueGrey[300],
       ),
-      onPressed: () {
-        setState(() {
-          _isPasswordObscured = !_isPasswordObscured;
-        });
-      },
+      onPressed: () => setState(() => _isPasswordObscured = !_isPasswordObscured),
     );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
+      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
       body: Stack(
         children: [
           const DynamicNebulaBackground(),
           Center(
             child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.all(24),
                 child: Card(
                   color: Colors.blueGrey[900]?.withOpacity(0.6),
                   elevation: 8,
@@ -275,26 +248,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Create Account',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
+                          const Text('Create Account',
+                              style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontFamily: 'monospace')),
                           const SizedBox(height: 24),
                           TextFormField(
                             controller: _emailController,
                             style: const TextStyle(color: Colors.white),
-                            decoration: _buildInputDecoration(
-                                'Email', Icons.alternate_email),
+                            decoration: _buildInputDecoration('Email', Icons.alternate_email),
                             keyboardType: TextInputType.emailAddress,
                             validator: (val) =>
-                                (val?.contains('@') ?? false)
-                                    ? null
-                                    : 'Please enter a valid email',
+                                (val?.contains('@') ?? false) ? null : 'Enter a valid email',
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -308,15 +275,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             validator: (val) {
                               switch (_usernameStatus) {
                                 case UsernameStatus.tooShort:
-                                  return 'Username must be at least $_minUsernameLength characters';
+                                  return 'Username must be at least $_minUsernameLength chars';
                                 case UsernameStatus.unavailable:
-                                  return 'This username is already taken';
+                                  return 'This username is taken';
                                 case UsernameStatus.checking:
                                   return 'Checking username...';
                                 case UsernameStatus.idle:
-                                  if (val == null || val.trim().isEmpty) {
-                                    return 'Please enter a username';
-                                  }
+                                  if (val == null || val.trim().isEmpty) return 'Enter a username';
                                   return null;
                                 case UsernameStatus.available:
                                 default:
@@ -329,31 +294,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             controller: _passwordController,
                             obscureText: _isPasswordObscured,
                             style: const TextStyle(color: Colors.white),
-                            decoration: _buildInputDecoration(
-                              'Password',
-                              Icons.lock_outline,
-                              suffixIcon: passwordVisibilityToggle,
-                            ),
-                            validator: (val) => (val?.length ?? 0) >= 6
-                                ? null
-                                : 'Password must be at least 6 characters',
+                            decoration: _buildInputDecoration('Password', Icons.lock_outline,
+                                suffixIcon: passwordToggle),
+                            validator: (val) => (val?.length ?? 0) >= 6 ? null : 'Password must be at least 6 chars',
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _confirmPasswordController,
                             obscureText: _isPasswordObscured,
                             style: const TextStyle(color: Colors.white),
-                            decoration: _buildInputDecoration(
-                              'Confirm Password',
-                              Icons.lock_person_outlined,
-                            ),
+                            decoration: _buildInputDecoration('Confirm Password', Icons.lock_person_outlined),
                             validator: (val) {
-                              if (val == null || val.isEmpty) {
-                                return 'Please confirm your password';
-                              }
-                              if (val != _passwordController.text) {
-                                return 'Passwords do not match';
-                              }
+                              if (val == null || val.isEmpty) return 'Confirm your password';
+                              if (val != _passwordController.text) return 'Passwords do not match';
                               return null;
                             },
                           ),
@@ -365,19 +318,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               width: double.infinity,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 16),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
                                   backgroundColor: Colors.amber[800],
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                onPressed: _isLoading ? null : _signUpWithEmail,
-                                child: const Text(
-                                  'Sign Up',
-                                  style: TextStyle(
-                                      fontSize: 16, color: Colors.white),
-                                ),
+                                onPressed: _signUpWithEmail,
+                                child: const Text('Sign Up', style: TextStyle(fontSize: 16, color: Colors.white)),
                               ),
                             ),
                           const SizedBox(height: 20),
@@ -388,14 +336,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               children: <TextSpan>[
                                 TextSpan(
                                   text: 'Sign In',
-                                  style: const TextStyle(
-                                    color: Colors.amber,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  recognizer: TapGestureRecognizer()
-                                    ..onTap = () {
-                                      context.go('/signin');
-                                    },
+                                  style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
+                                  recognizer: TapGestureRecognizer()..onTap = () => context.go('/signin'),
                                 ),
                               ],
                             ),

@@ -3,9 +3,9 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
-import 'package:encrypt/encrypt.dart' as encrypt_package;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Exception thrown when wallet decryption fails (wrong password or corrupted data).
+/// Exception thrown when wallet decryption fails.
 class WalletDecryptionException implements Exception {
   final String message;
   WalletDecryptionException(this.message);
@@ -17,109 +17,78 @@ class WalletDecryptionException implements Exception {
 class WalletKeys {
   final String publicKeyBase64; // base64 encoded public key
   final String encryptedPrivateKeyBase64; // base64 encrypted private key
-  final String saltBase64; // base64 salt used in PBKDF2
   final String ivBase64; // base64 nonce/IV for AES-GCM
 
   WalletKeys({
     required this.publicKeyBase64,
     required this.encryptedPrivateKeyBase64,
-    required this.saltBase64,
     required this.ivBase64,
   });
 
   Map<String, dynamic> toJson() => {
         'publicKey': publicKeyBase64,
         'encryptedPrivateKey': encryptedPrivateKeyBase64,
-        'saltBase64': saltBase64,
         'ivBase64': ivBase64,
       };
 
   factory WalletKeys.fromJson(Map<String, dynamic> json) => WalletKeys(
         publicKeyBase64: json['publicKey'],
         encryptedPrivateKeyBase64: json['encryptedPrivateKey'],
-        saltBase64: json['saltBase64'],
         ivBase64: json['ivBase64'],
       );
 }
 
 /// Wallet service managing key generation, encryption, decryption, and signing.
 class WalletService {
-  static const int _aesKeyLength = 32;
+  static const int _aesKeyLength = 32; // 256-bit key
   static const int _aesGcmNonceLength = 12;
-  static const int _pbkdf2Iterations = 10000;
 
   final Random _secureRandom = Random.secure();
+  final FlutterSecureStorage _secureStorage;
 
-  WalletService();
+  WalletService({FlutterSecureStorage? secureStorage})
+      : _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
-  /// Generates a new Ed25519 key pair and encrypts the private key using AES-GCM
-  /// with a key derived from [encryptionPassword] using PBKDF2.
-  Future<WalletKeys> generateWalletKeys({
-    required String encryptionPassword,
-  }) async {
+  /// Generates a new Ed25519 key pair, encrypts the private key, and stores AES key securely.
+  Future<WalletKeys> generateWalletKeys({required String walletId}) async {
     final ed25519 = Ed25519();
-
     final keyPair = await ed25519.newKeyPair();
     final privateKeyBytes = await keyPair.extractPrivateKeyBytes();
     final publicKeyBytes = await keyPair.extractPublicKey().then((pub) => pub.bytes);
 
-    final salt = _generateRandomBytes(_aesKeyLength);
+    final aesKey = _generateRandomBytes(_aesKeyLength);
     final nonce = _generateRandomBytes(_aesGcmNonceLength);
 
-    final aesKey = await _deriveKeyFromPassword(encryptionPassword, salt);
+    final encryptedPrivateKeyBase64 = await _encryptPrivateKeyGcm(privateKeyBytes, aesKey, nonce);
 
-    final encryptedPrivateKeyBase64 =
-        await _encryptPrivateKeyGcm(privateKeyBytes, aesKey, nonce);
-
-    final publicKeyBase64 = base64Encode(publicKeyBytes);
+    // Store AES key securely in FlutterSecureStorage
+    await _secureStorage.write(key: 'wallet_key_$walletId', value: base64Encode(aesKey));
 
     return WalletKeys(
-      publicKeyBase64: publicKeyBase64,
+      publicKeyBase64: base64Encode(publicKeyBytes),
       encryptedPrivateKeyBase64: encryptedPrivateKeyBase64,
-      saltBase64: base64Encode(salt),
       ivBase64: base64Encode(nonce),
     );
   }
 
-  /// Decrypts the private key bytes from the encrypted data using AES-GCM
-  Future<Uint8List> decryptPrivateKey({
-    required String encryptedPrivateKeyBase64,
-    required String encryptionPassword,
-    required String saltBase64,
-    required String ivBase64,
-  }) async {
-    final salt = base64Decode(saltBase64);
-    final nonce = base64Decode(ivBase64);
-    final encryptedBytes = base64Decode(encryptedPrivateKeyBase64);
-
-    final aesKey = await _deriveKeyFromPassword(encryptionPassword, salt);
+  /// Decrypts private key using AES key retrieved from secure storage.
+  Future<Uint8List> decryptPrivateKey({required String walletId, required WalletKeys keys}) async {
+    final aesKeyBase64 = await _secureStorage.read(key: 'wallet_key_$walletId');
+    if (aesKeyBase64 == null) {
+      throw WalletDecryptionException('AES key not found for wallet $walletId.');
+    }
+    final aesKey = base64Decode(aesKeyBase64);
+    final nonce = base64Decode(keys.ivBase64);
+    final encryptedBytes = base64Decode(keys.encryptedPrivateKeyBase64);
 
     try {
       return await _decryptPrivateKeyGcm(encryptedBytes, aesKey, nonce);
     } catch (_) {
-      throw WalletDecryptionException('Failed to decrypt private key. Check your password.');
+      throw WalletDecryptionException('Failed to decrypt private key.');
     }
   }
 
-  /// Verifies password correctness without returning the key
-  Future<bool> verifyPassword({
-    required WalletKeys walletKeys,
-    required String encryptionPassword,
-  }) async {
-    try {
-      await decryptPrivateKey(
-        encryptedPrivateKeyBase64: walletKeys.encryptedPrivateKeyBase64,
-        encryptionPassword: encryptionPassword,
-        saltBase64: walletKeys.saltBase64,
-        ivBase64: walletKeys.ivBase64,
-      );
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  /// Signs transaction data using Ed25519 private key bytes
+  /// Signs transaction data using Ed25519 private key bytes.
   Future<Uint8List> signTransaction({
     required Uint8List privateKeyBytes,
     required Uint8List data,
@@ -130,14 +99,8 @@ class WalletService {
     return Uint8List.fromList(signature.bytes);
   }
 
-  Future<String> signTransactionBase64({
-    required Uint8List privateKeyBytes,
-    required String data,
-  }) async {
-    final signatureBytes = await signTransaction(
-      privateKeyBytes: privateKeyBytes,
-      data: utf8.encode(data) as Uint8List,
-    );
+  Future<String> signTransactionBase64({required Uint8List privateKeyBytes, required String data}) async {
+    final signatureBytes = await signTransaction(privateKeyBytes: privateKeyBytes, data: utf8.encode(data) as Uint8List);
     return base64Encode(signatureBytes);
   }
 
@@ -149,7 +112,7 @@ class WalletService {
   }
 
   Future<Uint8List> _decryptPrivateKeyGcm(Uint8List encryptedBytes, Uint8List aesKey, Uint8List nonce) async {
-    if (encryptedBytes.length < 16) throw WalletDecryptionException('Invalid encrypted data length');
+    if (encryptedBytes.length < 16) throw WalletDecryptionException('Invalid encrypted data length.');
     final macBytes = encryptedBytes.sublist(encryptedBytes.length - 16);
     final cipherTextBytes = encryptedBytes.sublist(0, encryptedBytes.length - 16);
     final secretBox = SecretBox(cipherTextBytes, nonce: nonce, mac: Mac(macBytes));
@@ -158,12 +121,7 @@ class WalletService {
     return Uint8List.fromList(decryptedBytes);
   }
 
-  Future<Uint8List> _deriveKeyFromPassword(String password, Uint8List salt) async {
-    final pbkdf2 = Pbkdf2(macAlgorithm: Hmac.sha256(), iterations: _pbkdf2Iterations, bits: _aesKeyLength * 8);
-    final secretKey = await pbkdf2.deriveKey(secretKey: SecretKey(utf8.encode(password)), nonce: salt);
-    return Uint8List.fromList(await secretKey.extractBytes());
-  }
-
-  Uint8List _generateRandomBytes(int length) => Uint8List.fromList(List<int>.generate(length, (_) => _secureRandom.nextInt(256)));
+  Uint8List _generateRandomBytes(int length) =>
+      Uint8List.fromList(List<int>.generate(length, (_) => _secureRandom.nextInt(256)));
 }
 

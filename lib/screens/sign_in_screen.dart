@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../state/auth_provider.dart' as MyAppAuthProvider;
+import '../state/auth_provider.dart';
+import '../service/wallet_manager.dart';
 import '../widgets/dynamic_nebula_background.dart';
 
-class SignInScreen extends StatefulWidget {
+class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
   @override
-  State<SignInScreen> createState() => _SignInScreenState();
+  ConsumerState<SignInScreen> createState() => _SignInScreenState();
 }
 
-class _SignInScreenState extends State<SignInScreen> {
+class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -27,14 +28,13 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _signIn() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    // Unfocus text fields to dismiss keyboard on submit
+    // Unfocus text fields
     FocusScope.of(context).unfocus();
 
-    final authProvider = context.read<MyAppAuthProvider.AuthProvider>();
+    final authProvider = ref.read(authProviderProvider.notifier);
+    final walletManager = ref.read(walletManagerProvider.notifier);
 
     final result = await authProvider.signInWithEmailAndPassword(
       _emailController.text.trim(),
@@ -42,16 +42,24 @@ class _SignInScreenState extends State<SignInScreen> {
     );
 
     if (result['success'] == false && mounted) {
-      // Clear password on failure for security
       _passwordController.clear();
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result['error'] ?? 'An unknown error occurred.'),
           backgroundColor: Colors.redAccent,
         ),
       );
+      return;
     }
+
+    // Unlock existing wallet if present
+    final wallets = walletManager.wallets;
+    if (wallets.isNotEmpty) {
+      await walletManager.unlockWallet(id: wallets.first.id);
+    }
+
+    // Navigate to home/dashboard after sign-in
+    if (mounted) context.go('/home');
   }
 
   InputDecoration _buildInputDecoration(String label, IconData icon,
@@ -84,7 +92,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = context.watch<MyAppAuthProvider.AuthProvider>().isLoading;
+    final isLoading = ref.watch(authProviderProvider).isLoading;
 
     final passwordVisibilityToggle = IconButton(
       icon: Icon(
