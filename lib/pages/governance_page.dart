@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:ui';
 
@@ -16,8 +17,22 @@ import '../models/user.dart';
 // A StateProvider to manage the selected filter status.
 final selectedStatusProvider = StateProvider<String>((ref) => 'ACTIVE');
 
-// This is a placeholder for your actual auth provider and user model.
-final authUserProvider = Provider<User?>((ref) => User(uid: 'user123', email: 'user@example.com'));
+// Firebase Auth user provider
+final firebaseAuthUserProvider = StreamProvider<User?>((ref) {
+  return FirebaseAuth.instance.authStateChanges();
+});
+
+// Enhanced auth user provider that works with Firebase
+final authUserProvider = Provider<User?>((ref) {
+  final firebaseUser = ref.watch(firebaseAuthUserProvider);
+  return firebaseUser.when(
+    data: (user) => user != null 
+        ? User(uid: user.uid, email: user.email ?? 'No email') 
+        : null,
+    loading: () => null,
+    error: (_, __) => null,
+  );
+});
 
 // A StateNotifier for fetching and managing the list of proposals.
 class ProposalsNotifier extends StateNotifier<AsyncValue<List<Proposal>>> {
@@ -33,50 +48,101 @@ class ProposalsNotifier extends StateNotifier<AsyncValue<List<Proposal>>> {
       // Simulate network delay
       await Future.delayed(const Duration(seconds: 1));
 
-      // This is sample data. You would replace this with a real API call.
-      final List<Proposal> fetchedProposals = [
+      // Mock data based on status filter - replace with real API call to your Flask backend
+      final allProposals = [
         Proposal(
           id: '1',
           title: 'Community Garden Initiative',
-          description: 'A proposal to establish a community garden in the central park.',
+          description: 'A proposal to establish a community garden in the central park to promote sustainability and community engagement.',
           proposerId: 'user123',
           status: 'ACTIVE',
           voteEndTime: DateTime.now().add(const Duration(days: 5)),
           votesFor: 120,
           votesAgainst: 30,
+          createdAt: DateTime.now().subtract(const Duration(days: 2)),
+          requiredVotes: 200,
         ),
         Proposal(
           id: '2',
-          title: 'Upgrade Public WiFi',
-          description: 'Allocate funds to improve the public WiFi network in the city center.',
+          title: 'Upgrade Public WiFi Infrastructure',
+          description: 'Allocate funds to improve the public WiFi network in the city center for better connectivity.',
           proposerId: 'user456',
           status: 'ACTIVE',
           voteEndTime: DateTime.now().add(const Duration(days: 10)),
           votesFor: 85,
           votesAgainst: 15,
+          createdAt: DateTime.now().subtract(const Duration(days: 4)),
+          requiredVotes: 150,
         ),
-      ].where((p) => p.status == status).toList();
+        Proposal(
+          id: '3',
+          title: 'Youth Sports Program Funding',
+          description: 'Increase funding for youth sports programs to encourage physical activity among children.',
+          proposerId: 'user789',
+          status: 'PASSED',
+          voteEndTime: DateTime.now().subtract(const Duration(days: 1)),
+          votesFor: 180,
+          votesAgainst: 45,
+          createdAt: DateTime.now().subtract(const Duration(days: 15)),
+          requiredVotes: 200,
+        ),
+        Proposal(
+          id: '4',
+          title: 'Downtown Parking Fees Increase',
+          description: 'Proposal to increase downtown parking fees to fund public transportation improvements.',
+          proposerId: 'user101',
+          status: 'FAILED',
+          voteEndTime: DateTime.now().subtract(const Duration(days: 3)),
+          votesFor: 60,
+          votesAgainst: 140,
+          createdAt: DateTime.now().subtract(const Duration(days: 20)),
+          requiredVotes: 150,
+        ),
+      ];
 
-      state = AsyncValue.data(fetchedProposals);
+      final filteredProposals = allProposals
+          .where((p) => p.status == status)
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Sort by newest first
+
+      state = AsyncValue.data(filteredProposals);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
+  }
+
+  Future<void> refreshProposals({required String status, required String idToken}) async {
+    await fetchProposals(status: status, idToken: idToken);
   }
 }
 
 // The provider to access the ProposalsNotifier state.
 final proposalsProvider = StateNotifierProvider<ProposalsNotifier, AsyncValue<List<Proposal>>>((ref) {
+  return ProposalsNotifier();
+});
+
+// Auto-fetch provider that triggers when status changes
+final autoFetchProvider = Provider<void>((ref) {
   final status = ref.watch(selectedStatusProvider);
-  final notifier = ProposalsNotifier();
-  
-  // Asynchronously fetch proposals when the provider is first created or the status changes.
   final user = ref.watch(authUserProvider);
-  const idToken = 'dummy_id_token'; // Replace with a call to get the real token
-  if (user != null) {
-     notifier.fetchProposals(status: status, idToken: idToken);
-  }
   
-  return notifier;
+  if (user != null) {
+    // Get Firebase ID token
+    FirebaseAuth.instance.currentUser?.getIdToken().then((idToken) {
+      if (idToken != null) {
+        ref.read(proposalsProvider.notifier).fetchProposals(
+          status: status, 
+          idToken: idToken,
+        );
+      }
+    }).catchError((error) {
+      // Handle token error
+      ref.read(proposalsProvider.notifier).fetchProposals(
+        status: status, 
+        idToken: 'fallback_token',
+      );
+    });
+  }
 });
 
 // --- GOVERNANCE PAGE WIDGET ---
@@ -90,7 +156,8 @@ class GovernancePage extends ConsumerStatefulWidget {
 
 class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProviderStateMixin {
   late final AnimationController _listAnimationController;
-
+  late final AnimationController _headerAnimationController;
+  
   @override
   void initState() {
     super.initState();
@@ -98,37 +165,80 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
+    _headerAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _headerAnimationController.forward();
   }
 
   @override
   void dispose() {
     _listAnimationController.dispose();
+    _headerAnimationController.dispose();
     super.dispose();
   }
   
-  // This method is now much simpler, as Riverpod handles the state and fetching.
   Future<void> _onRefresh() async {
     final status = ref.read(selectedStatusProvider);
-    final user = ref.read(authUserProvider);
-    const idToken = 'dummy_id_token'; 
-    if (user != null) {
-      // Trigger a re-fetch by calling the notifier directly.
-      await ref.read(proposalsProvider.notifier).fetchProposals(status: status, idToken: idToken);
+    final currentUser = FirebaseAuth.instance.currentUser;
+    
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please sign in to view proposals'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final idToken = await currentUser.getIdToken();
+      await ref.read(proposalsProvider.notifier).refreshProposals(
+        status: status, 
+        idToken: idToken,
+      );
+      _listAnimationController.reset();
       _listAnimationController.forward();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh proposals: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   void _showCreateProposalForm() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to create proposals'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Close',
+      barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 400),
       pageBuilder: (context, anim1, anim2) {
         return CreateProposalPageContent(
           onFormCompleted: () {
             Navigator.of(context).pop();
-            _onRefresh(); // Refresh the list when the form is submitted.
+            _onRefresh();
           },
         );
       },
@@ -137,7 +247,10 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
           position: Tween(begin: const Offset(0, 1), end: Offset.zero).animate(
             CurvedAnimation(parent: anim1, curve: Curves.easeInOutCubic),
           ),
-          child: child,
+          child: FadeTransition(
+            opacity: anim1,
+            child: child,
+          ),
         );
       },
     );
@@ -148,76 +261,259 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
     final theme = Theme.of(context);
     final proposalsAsync = ref.watch(proposalsProvider);
     final selectedStatus = ref.watch(selectedStatusProvider);
+    final authUser = ref.watch(authUserProvider);
+    final firebaseUserAsync = ref.watch(firebaseAuthUserProvider);
+    
+    // Trigger auto-fetch when dependencies change
+    ref.watch(autoFetchProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreateProposalForm,
-        icon: const Icon(Icons.add),
-        label: const Text('Create Proposal'),
-        backgroundColor: theme.colorScheme.tertiary,
-        foregroundColor: theme.colorScheme.onTertiary,
-      ),
-      body: RefreshIndicator(
-        onRefresh: _onRefresh,
-        color: theme.colorScheme.tertiary,
-        backgroundColor: theme.colorScheme.background,
-        child: CustomScrollView(
-          slivers: [
-            _buildSliverAppBar(theme),
-            _buildHeader(theme),
-            _buildFilterBar(theme, selectedStatus),
-            _buildProposalList(theme, proposalsAsync),
-          ],
+      floatingActionButton: authUser != null 
+          ? FloatingActionButton.extended(
+              onPressed: _showCreateProposalForm,
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Create Proposal'),
+              backgroundColor: theme.colorScheme.tertiary,
+              foregroundColor: theme.colorScheme.onTertiary,
+              elevation: 8,
+            )
+          : null,
+      body: firebaseUserAsync.when(
+        loading: () => const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading user session...'),
+            ],
+          ),
         ),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              const Text(
+                'Authentication Error',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Error: $error',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  ref.invalidate(firebaseAuthUserProvider);
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (firebaseUser) {
+          if (firebaseUser == null) {
+            return _buildSignInPrompt(theme);
+          }
+          
+          return RefreshIndicator(
+            onRefresh: _onRefresh,
+            color: theme.colorScheme.tertiary,
+            backgroundColor: theme.colorScheme.surface,
+            child: CustomScrollView(
+              slivers: [
+                _buildSliverAppBar(theme, firebaseUser),
+                _buildHeader(theme, firebaseUser),
+                _buildFilterBar(theme, selectedStatus),
+                _buildProposalList(theme, proposalsAsync),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  SliverAppBar _buildSliverAppBar(ThemeData theme) {
+  Widget _buildSignInPrompt(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.how_to_vote_outlined,
+            size: 80,
+            color: theme.colorScheme.tertiary,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Join the Governance',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Sign in to participate in community governance,\ncreate proposals, and vote on important decisions.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () {
+              // Navigate to sign-in page or trigger sign-in flow
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please sign in from the main app'),
+                  backgroundColor: Colors.blue,
+                ),
+              );
+            },
+            icon: const Icon(Icons.login),
+            label: const Text('Sign In'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.tertiary,
+              foregroundColor: theme.colorScheme.onTertiary,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  SliverAppBar _buildSliverAppBar(ThemeData theme, User firebaseUser) {
     return SliverAppBar(
-      title: Text('Governance', style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onBackground)),
+      title: Text(
+        'Governance', 
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: theme.colorScheme.onBackground,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       backgroundColor: Colors.transparent,
       elevation: 0,
       pinned: true,
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.tertiary.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.person,
+                size: 16,
+                color: theme.colorScheme.tertiary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                firebaseUser.email?.split('@')[0] ?? 'User',
+                style: TextStyle(
+                  color: theme.colorScheme.tertiary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
       flexibleSpace: ClipRRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(color: theme.colorScheme.background.withOpacity(0.2)),
+          child: Container(
+            color: theme.colorScheme.surface.withOpacity(0.2),
+          ),
         ),
       ),
     );
   }
 
-  SliverToBoxAdapter _buildHeader(ThemeData theme) {
+  SliverToBoxAdapter _buildHeader(ThemeData theme, User firebaseUser) {
     return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.1)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.gavel_rounded, color: theme.colorScheme.tertiary, size: 40),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Empower the community. Propose new ideas and vote to shape our future.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        height: 1.5,
-                      ),
+      child: FadeTransition(
+        opacity: _headerAnimationController,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, -0.2),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: _headerAnimationController,
+            curve: Curves.easeOutCubic,
+          )),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.tertiary.withOpacity(0.1),
+                        theme.colorScheme.surface.withOpacity(0.2),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.colorScheme.tertiary.withOpacity(0.2),
                     ),
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.tertiary.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.gavel_rounded, 
+                          color: theme.colorScheme.tertiary, 
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Community Governance',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Shape our future together. Propose ideas, vote on decisions, and make your voice heard.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -227,27 +523,48 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
   }
 
   SliverToBoxAdapter _buildFilterBar(ThemeData theme, String selectedStatus) {
-    final statuses = ['ACTIVE', 'PASSED', 'FAILED'];
+    final statuses = [
+      {'key': 'ACTIVE', 'label': 'Active', 'icon': Icons.how_to_vote},
+      {'key': 'PASSED', 'label': 'Passed', 'icon': Icons.check_circle},
+      {'key': 'FAILED', 'label': 'Failed', 'icon': Icons.cancel},
+    ];
+    
     return SliverToBoxAdapter(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
-        child: SegmentedButton<String>(
-          segments: statuses.map((status) {
-            return ButtonSegment<String>(
-              value: status,
-              label: Text(status.toUpperCase()),
-            );
-          }).toList(),
-          selected: {selectedStatus},
-          onSelectionChanged: (newSelection) {
-            ref.read(selectedStatusProvider.notifier).state = newSelection.first;
-            _onRefresh();
-          },
-          style: SegmentedButton.styleFrom(
-            backgroundColor: theme.colorScheme.surface.withOpacity(0.1),
-            foregroundColor: theme.colorScheme.onSurface.withOpacity(0.7),
-            selectedBackgroundColor: theme.colorScheme.tertiary,
-            selectedForegroundColor: theme.colorScheme.onTertiary,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: statuses.map((status) {
+              final isSelected = selectedStatus == status['key'];
+              return Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: FilterChip(
+                  avatar: Icon(
+                    status['icon'] as IconData,
+                    size: 18,
+                    color: isSelected 
+                        ? theme.colorScheme.onTertiary
+                        : theme.colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                  label: Text(status['label'] as String),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) {
+                      ref.read(selectedStatusProvider.notifier).state = status['key'] as String;
+                    }
+                  },
+                  selectedColor: theme.colorScheme.tertiary,
+                  backgroundColor: theme.colorScheme.surface.withOpacity(0.1),
+                  labelStyle: TextStyle(
+                    color: isSelected 
+                        ? theme.colorScheme.onTertiary
+                        : theme.colorScheme.onSurface.withOpacity(0.7),
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ),
       ),
@@ -256,20 +573,79 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
 
   Widget _buildProposalList(ThemeData theme, AsyncValue<List<Proposal>> proposalsAsync) {
     return proposalsAsync.when(
-      loading: () => _buildLoadingShimmer(),
+      loading: () => _buildLoadingShimmer(theme),
       error: (err, stack) => SliverFillRemaining(
         child: Center(
-          child: Text('Error: $err', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, color: theme.colorScheme.error, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load proposals',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Error: $err',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.error.withOpacity(0.7),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _onRefresh,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       ),
       data: (proposals) {
         if (proposals.isEmpty) {
-          return const SliverFillRemaining(
+          return SliverFillRemaining(
             child: Center(
-              child: Text("No proposals found in this category. Be the first to create one!"),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.inbox_outlined,
+                    size: 80,
+                    color: theme.colorScheme.onSurface.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "No proposals found",
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Be the first to create a proposal in this category!",
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: _showCreateProposalForm,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Create Proposal'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.tertiary,
+                      foregroundColor: theme.colorScheme.onTertiary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
+        
         _listAnimationController.forward();
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0).copyWith(bottom: 100),
@@ -283,15 +659,21 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
                     curve: Interval(
                       (1 / proposals.length) * index,
                       1.0,
-                      curve: Curves.easeOut,
+                      curve: Curves.easeOutCubic,
                     ),
                   ),
                 );
                 return FadeTransition(
                   opacity: animation,
                   child: SlideTransition(
-                    position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(animation),
-                    child: ProposalCard(proposal: proposal),
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.3),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: ProposalCard(proposal: proposal),
+                    ),
                   ),
                 );
               },
@@ -303,19 +685,21 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
     );
   }
 
-  Widget _buildLoadingShimmer() {
+  Widget _buildLoadingShimmer(ThemeData theme) {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) => Shimmer.fromColors(
-            baseColor: Theme.of(context).colorScheme.surface.withOpacity(0.2),
-            highlightColor: Theme.of(context).colorScheme.surface.withOpacity(0.1),
-            child: Card(
+            baseColor: theme.colorScheme.surface.withOpacity(0.3),
+            highlightColor: theme.colorScheme.surface.withOpacity(0.1),
+            child: Container(
               margin: const EdgeInsets.symmetric(vertical: 8.0),
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.1),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-              child: const SizedBox(height: 150),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(16.0),
+              ),
+              height: 160,
             ),
           ),
           childCount: 4,
@@ -325,7 +709,7 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
   }
 }
 
-// Placeholder for your models for the code to be runnable
+// Enhanced Proposal model with additional fields
 class Proposal {
   final String id;
   final String title;
@@ -335,6 +719,8 @@ class Proposal {
   final DateTime voteEndTime;
   final int votesFor;
   final int votesAgainst;
+  final DateTime createdAt;
+  final int requiredVotes;
 
   Proposal({
     required this.id,
@@ -345,6 +731,11 @@ class Proposal {
     required this.voteEndTime,
     required this.votesFor,
     required this.votesAgainst,
+    required this.createdAt,
+    required this.requiredVotes,
   });
-}
 
+  double get votingProgress => (votesFor + votesAgainst) / requiredVotes;
+  bool get isActive => status == 'ACTIVE' && DateTime.now().isBefore(voteEndTime);
+  Duration get timeRemaining => voteEndTime.difference(DateTime.now());
+}
