@@ -4,10 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'dart:ui';
+import 'dart:convert';
 
-// --- MOCK DATA MODELS AND PROVIDERS (Refactored to use Riverpod) ---
+// --- DATA MODELS ---
 
 class PublicLedgerEntry {
   final String id;
@@ -15,6 +18,8 @@ class PublicLedgerEntry {
   final String title;
   final int lovesValue;
   final DateTime createdAt;
+  final String? description;
+  final String? transactionHash;
 
   PublicLedgerEntry({
     required this.id,
@@ -22,16 +27,178 @@ class PublicLedgerEntry {
     required this.title,
     required this.lovesValue,
     required this.createdAt,
+    this.description,
+    this.transactionHash,
   });
+
+  factory PublicLedgerEntry.fromJson(Map<String, dynamic> json) {
+    return PublicLedgerEntry(
+      id: json['id'] ?? '',
+      walletId: json['wallet_id'] ?? json['walletId'] ?? '',
+      title: json['title'] ?? '',
+      lovesValue: (json['loves_value'] ?? json['lovesValue'] ?? 0).toInt(),
+      createdAt: DateTime.parse(json['created_at'] ?? json['createdAt'] ?? DateTime.now().toIso8601String()),
+      description: json['description'],
+      transactionHash: json['transaction_hash'] ?? json['transactionHash'],
+    );
+  }
 }
 
 class User {
   final String id;
   final String walletId;
-  User({required this.id, required this.walletId});
+  final String? name;
+  final String? email;
+
+  User({
+    required this.id,
+    required this.walletId,
+    this.name,
+    this.email,
+  });
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
+      id: json['id'] ?? '',
+      walletId: json['wallet_id'] ?? json['walletId'] ?? '',
+      name: json['name'],
+      email: json['email'],
+    );
+  }
 }
 
-// State class to hold all ledger-related data and status flags.
+// --- FLASK API SERVICE ---
+
+class FlaskLedgerService {
+  final String baseUrl;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  FlaskLedgerService({required this.baseUrl});
+
+  // Get Firebase ID token for authentication with Flask
+  Future<String?> _getIdToken() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    return await user.getIdToken();
+  }
+
+  Future<Map<String, String>> _getHeaders() async {
+    final token = await _getIdToken();
+    final headers = {
+      'Content-Type': 'application/json',
+    };
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  Future<List<PublicLedgerEntry>> fetchPublicLedgerEntries({
+    int limit = 10,
+    String? lastDocumentId,
+    String? searchQuery,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'limit': limit.toString(),
+      };
+
+      if (lastDocumentId != null) {
+        queryParams['after'] = lastDocumentId;
+      }
+
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        queryParams['search'] = searchQuery;
+      }
+
+      final uri = Uri.parse('$baseUrl/api/ledger/entries')
+          .replace(queryParameters: queryParams);
+
+      final headers = await _getHeaders();
+      final response = await http.get(uri, headers: headers);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> entries = data['entries'] ?? data['data'] ?? [];
+        
+        return entries
+            .map((entry) => PublicLedgerEntry.fromJson(entry))
+            .toList();
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication failed. Please sign in again.');
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'Failed to fetch ledger entries');
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
+  Future<bool> sendLoves({
+    required String senderWallet,
+    required String recipientWallet,
+    required int amount,
+    String? memo,
+  }) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ledger/send-loves'),
+        headers: headers,
+        body: json.encode({
+          'sender_wallet': senderWallet,
+          'recipient_wallet': recipientWallet,
+          'amount': amount,
+          'memo': memo,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication failed. Please sign in again.');
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'Failed to send loves');
+      }
+    } catch (e) {
+      print('Error sending loves: $e');
+      if (e is Exception) rethrow;
+      return false;
+    }
+  }
+
+  Future<User?> getCurrentUser() async {
+    try {
+      final firebaseUser = _auth.currentUser;
+      if (firebaseUser == null) return null;
+
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/user/profile'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return User.fromJson(data);
+      } else if (response.statusCode == 401) {
+        // Token might be expired, try to refresh
+        await firebaseUser.getIdToken(true);
+        return getCurrentUser(); // Retry once
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching user: $e');
+      return null;
+    }
+  }
+}
+
+// --- STATE MANAGEMENT ---
+
 class LedgerState {
   final List<PublicLedgerEntry> publicLedgerEntries;
   final bool isInitialLoading;
@@ -39,6 +206,7 @@ class LedgerState {
   final String? errorMessage;
   final String? lastDocumentId;
   final String currentSearchQuery;
+  final bool hasMoreData;
 
   LedgerState({
     required this.publicLedgerEntries,
@@ -47,6 +215,7 @@ class LedgerState {
     this.errorMessage,
     this.lastDocumentId,
     this.currentSearchQuery = '',
+    this.hasMoreData = true,
   });
 
   LedgerState copyWith({
@@ -56,6 +225,7 @@ class LedgerState {
     String? errorMessage,
     String? lastDocumentId,
     String? currentSearchQuery,
+    bool? hasMoreData,
   }) {
     return LedgerState(
       publicLedgerEntries: publicLedgerEntries ?? this.publicLedgerEntries,
@@ -64,49 +234,58 @@ class LedgerState {
       errorMessage: errorMessage,
       lastDocumentId: lastDocumentId ?? this.lastDocumentId,
       currentSearchQuery: currentSearchQuery ?? this.currentSearchQuery,
+      hasMoreData: hasMoreData ?? this.hasMoreData,
     );
   }
 }
 
-// StateNotifier to manage the state of the public ledger.
 class LedgerNotifier extends StateNotifier<LedgerState> {
-  LedgerNotifier() : super(LedgerState(publicLedgerEntries: []));
+  final FlaskLedgerService _service;
+
+  LedgerNotifier(this._service) : super(LedgerState(publicLedgerEntries: []));
 
   Future<void> fetchPublicLedgerEntries({bool isRefresh = false}) async {
-    if (state.isFetchingMore || state.isInitialLoading) return;
+    if ((state.isFetchingMore || state.isInitialLoading) && !isRefresh) return;
+    if (!state.hasMoreData && !isRefresh) return;
 
     if (isRefresh) {
-      state = state.copyWith(isInitialLoading: true, publicLedgerEntries: [], lastDocumentId: null);
+      state = state.copyWith(
+        isInitialLoading: true,
+        publicLedgerEntries: [],
+        lastDocumentId: null,
+        hasMoreData: true,
+        errorMessage: null,
+      );
     } else {
-      state = state.copyWith(isFetchingMore: true);
+      state = state.copyWith(isFetchingMore: true, errorMessage: null);
     }
 
     try {
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
-
-      // Generate mock data for demonstration
-      final newEntries = List.generate(
-        10,
-        (i) => PublicLedgerEntry(
-          id: '${state.publicLedgerEntries.length + i}',
-          walletId: 'wallet_${state.publicLedgerEntries.length + i}',
-          title: 'Action ${state.publicLedgerEntries.length + i}',
-          lovesValue: 50 + (i * 10),
-          createdAt: DateTime.now().subtract(Duration(days: i)),
-        ),
+      final newEntries = await _service.fetchPublicLedgerEntries(
+        limit: 10,
+        lastDocumentId: isRefresh ? null : state.lastDocumentId,
+        searchQuery: state.currentSearchQuery.isEmpty ? null : state.currentSearchQuery,
       );
 
+      final updatedEntries = isRefresh 
+          ? newEntries 
+          : [...state.publicLedgerEntries, ...newEntries];
+
+      final lastDocId = newEntries.isNotEmpty ? newEntries.last.id : state.lastDocumentId;
+
       state = state.copyWith(
-        publicLedgerEntries: [...state.publicLedgerEntries, ...newEntries],
+        publicLedgerEntries: updatedEntries,
         isInitialLoading: false,
         isFetchingMore: false,
+        lastDocumentId: lastDocId,
+        hasMoreData: newEntries.length >= 10,
         errorMessage: null,
       );
     } catch (e) {
       state = state.copyWith(
         isInitialLoading: false,
         isFetchingMore: false,
-        errorMessage: 'Failed to fetch ledger entries.',
+        errorMessage: e.toString(),
       );
     }
   }
@@ -116,40 +295,47 @@ class LedgerNotifier extends StateNotifier<LedgerState> {
       isInitialLoading: true,
       publicLedgerEntries: [],
       currentSearchQuery: query,
+      lastDocumentId: null,
+      hasMoreData: true,
+      errorMessage: null,
     );
+
     try {
-      await Future.delayed(const Duration(milliseconds: 800)); // Simulate search API call
-      final mockSearchResults = List.generate(
-        5,
-        (i) => PublicLedgerEntry(
-          id: 'search_$i',
-          walletId: 'search_wallet_$i',
-          title: 'Search Result for "$query" $i',
-          lovesValue: 100 + i,
-          createdAt: DateTime.now(),
-        ),
+      final searchResults = await _service.fetchPublicLedgerEntries(
+        limit: 10,
+        searchQuery: query.isEmpty ? null : query,
       );
+
       state = state.copyWith(
-        publicLedgerEntries: mockSearchResults,
+        publicLedgerEntries: searchResults,
         isInitialLoading: false,
         isFetchingMore: false,
+        lastDocumentId: searchResults.isNotEmpty ? searchResults.last.id : null,
+        hasMoreData: searchResults.length >= 10,
         errorMessage: null,
       );
     } catch (e) {
       state = state.copyWith(
         isInitialLoading: false,
         isFetchingMore: false,
-        errorMessage: 'Failed to perform search.',
+        errorMessage: e.toString(),
       );
     }
   }
 
-  Future<bool> sendLoves({required String senderWallet, required String recipientWallet, required int amount, String? memo}) async {
+  Future<bool> sendLoves({
+    required String senderWallet,
+    required String recipientWallet,
+    required int amount,
+    String? memo,
+  }) async {
     try {
-      // Simulate sending Loves via an API
-      await Future.delayed(const Duration(seconds: 1));
-      print('Sending $amount Loves from $senderWallet to $recipientWallet with memo: $memo');
-      return true;
+      return await _service.sendLoves(
+        senderWallet: senderWallet,
+        recipientWallet: recipientWallet,
+        amount: amount,
+        memo: memo,
+      );
     } catch (e) {
       print('Error sending loves: $e');
       return false;
@@ -157,13 +343,63 @@ class LedgerNotifier extends StateNotifier<LedgerState> {
   }
 }
 
-// Riverpod providers for state management
-final userProvider = Provider<User?>((ref) => User(id: 'user123', walletId: 'wallet_user123'));
-final ledgerProvider = StateNotifierProvider<LedgerNotifier, LedgerState>((ref) {
-  return LedgerNotifier();
+// User state notifier
+class UserNotifier extends StateNotifier<User?> {
+  final FlaskLedgerService _service;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  StreamSubscription<User?>? _authSubscription;
+
+  UserNotifier(this._service) : super(null) {
+    _authSubscription = _auth.authStateChanges().listen((firebaseUser) {
+      if (firebaseUser != null) {
+        _fetchUserProfile();
+      } else {
+        state = null;
+      }
+    });
+  }
+
+  Future<void> _fetchUserProfile() async {
+    try {
+      final user = await _service.getCurrentUser();
+      state = user;
+    } catch (e) {
+      print('Error fetching user profile: $e');
+      state = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+}
+
+// --- RIVERPOD PROVIDERS ---
+
+// Configuration provider - change this to your Flask backend URL
+final flaskBaseUrlProvider = Provider<String>((ref) {
+  // Replace with your actual Flask backend URL
+  return 'http://your-flask-backend-url.com'; // e.g., 'https://api.yourapp.com'
 });
 
-// --- WIDGETS ---
+final flaskServiceProvider = Provider<FlaskLedgerService>((ref) {
+  final baseUrl = ref.watch(flaskBaseUrlProvider);
+  return FlaskLedgerService(baseUrl: baseUrl);
+});
+
+final userProvider = StateNotifierProvider<UserNotifier, User?>((ref) {
+  final service = ref.watch(flaskServiceProvider);
+  return UserNotifier(service);
+});
+
+final ledgerProvider = StateNotifierProvider<LedgerNotifier, LedgerState>((ref) {
+  final service = ref.watch(flaskServiceProvider);
+  return LedgerNotifier(service);
+});
+
+// --- WIDGETS (same as before, but with error handling improvements) ---
 
 class PublicLedgerPage extends ConsumerStatefulWidget {
   const PublicLedgerPage({super.key});
@@ -226,7 +462,6 @@ class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with Ticker
 
   @override
   Widget build(BuildContext context) {
-    // Watch the providers to get the current state
     final ledgerState = ref.watch(ledgerProvider);
     final user = ref.watch(userProvider);
     final currentUserWalletId = user?.walletId;
@@ -239,6 +474,10 @@ class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with Ticker
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchInitialData,
+          ),
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: () {
@@ -302,25 +541,55 @@ class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with Ticker
 
     if (ledgerState.errorMessage != null) {
       return Center(
-        child: Text(
-          'Error: ${ledgerState.errorMessage}',
-          style: const TextStyle(color: Colors.redAccent),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.redAccent.withOpacity(0.7),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Error: ${ledgerState.errorMessage}',
+              style: const TextStyle(color: Colors.redAccent),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchInitialData,
+              child: const Text('Retry'),
+            ),
+          ],
         ),
       );
     }
 
     if (ledgerState.publicLedgerEntries.isEmpty) {
       return Center(
-        child: Text(
-          ledgerState.currentSearchQuery.isNotEmpty
-              ? 'No results found for "${ledgerState.currentSearchQuery}".'
-              : 'No public ledger entries found.',
-          style: const TextStyle(color: Colors.white70),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inbox_outlined,
+              size: 64,
+              color: Colors.white.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              ledgerState.currentSearchQuery.isNotEmpty
+                  ? 'No results found for "${ledgerState.currentSearchQuery}".'
+                  : 'No public ledger entries found.',
+              style: const TextStyle(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       );
     }
 
-    final itemCount = ledgerState.publicLedgerEntries.length + (ledgerState.isFetchingMore ? 1 : 0);
+    final itemCount = ledgerState.publicLedgerEntries.length + 
+        (ledgerState.isFetchingMore ? 1 : 0);
 
     return ListView.builder(
       controller: _scrollController,
@@ -366,12 +635,24 @@ class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with Ticker
                   );
                   return false;
                 }
-                return ref.read(ledgerProvider.notifier).sendLoves(
-                  senderWallet: currentUserWalletId,
-                  recipientWallet: recipientWalletId,
-                  amount: amount,
-                  memo: memo,
-                );
+                try {
+                  final success = await ref.read(ledgerProvider.notifier).sendLoves(
+                    senderWallet: currentUserWalletId,
+                    recipientWallet: recipientWalletId,
+                    amount: amount,
+                    memo: memo,
+                  );
+                  if (success) {
+                    // Refresh the ledger after successful transaction
+                    _fetchInitialData();
+                  }
+                  return success;
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                  return false;
+                }
               },
             ),
           ),
@@ -464,7 +745,7 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
           _formAnimationController.reverse();
         });
       } else if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error sending loves.')));
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error sending loves.')));
       }
     } catch (e) {
       if (mounted) {
@@ -660,8 +941,228 @@ class MyApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: Colors.deepPurple.shade900,
       ),
-      home: const PublicLedgerPage(),
+      home: const AuthWrapper(),
     );
   }
 }
 
+// Auth wrapper to handle Firebase Authentication state
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: Colors.amber),
+            ),
+          );
+        }
+        
+        if (snapshot.hasData) {
+          return const PublicLedgerPage();
+        } else {
+          return const SignInPage();
+        }
+      },
+    );
+  }
+}
+
+// Simple sign-in page for demonstration
+class SignInPage extends StatefulWidget {
+  const SignInPage({Key? key}) : super(key: key);
+
+  @override
+  State<SignInPage> createState() => _SignInPageState();
+}
+
+class _SignInPageState extends State<SignInPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _signIn() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+    } on FirebaseAuthException catch (e) {
+      String message = 'Sign in failed';
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'No user found with this email';
+          break;
+        case 'wrong-password':
+          message = 'Incorrect password';
+          break;
+        case 'invalid-email':
+          message = 'Invalid email address';
+          break;
+        case 'user-disabled':
+          message = 'This account has been disabled';
+          break;
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.deepPurple.shade900,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.deepPurple.shade900,
+              Colors.deepPurple.shade700,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.favorite,
+                  size: 80,
+                  color: Colors.amber,
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Welcome to Ledger',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Sign in to continue',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 48),
+                TextField(
+                  controller: _emailController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Email',
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    prefixIcon: const Icon(Icons.email, color: Colors.white70),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _passwordController,
+                  style: const TextStyle(color: Colors.white),
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    prefixIcon: const Icon(Icons.lock, color: Colors.white70),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _signIn,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(
+                            color: Colors.black,
+                            strokeWidth: 2,
+                          )
+                        : const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    // Add sign up navigation or functionality here
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Sign up functionality coming soon!')),
+                    );
+                  },
+                  child: const Text(
+                    'Don\'t have an account? Sign up',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

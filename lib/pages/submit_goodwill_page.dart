@@ -1,47 +1,91 @@
 // lib/pages/submit_goodwill_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
+import 'dart:convert';
 
-// --- MOCK DATA MODELS AND PROVIDERS (Refactored to use Riverpod) ---
+// --- DATA MODELS ---
 
 class GoodwillAction {
+  final String? id;
   final String performerUserId;
   final String actionType;
   final String description;
   final int lovesValue;
   final Map<String, dynamic> contextualData;
+  final DateTime? createdAt;
+  final String? status;
 
   GoodwillAction({
+    this.id,
     required this.performerUserId,
     required this.actionType,
     required this.description,
     required this.lovesValue,
     required this.contextualData,
+    this.createdAt,
+    this.status,
   });
+
+  factory GoodwillAction.fromJson(Map<String, dynamic> json) {
+    return GoodwillAction(
+      id: json['id'],
+      performerUserId: json['performer_user_id'] ?? json['performerUserId'] ?? '',
+      actionType: json['action_type'] ?? json['actionType'] ?? '',
+      description: json['description'] ?? '',
+      lovesValue: (json['loves_value'] ?? json['lovesValue'] ?? 0).toInt(),
+      contextualData: Map<String, dynamic>.from(json['contextual_data'] ?? json['contextualData'] ?? {}),
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at']) 
+          : json['createdAt'] != null 
+              ? DateTime.parse(json['createdAt'])
+              : null,
+      status: json['status'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (id != null) 'id': id,
+      'performer_user_id': performerUserId,
+      'action_type': actionType,
+      'description': description,
+      'loves_value': lovesValue,
+      'contextual_data': contextualData,
+      if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+      if (status != null) 'status': status,
+    };
+  }
 }
 
 class GoodwillProcessingState {
   final bool isProcessingGoodwill;
   final String? error;
   final List<GoodwillAction> pendingSubmissions;
+  final List<GoodwillAction> recentSubmissions;
 
   GoodwillProcessingState({
     this.isProcessingGoodwill = false,
     this.error,
     this.pendingSubmissions = const [],
+    this.recentSubmissions = const [],
   });
 
   GoodwillProcessingState copyWith({
     bool? isProcessingGoodwill,
     String? error,
     List<GoodwillAction>? pendingSubmissions,
+    List<GoodwillAction>? recentSubmissions,
   }) {
     return GoodwillProcessingState(
       isProcessingGoodwill: isProcessingGoodwill ?? this.isProcessingGoodwill,
       error: error,
       pendingSubmissions: pendingSubmissions ?? this.pendingSubmissions,
+      recentSubmissions: recentSubmissions ?? this.recentSubmissions,
     );
   }
 }
@@ -53,6 +97,8 @@ class BackendStatus {
   final bool endocrineActive;
   final bool immuneActive;
   final List<String> recentEvents;
+  final int totalSubmissions;
+  final int pendingCount;
 
   BackendStatus({
     required this.nodeVersion,
@@ -61,12 +107,236 @@ class BackendStatus {
     required this.endocrineActive,
     required this.immuneActive,
     required this.recentEvents,
+    this.totalSubmissions = 0,
+    this.pendingCount = 0,
   });
+
+  factory BackendStatus.fromJson(Map<String, dynamic> json) {
+    return BackendStatus(
+      nodeVersion: json['node_version'] ?? json['nodeVersion'] ?? 'Unknown',
+      metabolicActive: json['metabolic_active'] ?? json['metabolicActive'] ?? false,
+      nervousActive: json['nervous_active'] ?? json['nervousActive'] ?? false,
+      endocrineActive: json['endocrine_active'] ?? json['endocrineActive'] ?? false,
+      immuneActive: json['immune_active'] ?? json['immuneActive'] ?? false,
+      recentEvents: List<String>.from(json['recent_events'] ?? json['recentEvents'] ?? []),
+      totalSubmissions: (json['total_submissions'] ?? json['totalSubmissions'] ?? 0).toInt(),
+      pendingCount: (json['pending_count'] ?? json['pendingCount'] ?? 0).toInt(),
+    );
+  }
 }
 
-// State Notifier to manage the goodwill submission process.
+// --- FLASK API SERVICE ---
+
+class FlaskGoodwillService {
+  final String baseUrl;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  FlaskGoodwillService({required this.baseUrl});
+
+  Future<String?> _getIdToken() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    return await user.getIdToken();
+  }
+
+  Future<Map<String, String>> _getHeaders() async {
+    final token = await _getIdToken();
+    final headers = {
+      'Content-Type': 'application/json',
+    };
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  Future<bool> submitGoodwill(GoodwillAction action) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/goodwill/submit'),
+        headers: headers,
+        body: json.encode(action.toJson()),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication failed. Please sign in again.');
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'Failed to submit goodwill action');
+      }
+    } catch (e) {
+      print('Error submitting goodwill: $e');
+      if (e is Exception) rethrow;
+      return false;
+    }
+  }
+
+  Future<List<GoodwillAction>> getUserSubmissions({
+    int limit = 10,
+    String? status, // 'pending', 'approved', 'rejected'
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'limit': limit.toString(),
+      };
+      
+      if (status != null) {
+        queryParams['status'] = status;
+      }
+
+      final uri = Uri.parse('$baseUrl/api/goodwill/user-submissions')
+          .replace(queryParameters: queryParams);
+
+      final headers = await _getHeaders();
+      final response = await http.get(uri, headers: headers);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> submissions = data['submissions'] ?? data['data'] ?? [];
+        
+        return submissions
+            .map((submission) => GoodwillAction.fromJson(submission))
+            .toList();
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication failed. Please sign in again.');
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'Failed to fetch submissions');
+      }
+    } catch (e) {
+      print('Error fetching user submissions: $e');
+      if (e is Exception) rethrow;
+      return [];
+    }
+  }
+
+  Future<BackendStatus> getBackendStatus() async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/status'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return BackendStatus.fromJson(data);
+      } else {
+        throw Exception('Failed to fetch backend status');
+      }
+    } catch (e) {
+      print('Error fetching backend status: $e');
+      throw e;
+    }
+  }
+
+  Future<Map<String, dynamic>> calculateLovesValue({
+    required String actionType,
+    required String description,
+    required String impactLevel,
+    required int durationMinutes,
+  }) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/goodwill/calculate-loves'),
+        headers: headers,
+        body: json.encode({
+          'action_type': actionType,
+          'description': description,
+          'impact_level': impactLevel,
+          'duration_minutes': durationMinutes,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        // Fallback to local calculation if endpoint doesn't exist
+        return _calculateLovesLocally(
+          description: description,
+          impactLevel: impactLevel,
+          durationMinutes: durationMinutes,
+        );
+      }
+    } catch (e) {
+      print('Error calculating loves value: $e');
+      // Fallback to local calculation
+      return _calculateLovesLocally(
+        description: description,
+        impactLevel: impactLevel,
+        durationMinutes: durationMinutes,
+      );
+    }
+  }
+
+  Map<String, dynamic> _calculateLovesLocally({
+    required String description,
+    required String impactLevel,
+    required int durationMinutes,
+  }) {
+    int baseFromDescription = (description.trim().length / 2).clamp(10, 50).toInt();
+    int durationScore = ((durationMinutes.clamp(0, 120) / 120) * 50).toInt();
+
+    final impactMultipliers = {
+      'Low': 0.8,
+      'Medium': 1.0,
+      'High': 1.2,
+    };
+    double impactMultiplier = impactMultipliers[impactLevel] ?? 1.0;
+
+    final calculatedLoves = ((baseFromDescription + durationScore) * impactMultiplier).clamp(1, 100).toInt();
+
+    return {
+      'loves_value': calculatedLoves,
+      'breakdown': {
+        'description_score': baseFromDescription,
+        'duration_score': durationScore,
+        'impact_multiplier': impactMultiplier,
+      },
+    };
+  }
+}
+
+// --- STATE MANAGEMENT ---
+
 class GoodwillProcessingNotifier extends StateNotifier<GoodwillProcessingState> {
-  GoodwillProcessingNotifier() : super(GoodwillProcessingState());
+  final FlaskGoodwillService _service;
+  Timer? _statusRefreshTimer;
+
+  GoodwillProcessingNotifier(this._service) : super(GoodwillProcessingState()) {
+    _refreshUserSubmissions();
+    _startPeriodicRefresh();
+  }
+
+  void _startPeriodicRefresh() {
+    _statusRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _refreshUserSubmissions();
+    });
+  }
+
+  @override
+  void dispose() {
+    _statusRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshUserSubmissions() async {
+    try {
+      final pending = await _service.getUserSubmissions(status: 'pending');
+      final recent = await _service.getUserSubmissions(limit: 5);
+      
+      state = state.copyWith(
+        pendingSubmissions: pending,
+        recentSubmissions: recent,
+      );
+    } catch (e) {
+      print('Error refreshing user submissions: $e');
+    }
+  }
 
   Future<bool> submitGoodwill({
     required String performerUserId,
@@ -76,79 +346,151 @@ class GoodwillProcessingNotifier extends StateNotifier<GoodwillProcessingState> 
     required Map<String, dynamic> contextualData,
   }) async {
     state = state.copyWith(isProcessingGoodwill: true, error: null);
+    
     final newSubmission = GoodwillAction(
       performerUserId: performerUserId,
       actionType: actionType,
       description: description,
       lovesValue: lovesValue,
       contextualData: contextualData,
+      status: 'pending',
     );
+
+    // Optimistically add to pending list
     state = state.copyWith(
       pendingSubmissions: [...state.pendingSubmissions, newSubmission],
     );
 
     try {
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
-      // On success, we would remove the item from the pending list and update the user's data.
-      final updatedPendingList = List<GoodwillAction>.from(state.pendingSubmissions);
-      updatedPendingList.remove(newSubmission);
-      state = state.copyWith(
-        isProcessingGoodwill: false,
-        pendingSubmissions: updatedPendingList,
-      );
-      return true;
+      final success = await _service.submitGoodwill(newSubmission);
+      
+      if (success) {
+        // Refresh the actual data from server
+        await _refreshUserSubmissions();
+        state = state.copyWith(isProcessingGoodwill: false);
+        return true;
+      } else {
+        // Remove from pending list if failed
+        final updatedPending = List<GoodwillAction>.from(state.pendingSubmissions);
+        updatedPending.remove(newSubmission);
+        state = state.copyWith(
+          isProcessingGoodwill: false,
+          pendingSubmissions: updatedPending,
+          error: 'Failed to submit goodwill action',
+        );
+        return false;
+      }
     } catch (e) {
+      // Remove from pending list if failed
+      final updatedPending = List<GoodwillAction>.from(state.pendingSubmissions);
+      updatedPending.remove(newSubmission);
       state = state.copyWith(
         isProcessingGoodwill: false,
-        error: 'Failed to submit goodwill: $e',
+        pendingSubmissions: updatedPending,
+        error: e.toString(),
       );
       return false;
     }
   }
-}
 
-// State Notifier to manage the backend status.
-class BackendStatusNotifier extends StateNotifier<BackendStatus?> {
-  BackendStatusNotifier() : super(null) {
-    _fetchStatus();
-  }
-
-  Future<void> _fetchStatus() async {
+  Future<Map<String, dynamic>> calculateLovesValue({
+    required String actionType,
+    required String description,
+    required String impactLevel,
+    required int durationMinutes,
+  }) async {
     try {
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
-      state = BackendStatus(
-        nodeVersion: '1.2.3-alpha',
-        metabolicActive: true,
-        nervousActive: true,
-        endocrineActive: Random().nextBool(),
-        immuneActive: true,
-        recentEvents: const [
-          'Metabolic system processed new batch.',
-          'New goodwill act received.',
-          'Endocrine system experiencing minor latency.',
-        ],
+      return await _service.calculateLovesValue(
+        actionType: actionType,
+        description: description,
+        impactLevel: impactLevel,
+        durationMinutes: durationMinutes,
       );
     } catch (e) {
-      // In a real app, handle errors gracefully.
-      state = null;
+      print('Error calculating loves value: $e');
+      return _service._calculateLovesLocally(
+        description: description,
+        impactLevel: impactLevel,
+        durationMinutes: durationMinutes,
+      );
     }
   }
 }
 
-// MOCK User Provider for demonstration
-class User {
-  final String id;
-  User({required this.id});
-}
-final userProvider = Provider<User?>((ref) => User(id: 'user123'));
+class BackendStatusNotifier extends StateNotifier<BackendStatus?> {
+  final FlaskGoodwillService _service;
+  Timer? _refreshTimer;
 
-// Riverpod providers
+  BackendStatusNotifier(this._service) : super(null) {
+    _fetchStatus();
+    _startPeriodicRefresh();
+  }
+
+  void _startPeriodicRefresh() {
+    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      _fetchStatus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchStatus() async {
+    try {
+      final status = await _service.getBackendStatus();
+      state = status;
+    } catch (e) {
+      print('Error fetching backend status: $e');
+      // Keep the previous state if fetch fails
+    }
+  }
+}
+
+// User provider using Firebase Auth
+class UserNotifier extends StateNotifier<User?> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  StreamSubscription<User?>? _authSubscription;
+
+  UserNotifier() : super(null) {
+    _authSubscription = _auth.authStateChanges().listen((user) {
+      state = user;
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+}
+
+// --- RIVERPOD PROVIDERS ---
+
+// Use the same Flask base URL as the ledger page
+final flaskBaseUrlProvider = Provider<String>((ref) {
+  return 'http://your-flask-backend-url.com'; // Replace with your actual URL
+});
+
+final flaskGoodwillServiceProvider = Provider<FlaskGoodwillService>((ref) {
+  final baseUrl = ref.watch(flaskBaseUrlProvider);
+  return FlaskGoodwillService(baseUrl: baseUrl);
+});
+
+final userProvider = StateNotifierProvider<UserNotifier, User?>((ref) {
+  return UserNotifier();
+});
+
 final goodwillProcessingProvider = StateNotifierProvider<GoodwillProcessingNotifier, GoodwillProcessingState>((ref) {
-  return GoodwillProcessingNotifier();
+  final service = ref.watch(flaskGoodwillServiceProvider);
+  return GoodwillProcessingNotifier(service);
 });
 
 final backendStatusProvider = StateNotifierProvider<BackendStatusNotifier, BackendStatus?>((ref) {
-  return BackendStatusNotifier();
+  final service = ref.watch(flaskGoodwillServiceProvider);
+  return BackendStatusNotifier(service);
 });
 
 // --- WIDGETS ---
@@ -181,6 +523,7 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
 
   int _lovesValue = 25;
   int _durationMinutes = 0;
+  bool _isCalculatingLoves = false;
 
   late final TabController _tabController;
   OverlayEntry? _celebrationOverlay;
@@ -198,22 +541,33 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
     super.dispose();
   }
 
-  void _updateLovesScore() {
-    int baseFromDescription = (_description.trim().length / 2).clamp(10, 50).toInt();
-    int durationScore = ((_durationMinutes.clamp(0, 120) / 120) * 50).toInt();
-
-    final impactMultipliers = {
-      'Low': 0.8,
-      'Medium': 1.0,
-      'High': 1.2,
-    };
-    double impactMultiplier = impactMultipliers[_impactLevel] ?? 1.0;
-
-    final calculatedLoves = ((baseFromDescription + durationScore) * impactMultiplier).clamp(1, 100).toInt();
-
-    setState(() {
-      _lovesValue = calculatedLoves;
-    });
+  Future<void> _updateLovesScore() async {
+    if (_actionType.isEmpty || _description.trim().isEmpty) return;
+    
+    setState(() => _isCalculatingLoves = true);
+    
+    try {
+      final result = await ref.read(goodwillProcessingProvider.notifier).calculateLovesValue(
+        actionType: _actionType,
+        description: _description,
+        impactLevel: _impactLevel,
+        durationMinutes: _durationMinutes,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _lovesValue = result['loves_value'] ?? 25;
+          _isCalculatingLoves = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCalculatingLoves = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error calculating loves: $e')),
+        );
+      }
+    }
   }
 
   void _showSuccessOverlay() {
@@ -225,8 +579,7 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
 
     Overlay.of(context).insert(_celebrationOverlay!);
 
-    // Schedule the removal of the overlay after the animation completes
-    Future.delayed(const Duration(seconds: 4 * 3), () { // 4 seconds per effect, 3 effects
+    Future.delayed(const Duration(seconds: 12), () { // 4 seconds per effect, 3 effects
       _celebrationOverlay?.remove();
       _celebrationOverlay = null;
       if (mounted) {
@@ -270,20 +623,21 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
     if (currentUser == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Error: User not found."), backgroundColor: Colors.redAccent),
+          const SnackBar(content: Text("Error: Please sign in to submit."), backgroundColor: Colors.redAccent),
         );
       }
       return;
     }
 
     final success = await ref.read(goodwillProcessingProvider.notifier).submitGoodwill(
-      performerUserId: currentUser.id,
+      performerUserId: currentUser.uid,
       actionType: _actionType,
       description: _description.trim(),
       lovesValue: _lovesValue,
       contextualData: {
         'duration_minutes': _durationMinutes,
         'impact_level': _impactLevel,
+        'submitted_at': DateTime.now().toIso8601String(),
       },
     );
 
@@ -320,6 +674,8 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
   }
 
   Widget _buildControls(BuildContext context, ControlsDetails details) {
+    final goodwillState = ref.watch(goodwillProcessingProvider);
+    
     return Padding(
       padding: const EdgeInsets.only(top: 24.0),
       child: Row(
@@ -327,15 +683,31 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
         children: [
           if (_currentStep > 0)
             TextButton.icon(
-              onPressed: details.onStepCancel,
+              onPressed: goodwillState.isProcessingGoodwill ? null : details.onStepCancel,
               icon: const Icon(Icons.arrow_back, color: Colors.white70),
               label: const Text('Back', style: TextStyle(color: Colors.white70)),
             ),
           const Spacer(),
           ElevatedButton.icon(
-            onPressed: details.onStepContinue,
-            icon: Icon(_currentStep == 4 ? Icons.check_circle_outline : Icons.arrow_forward),
-            label: Text(_currentStep == 4 ? 'Submit' : 'Next'),
+            onPressed: goodwillState.isProcessingGoodwill || _isCalculatingLoves 
+                ? null 
+                : details.onStepContinue,
+            icon: goodwillState.isProcessingGoodwill || _isCalculatingLoves
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                  )
+                : Icon(_currentStep == 4 ? Icons.check_circle_outline : Icons.arrow_forward),
+            label: Text(
+              goodwillState.isProcessingGoodwill 
+                  ? 'Submitting...'
+                  : _isCalculatingLoves
+                      ? 'Calculating...'
+                      : _currentStep == 4 
+                          ? 'Submit' 
+                          : 'Next'
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.amber[800],
               foregroundColor: Colors.black,
@@ -411,13 +783,29 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
         initialValue: _description,
         maxLines: 5,
         decoration: const InputDecoration(
-          hintText: 'Describe your act of goodwill...',
+          hintText: 'Describe your act of goodwill in detail...',
           filled: true,
           fillColor: Colors.white12,
           border: OutlineInputBorder(),
+          helperText: 'Be specific about what you did, who it helped, and the impact it had.',
         ),
-        validator: (val) => val == null || val.trim().isEmpty ? 'Description cannot be empty' : null,
+        validator: (val) {
+          if (val == null || val.trim().isEmpty) {
+            return 'Description cannot be empty';
+          }
+          if (val.trim().length < 10) {
+            return 'Please provide a more detailed description (at least 10 characters)';
+          }
+          return null;
+        },
         onSaved: (val) => _description = val ?? '',
+        onChanged: (val) {
+          _description = val;
+          // Auto-calculate loves when description changes
+          if (val.length > 10 && _actionType.isNotEmpty) {
+            _updateLovesScore();
+          }
+        },
       ),
     );
   }
@@ -425,7 +813,19 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
   Widget _buildStep3LovesSlider() {
     return Column(
       children: [
-        Text('Assign a Loves Value: $_lovesValue', style: const TextStyle(color: Colors.white)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Loves Value: $_lovesValue', style: const TextStyle(color: Colors.white, fontSize: 16)),
+            if (_isCalculatingLoves)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
         Slider(
           min: 1,
           max: 100,
@@ -434,6 +834,12 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
           onChanged: (val) => setState(() => _lovesValue = val.toInt()),
           activeColor: Colors.amber,
           inactiveColor: Colors.amber[200],
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'This value will be automatically calculated based on your description, but you can adjust it if needed.',
+          style: TextStyle(color: Colors.white70, fontSize: 12),
+          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -449,11 +855,15 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
             labelText: 'Impact Level',
             filled: true,
             fillColor: Colors.white12,
+            helperText: 'How significant was the impact of your action?',
           ),
           items: ['Low', 'Medium', 'High']
               .map((level) => DropdownMenuItem(value: level, child: Text(level)))
               .toList(),
-          onChanged: (val) => setState(() => _impactLevel = val ?? 'Medium'),
+          onChanged: (val) {
+            setState(() => _impactLevel = val ?? 'Medium');
+            _updateLovesScore();
+          },
         ),
         const SizedBox(height: 12),
         TextFormField(
@@ -462,10 +872,14 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
             labelText: 'Duration (minutes)',
             filled: true,
             fillColor: Colors.white12,
+            helperText: 'How long did this action take?',
           ),
           onChanged: (val) {
             final parsed = int.tryParse(val);
-            if (parsed != null) setState(() => _durationMinutes = parsed);
+            if (parsed != null) {
+              setState(() => _durationMinutes = parsed);
+              _updateLovesScore();
+            }
           },
           validator: (val) {
             if (val == null || val.isEmpty) return 'Duration required';
@@ -482,35 +896,105 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Type: $_actionType', style: const TextStyle(color: Colors.white)),
-        const SizedBox(height: 8),
-        Text('Description:', style: const TextStyle(color: Colors.white70)),
-        Text(_description, style: const TextStyle(color: Colors.white)),
-        const SizedBox(height: 8),
-        Text('Loves Value: $_lovesValue', style: const TextStyle(color: Colors.white)),
-        const SizedBox(height: 8),
-        Text('Impact Level: $_impactLevel', style: const TextStyle(color: Colors.white)),
-        const SizedBox(height: 8),
-        Text('Duration: $_durationMinutes minutes', style: const TextStyle(color: Colors.white)),
+        Card(
+          color: Colors.grey[800],
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(_actTypes[_actionType], color: Colors.amber),
+                    const SizedBox(width: 8),
+                    Text('Type: $_actionType', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('Description:', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(_description, style: const TextStyle(color: Colors.white)),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Loves Value: $_lovesValue', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                        Text('Impact Level: $_impactLevel', style: const TextStyle(color: Colors.white70)),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('Duration: $_durationMinutes min', style: const TextStyle(color: Colors.white70)),
+                        Text('Status: Pending Review', style: TextStyle(color: Colors.orange[300])),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'By submitting this goodwill action, you confirm that the information provided is accurate and that this action was genuinely performed.',
+          style: TextStyle(color: Colors.white60, fontSize: 12),
+        ),
       ],
     );
   }
 
-  // --- New backend status tab ---
-
   @override
   Widget build(BuildContext context) {
     final goodwillState = ref.watch(goodwillProcessingProvider);
+    final user = ref.watch(userProvider);
+
+    // Show sign-in message if user is not authenticated
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Submit Bright Act'),
+          backgroundColor: Colors.amber[800],
+        ),
+        backgroundColor: Colors.grey[900],
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person_outline, size: 64, color: Colors.white54),
+              SizedBox(height: 16),
+              Text(
+                'Please sign in to submit goodwill actions',
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Submit Bright Act'),
         backgroundColor: Colors.amber[800],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              ref.read(goodwillProcessingProvider.notifier)._refreshUserSubmissions();
+              ref.read(backendStatusProvider.notifier)._fetchStatus();
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
             Tab(icon: Icon(Icons.add_circle_outline), text: 'Submit Act'),
-            Tab(icon: Icon(Icons.cloud_queue), text: 'Submission Status'),
+            Tab(icon: Icon(Icons.cloud_queue), text: 'Status & History'),
           ],
         ),
       ),
@@ -529,7 +1013,7 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
             physics: const ClampingScrollPhysics(),
           ),
 
-          // Submission Status Tab
+          // Status & History Tab
           const _BackendStatusTab(),
         ],
       ),
@@ -544,7 +1028,7 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
   }
 }
 
-/// Widget to display backend status & pending submissions nicely
+/// Widget to display backend status & user submissions
 class _BackendStatusTab extends ConsumerWidget {
   const _BackendStatusTab();
 
@@ -553,66 +1037,177 @@ class _BackendStatusTab extends ConsumerWidget {
     final backendStatus = ref.watch(backendStatusProvider);
     final goodwillState = ref.watch(goodwillProcessingProvider);
 
-    if (backendStatus == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Node Version: ${backendStatus.nodeVersion}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            children: [
-              _statusChip('Metabolic System', backendStatus.metabolicActive),
-              _statusChip('Nervous System', backendStatus.nervousActive),
-              _statusChip('Endocrine System', backendStatus.endocrineActive),
-              _statusChip('Immune System', backendStatus.immuneActive),
-            ],
-          ),
-          const Divider(height: 32, color: Colors.white24),
-          const Text('Recent Events:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
-          Expanded(
-            child: ListView.builder(
-              itemCount: backendStatus.recentEvents.length,
-              itemBuilder: (context, index) {
-                final event = backendStatus.recentEvents[index];
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.bolt, color: Colors.amberAccent),
-                  title: Text(event, style: const TextStyle(color: Colors.white70)),
-                );
-              },
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Future.wait([
+          ref.read(backendStatusProvider.notifier)._fetchStatus(),
+          ref.read(goodwillProcessingProvider.notifier)._refreshUserSubmissions(),
+        ]);
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Backend Status Card
+            Card(
+              color: Colors.grey[800],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.cloud, color: Colors.amber),
+                        SizedBox(width: 8),
+                        Text('Backend Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.amber)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (backendStatus == null)
+                      const Center(child: CircularProgressIndicator(color: Colors.amber))
+                    else ...[
+                      Text('Node Version: ${backendStatus.nodeVersion}', 
+                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                      const SizedBox(height: 8),
+                      Text('Total Submissions: ${backendStatus.totalSubmissions}', 
+                           style: const TextStyle(color: Colors.white70)),
+                      Text('Pending Review: ${backendStatus.pendingCount}', 
+                           style: const TextStyle(color: Colors.orange)),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _statusChip('Metabolic System', backendStatus.metabolicActive),
+                          _statusChip('Nervous System', backendStatus.nervousActive),
+                          _statusChip('Endocrine System', backendStatus.endocrineActive),
+                          _statusChip('Immune System', backendStatus.immuneActive),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          ),
-          const Divider(height: 32, color: Colors.white24),
-          const Text('Pending Goodwill Submissions:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
-          Expanded(
-            child: _PendingSubmissionsList(pending: goodwillState.pendingSubmissions),
-          ),
-        ],
+            
+            const SizedBox(height: 16),
+
+            // Recent Events Card
+            if (backendStatus != null && backendStatus.recentEvents.isNotEmpty) ...[
+              Card(
+                color: Colors.grey[800],
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.history, color: Colors.amber),
+                          SizedBox(width: 8),
+                          Text('Recent Events', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ...backendStatus.recentEvents.take(5).map((event) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.bolt, color: Colors.amberAccent, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(event, style: const TextStyle(color: Colors.white70)),
+                            ),
+                          ],
+                        ),
+                      )),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Pending Submissions Card
+            Card(
+              color: Colors.grey[800],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.hourglass_empty, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        const Text('Pending Submissions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
+                        const Spacer(),
+                        Text('${goodwillState.pendingSubmissions.length}', 
+                             style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (goodwillState.pendingSubmissions.isEmpty)
+                      const Text('No pending submissions.', style: TextStyle(color: Colors.white70))
+                    else
+                      _PendingSubmissionsList(pending: goodwillState.pendingSubmissions),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Recent Submissions Card
+            Card(
+              color: Colors.grey[800],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.history, color: Colors.green),
+                        SizedBox(width: 8),
+                        Text('Recent Submissions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (goodwillState.recentSubmissions.isEmpty)
+                      const Text('No recent submissions.', style: TextStyle(color: Colors.white70))
+                    else
+                      _RecentSubmissionsList(recent: goodwillState.recentSubmissions),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _statusChip(String label, bool active) {
     return Chip(
-      label: Text(label),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
       avatar: Icon(
         active ? Icons.check_circle : Icons.cancel,
         color: active ? Colors.greenAccent : Colors.redAccent,
+        size: 16,
       ),
-      backgroundColor: Colors.grey[800],
+      backgroundColor: Colors.grey[700],
       labelStyle: const TextStyle(color: Colors.white),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
 }
 
-/// A simple list widget showing pending goodwill submissions
+/// Widget showing pending goodwill submissions
 class _PendingSubmissionsList extends StatelessWidget {
   final List<GoodwillAction> pending;
 
@@ -620,23 +1215,123 @@ class _PendingSubmissionsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (pending.isEmpty) {
-      return const Center(child: Text('No pending submissions.', style: TextStyle(color: Colors.white70)));
-    }
-
-    return ListView.separated(
-      itemCount: pending.length,
-      separatorBuilder: (_, __) => const Divider(color: Colors.white24),
-      itemBuilder: (context, index) {
-        final submission = pending[index];
-        return ListTile(
-          leading: const Icon(Icons.hourglass_empty, color: Colors.amber),
-          title: Text(submission.actionType, style: const TextStyle(color: Colors.amber)),
-          subtitle: Text(submission.description, maxLines: 2, overflow: Text.ellipsis, style: const TextStyle(color: Colors.white70)),
-          trailing: const Text('Pending', style: TextStyle(color: Colors.amberAccent)),
-        );
-      },
+    return Column(
+      children: pending.map((submission) => Card(
+        color: Colors.grey[700],
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: ListTile(
+          dense: true,
+          leading: CircleAvatar(
+            backgroundColor: Colors.orange.withOpacity(0.2),
+            child: const Icon(Icons.hourglass_empty, color: Colors.orange, size: 16),
+          ),
+          title: Text(submission.actionType, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                submission.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Text('${submission.lovesValue} ❤️', style: const TextStyle(color: Colors.red, fontSize: 12)),
+                  const SizedBox(width: 8),
+                  Text('${submission.contextualData['duration_minutes'] ?? 0} min', 
+                       style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+          trailing: const Text('Pending', style: TextStyle(color: Colors.orange, fontSize: 12)),
+        ),
+      )).toList(),
     );
+  }
+}
+
+/// Widget showing recent goodwill submissions
+class _RecentSubmissionsList extends StatelessWidget {
+  final List<GoodwillAction> recent;
+
+  const _RecentSubmissionsList({required this.recent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: recent.map((submission) {
+        final status = submission.status ?? 'unknown';
+        final statusColor = status == 'approved' 
+            ? Colors.green 
+            : status == 'rejected' 
+                ? Colors.red 
+                : Colors.orange;
+        
+        return Card(
+          color: Colors.grey[700],
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: ListTile(
+            dense: true,
+            leading: CircleAvatar(
+              backgroundColor: statusColor.withOpacity(0.2),
+              child: Icon(
+                status == 'approved' 
+                    ? Icons.check_circle 
+                    : status == 'rejected' 
+                        ? Icons.cancel 
+                        : Icons.hourglass_empty,
+                color: statusColor,
+                size: 16,
+              ),
+            ),
+            title: Text(submission.actionType, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  submission.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text('${submission.lovesValue} ❤️', style: const TextStyle(color: Colors.red, fontSize: 12)),
+                    const SizedBox(width: 8),
+                    if (submission.createdAt != null)
+                      Text(
+                        _formatDate(submission.createdAt!),
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            trailing: Text(
+              status.toUpperCase(),
+              style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inMinutes}m ago';
+    }
   }
 }
 
@@ -928,4 +1623,3 @@ class SparklesPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant SparklesPainter oldDelegate) => oldDelegate.progress != progress;
 }
-

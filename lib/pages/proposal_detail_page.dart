@@ -6,51 +6,24 @@ import 'package:shimmer/shimmer.dart';
 import 'dart:ui';
 import 'dart:async';
 
-// --- MOCK DATA MODELS AND PROVIDERS (Refactored to use Riverpod) ---
+// Import the actual service and model files
+import 'package:goodwill/service/proposal_service.dart';
+import 'package:goodwill/models/proposal.dart';
+import 'package:goodwill/models/vote.dart';
 
-enum ProposalStatus { active, closed, rejected, draft, unknown }
+// --- DATA MODELS AND PROVIDERS ---
 
-class Proposal {
-  final String id;
-  final String title;
-  final String description;
-  final ProposalStatus status;
-  final DateTime? voteEndTime;
-  final int forVotes;
-  final int againstVotes;
-  final bool userHasVoted;
-
-  Proposal({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.status,
-    this.voteEndTime,
-    this.forVotes = 0,
-    this.againstVotes = 0,
-    this.userHasVoted = false,
-  });
-
-  Proposal copyWith({
-    String? id,
-    String? title,
-    String? description,
-    ProposalStatus? status,
-    DateTime? voteEndTime,
-    int? forVotes,
-    int? againstVotes,
-    bool? userHasVoted,
-  }) {
-    return Proposal(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      status: status ?? this.status,
-      voteEndTime: voteEndTime ?? this.voteEndTime,
-      forVotes: forVotes ?? this.forVotes,
-      againstVotes: againstVotes ?? this.againstVotes,
-      userHasVoted: userHasVoted ?? this.userHasVoted,
-    );
+// User model - should be replaced with your actual user model
+class User {
+  final String uid;
+  final String? walletId;
+  
+  User({required this.uid, this.walletId});
+  
+  // This should be implemented in your actual authentication system
+  Future<String?> getIdToken() async {
+    // TODO: Implement actual ID token retrieval
+    throw UnimplementedError('ID token retrieval not implemented');
   }
 }
 
@@ -78,23 +51,14 @@ class ProposalDetailState {
 
 // StateNotifier for proposal-related business logic.
 class ProposalNotifier extends StateNotifier<ProposalDetailState> {
-  ProposalNotifier() : super(ProposalDetailState());
+  final ProposalService _service;
+  ProposalNotifier(this._service) : super(ProposalDetailState());
 
   Future<void> fetchProposalDetails(String proposalId, {required String idToken}) async {
     state = ProposalDetailState(isLoading: true);
-    await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
     try {
-      final mockProposal = Proposal(
-        id: proposalId,
-        title: 'Launch a community recycling program.',
-        description: 'This proposal aims to allocate community funds to a new recycling initiative. It will cover the cost of bins, collection services, and public education. The goal is to reduce waste by 20% over the next year.',
-        status: ProposalStatus.active,
-        voteEndTime: DateTime.now().add(const Duration(days: 7)),
-        forVotes: 620,
-        againstVotes: 210,
-        userHasVoted: false, // Initial state, assumes user hasn't voted
-      );
-      state = ProposalDetailState(proposal: mockProposal);
+      final fetchedProposal = await _service.fetchProposalDetails(proposalId, idToken: idToken);
+      state = ProposalDetailState(proposal: fetchedProposal);
     } catch (e) {
       state = ProposalDetailState(error: 'Failed to fetch proposal details.');
     }
@@ -104,22 +68,26 @@ class ProposalNotifier extends StateNotifier<ProposalDetailState> {
     if (state.proposal == null) return false;
 
     state = ProposalDetailState(proposal: state.proposal, isSubmittingVote: true);
-
-    await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
     
     try {
-      // Simulate successful vote
-      final newForVotes = vote.voteValue == 'FOR' ? state.proposal!.forVotes + 1 : state.proposal!.forVotes;
-      final newAgainstVotes = vote.voteValue == 'AGAINST' ? state.proposal!.againstVotes + 1 : state.proposal!.againstVotes;
+      final success = await _service.submitVote(vote: vote, idToken: idToken);
+      if (success) {
+        // If the vote was successful, update the local state to reflect the change
+        // This is a simple optimistic update. A more robust solution might refetch the data.
+        final newForVotes = vote.voteValue == 'FOR' ? state.proposal!.forVotes + 1 : state.proposal!.forVotes;
+        final newAgainstVotes = vote.voteValue == 'AGAINST' ? state.proposal!.againstVotes + 1 : state.proposal!.againstVotes;
 
-      state = ProposalDetailState(
-        proposal: state.proposal!.copyWith(
-          forVotes: newForVotes,
-          againstVotes: newAgainstVotes,
-          userHasVoted: true,
-        ),
-      );
-      return true;
+        state = ProposalDetailState(
+          proposal: state.proposal!.copyWith(
+            forVotes: newForVotes,
+            againstVotes: newAgainstVotes,
+            userHasVoted: true,
+          ),
+        );
+      } else {
+        state = ProposalDetailState(proposal: state.proposal, error: 'Failed to submit vote.');
+      }
+      return success;
     } catch (e) {
       state = ProposalDetailState(proposal: state.proposal, error: 'Failed to submit vote.');
       return false;
@@ -129,16 +97,20 @@ class ProposalNotifier extends StateNotifier<ProposalDetailState> {
 
 // Use a family provider to manage a separate state for each proposal page.
 final proposalDetailProvider = StateNotifierProvider.family<ProposalNotifier, ProposalDetailState, String>((ref, proposalId) {
-  return ProposalNotifier();
+  final service = ref.watch(proposalServiceProvider);
+  return ProposalNotifier(service);
 });
 
-// MOCK AUTH PROVIDER (to simulate user and idToken)
-class MockUser {
-  final String uid = 'user123';
-  Future<String> getIdToken() async => 'mock-id-token';
-}
+final proposalServiceProvider = Provider<ProposalService>((ref) {
+  return ProposalService();
+});
 
-final authProvider = Provider<MockUser?>((ref) => MockUser());
+// TODO: Replace this with your actual authentication provider
+final authProvider = Provider<User?>((ref) {
+  // This should be replaced with your actual authentication provider
+  // For example: return ref.watch(firebaseAuthProvider).currentUser;
+  return null; // Return null when no user is authenticated
+});
 
 // --- APP-WIDE WIDGETS ---
 
@@ -166,13 +138,38 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
   Future<void> _fetchProposalData() async {
     final user = ref.read(authProvider);
     if (user != null) {
-      final idToken = await user.getIdToken();
-      await ref.read(proposalDetailProvider(widget.proposalId).notifier).fetchProposalDetails(
-        widget.proposalId,
-        idToken: idToken,
-      );
+      try {
+        final idToken = await user.getIdToken();
+        if (idToken != null) {
+          await ref.read(proposalDetailProvider(widget.proposalId).notifier).fetchProposalDetails(
+            widget.proposalId,
+            idToken: idToken,
+          );
+          if (mounted) {
+            _animationController.forward();
+          }
+        } else {
+          // Handle case where user exists but can't get ID token
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Authentication error. Please sign in again.')),
+            );
+          }
+        }
+      } catch (e) {
+        // Handle authentication errors
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Authentication error. Please sign in again.')),
+          );
+        }
+      }
+    } else {
+      // Handle case where no user is authenticated
       if (mounted) {
-        _animationController.forward();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to view proposal details.')),
+        );
       }
     }
   }
@@ -186,53 +183,66 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
   void _onVotePressed(String voteValue) async {
     final state = ref.read(proposalDetailProvider(widget.proposalId));
     final user = ref.read(authProvider);
-    final idToken = await user?.getIdToken();
 
-    if (state.proposal == null || user?.uid == null || idToken == null) {
+    if (state.proposal == null || user?.uid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error: User not authenticated or proposal not loaded.'), backgroundColor: Colors.redAccent),
       );
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (ctx) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: AlertDialog(
-          backgroundColor: Colors.grey[900]?.withOpacity(0.9),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Confirm Your Vote'),
-          content: const Text('This action costs 50 Loves and cannot be undone. Are you sure?'),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(ctx).pop(),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.amber[800]),
-              child: const Text('Confirm & Vote', style: TextStyle(color: Colors.black)),
-              onPressed: () async {
-                Navigator.of(ctx).pop();
-                final vote = VoteToSend(
-                  proposalId: state.proposal!.id,
-                  voterUserId: user!.uid,
-                  voteValue: voteValue,
-                );
-                final success = await ref.read(proposalDetailProvider(widget.proposalId).notifier).submitVote(vote: vote, idToken: idToken);
-                if (success && mounted) {
-                  _showVoteSuccessDialog();
-                } else if (mounted) {
-                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to cast vote.'), backgroundColor: Colors.redAccent),
-                   );
-                }
-              },
-            ),
-          ],
+    try {
+      final idToken = await user!.getIdToken();
+      if (idToken == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Authentication error. Please sign in again.'), backgroundColor: Colors.redAccent),
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        builder: (ctx) => BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            backgroundColor: Colors.grey[900]?.withOpacity(0.9),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Confirm Your Vote'),
+            content: const Text('This action costs 50 Loves and cannot be undone. Are you sure?'),
+            actions: [
+              TextButton(
+                child: const Text('Cancel'),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.amber[800]),
+                child: const Text('Confirm & Vote', style: TextStyle(color: Colors.black)),
+                onPressed: () async {
+                  Navigator.of(ctx).pop();
+                  final vote = VoteToSend(
+                    proposalId: state.proposal!.id,
+                    voterUserId: user.uid,
+                    voteValue: voteValue,
+                  );
+                  final success = await ref.read(proposalDetailProvider(widget.proposalId).notifier).submitVote(vote: vote, idToken: idToken);
+                  if (success && mounted) {
+                    _showVoteSuccessDialog();
+                  } else if (mounted) {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to cast vote.'), backgroundColor: Colors.redAccent),
+                     );
+                  }
+                },
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Authentication error. Please try again.'), backgroundColor: Colors.redAccent),
+      );
+    }
   }
 
   void _showVoteSuccessDialog() {
@@ -245,8 +255,39 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
 
   @override
   Widget build(BuildContext context) {
-    // Watch the provider to get the current state
     final proposalState = ref.watch(proposalDetailProvider(widget.proposalId));
+    final user = ref.watch(authProvider);
+
+    // Show authentication prompt if user is not signed in
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text('Proposal Details'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lock_outline, size: 64, color: Colors.white54),
+              const SizedBox(height: 16),
+              const Text(
+                'Sign in required',
+                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Please sign in to view proposal details.',
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -300,7 +341,7 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
               if (proposal.status == ProposalStatus.active)
                 _buildVotingSection(proposal)
               else
-                Center(child: Text('Voting has ended for this proposal.', style: const TextStyle(color: Colors.white70, fontSize: 16, fontStyle: FontStyle.italic))),
+                const Center(child: Text('Voting has ended for this proposal.', style: TextStyle(color: Colors.white70, fontSize: 16, fontStyle: FontStyle.italic))),
             ]),
           ),
         ),
@@ -336,7 +377,7 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: canVote ? () => _onVotePressed('AGAINST') : null,
-            icon: state.isSubmittingVote ? const SizedBox(height: 20, width: 20) : const Icon(Icons.thumb_down_alt_rounded), // Use a placeholder to keep alignment
+            icon: state.isSubmittingVote ? const SizedBox(height: 20, width: 20) : const Icon(Icons.thumb_down_alt_rounded),
             label: Text(state.isSubmittingVote ? 'Submitting...' : 'Vote AGAINST'),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: Colors.red.shade400, width: 2),
@@ -405,7 +446,7 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
       child: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          SizedBox(height: kToolbarHeight),
+          const SizedBox(height: kToolbarHeight),
           Container(height: 80, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16))),
           const SizedBox(height: 16),
           Container(height: 200, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16))),
@@ -455,7 +496,7 @@ class _VoteSuccessDialogState extends State<_VoteSuccessDialog> with SingleTicke
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.how_to_vote_rounded, color: Colors.greenAccent, size: 70),
+            const Icon(Icons.how_to_vote_rounded, color: Colors.greenAccent, size: 70),
             const SizedBox(height: 20),
             const Text(
               'Vote Cast!',
@@ -474,8 +515,6 @@ class _VoteSuccessDialogState extends State<_VoteSuccessDialog> with SingleTicke
   }
 }
 
-// --- MOCK WIDGETS FROM ORIGINAL CODE ---
-
 class VotingResultsBar extends StatelessWidget {
   final int forVotes;
   final int againstVotes;
@@ -493,8 +532,8 @@ class VotingResultsBar extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('For: ${forVotes}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-            Text('Against: ${againstVotes}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            Text('For: $forVotes', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            Text('Against: $againstVotes', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 8),
@@ -519,35 +558,3 @@ class VotingResultsBar extends StatelessWidget {
     );
   }
 }
-
-// --- MAIN APP ENTRY POINT ---
-
-void main() {
-  runApp(const ProviderScope(child: MyApp()));
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Proposal App',
-      themeMode: ThemeMode.dark,
-      darkTheme: ThemeData.dark().copyWith(
-        colorScheme: ColorScheme.fromSwatch(
-          primarySwatch: Colors.deepPurple,
-          accentColor: Colors.amber,
-          backgroundColor: Colors.deepPurple.shade900,
-          brightness: Brightness.dark,
-        ).copyWith(
-          secondary: Colors.amber.shade400,
-        ),
-        scaffoldBackgroundColor: Colors.deepPurple.shade900,
-      ),
-      home: const ProposalDetailPage(proposalId: 'prop_123'),
-    );
-  }
-}
-
