@@ -8,11 +8,17 @@ import 'package:flutter/material.dart';
 class DynamicNebulaBackground extends StatefulWidget {
   final double speed;
   final double blurSigma;
+  final bool enableAdaptivePerformance;
+  final double organicNoiseAmount;
+  final double pulsationAmount;
 
   const DynamicNebulaBackground({
     super.key,
     this.speed = 0.2,
-    this.blurSigma = 70.0, // Increased blur for a softer blend
+    this.blurSigma = 70.0,
+    this.enableAdaptivePerformance = true,
+    this.organicNoiseAmount = 0.02,
+    this.pulsationAmount = 0.15,
   });
 
   @override
@@ -21,77 +27,116 @@ class DynamicNebulaBackground extends StatefulWidget {
 
 class _DynamicNebulaBackgroundState extends State<DynamicNebulaBackground>
     with TickerProviderStateMixin {
+  // Constants for better maintainability
+  static const Duration _positionDuration = Duration(seconds: 40);
+  static const Duration _colorDuration = Duration(seconds: 30);
+  static const Duration _thermalCycleDuration = Duration(seconds: 120); // 2-minute thermal cycle
+  static const double _centralAreaBounds = 0.8;
+  static const double _centralAreaOffset = 0.1;
+  static const double _baseAmplitudeMin = 0.1;
+  static const double _baseAmplitudeRange = 0.1;
+  static const double _lowEndScreenThreshold = 400.0;
+  
   final Random _random = Random();
   
   late AnimationController _positionController;
   late AnimationController _colorController;
+  late AnimationController _thermalController;
   
-  // --- Layer Properties (Initial Offset & Amplitude for motion) ---
-  late Offset _initialPosition1, _initialPosition2, _initialPosition3;
-  late double _amplitude1, _amplitude2, _amplitude3;
-  late double _phaseShift1, _phaseShift2, _phaseShift3;
+  // Layer Properties
+  late final List<LayerProperties> _layers;
+  
+  // Performance adaptation
+  late final bool _isLowEndDevice;
+  late final double _adaptiveBlurSigma;
+  late final int _layerCount;
 
   @override
   void initState() {
     super.initState();
+    _initializePerformanceSettings();
     _initializeLayers();
-
-    // Controller for the smooth, orbital movement of layers
-    _positionController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 40), // Slower movement for a lava lamp feel
-    )..repeat(reverse: true); // Repeat with a reverse to keep it smooth
-
-    // Controller for the perpetual color evolution
-    _colorController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 30), // Very slow evolution
-    )..repeat();
+    _initializeControllers();
+  }
+  
+  void _initializePerformanceSettings() {
+    // Simple performance detection - you could make this more sophisticated
+    _isLowEndDevice = widget.enableAdaptivePerformance && 
+        MediaQuery.of(context).size.shortestSide < _lowEndScreenThreshold;
+    
+    _adaptiveBlurSigma = _isLowEndDevice ? widget.blurSigma * 0.6 : widget.blurSigma;
+    _layerCount = _isLowEndDevice ? 2 : 3;
   }
   
   void _initializeLayers() {
-    _initialPosition1 = _getRandomOffset();
-    _initialPosition2 = _getRandomOffset();
-    _initialPosition3 = _getRandomOffset();
+    _layers = List.generate(_layerCount, (index) => LayerProperties(
+      initialPosition: _getRandomOffset(),
+      amplitude: _baseAmplitudeMin + _random.nextDouble() * _baseAmplitudeRange,
+      phaseShift: _random.nextDouble() * 2 * pi,
+      orbitFrequencyX: 1.0 + _random.nextDouble() * 0.5, // Varied orbital frequencies
+      orbitFrequencyY: 0.8 + _random.nextDouble() * 0.7,
+      pulsePhase: _random.nextDouble() * 2 * pi,
+      pulseFrequency: 0.3 + _random.nextDouble() * 0.4,
+    ));
+  }
+  
+  void _initializeControllers() {
+    // Controller for smooth, orbital movement
+    _positionController = AnimationController(
+      vsync: this,
+      duration: _positionDuration,
+    )..repeat(reverse: true);
 
-    _amplitude1 = 0.1 + _random.nextDouble() * 0.1;
-    _amplitude2 = 0.1 + _random.nextDouble() * 0.1;
-    _amplitude3 = 0.1 + _random.nextDouble() * 0.1;
+    // Controller for color evolution
+    _colorController = AnimationController(
+      vsync: this,
+      duration: _colorDuration,
+    )..repeat();
     
-    _phaseShift1 = _random.nextDouble() * 2 * pi;
-    _phaseShift2 = _random.nextDouble() * 2 * pi;
-    _phaseShift3 = _random.nextDouble() * 2 * pi;
+    // Controller for thermal cycles (slower, like real lava lamp heating)
+    _thermalController = AnimationController(
+      vsync: this,
+      duration: _thermalCycleDuration,
+    )..repeat();
   }
 
-  /// Generates a random Offset within the screen bounds (0.0 to 1.0).
+  /// Generates a random Offset within the screen bounds with central bias.
   Offset _getRandomOffset() => Offset(
-      _random.nextDouble() * 0.8 + 0.1, // Ensure blobs start in a central area
-      _random.nextDouble() * 0.8 + 0.1);
+      _random.nextDouble() * _centralAreaBounds + _centralAreaOffset,
+      _random.nextDouble() * _centralAreaBounds + _centralAreaOffset);
 
   @override
   void dispose() {
     _positionController.dispose();
     _colorController.dispose();
+    _thermalController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_positionController, _colorController]),
+      animation: Listenable.merge([_positionController, _colorController, _thermalController]),
       builder: (context, child) {
-        final double time = _positionController.value * 2 * pi;
+        final double positionTime = _positionController.value * 2 * pi;
+        final double pulseTime = _positionController.value * 2 * pi * 2; // Faster pulse cycle
+        final double thermalTime = _thermalController.value * 2 * pi;
 
-        // Calculate new positions based on a smooth, non-linear function
-        final newPosition1 = _calculateNewPosition(_initialPosition1, _amplitude1, _phaseShift1, time);
-        final newPosition2 = _calculateNewPosition(_initialPosition2, _amplitude2, _phaseShift2, time);
-        final newPosition3 = _calculateNewPosition(_initialPosition3, _amplitude3, _phaseShift3, time);
+        // Calculate new positions with organic movement
+        final positions = _layers.map((layer) => 
+          _calculateOrganicPosition(layer, positionTime)).toList();
+        
+        // Calculate dynamic radii with pulsation
+        final radii = _layers.asMap().entries.map((entry) => 
+          _calculateDynamicRadius(entry.key, entry.value, pulseTime)).toList();
 
         return CustomPaint(
           painter: NebulaBackgroundPainter(
-            positions: [newPosition1, newPosition2, newPosition3],
-            colors: _getEvolvingColors(),
-            blurSigma: widget.blurSigma,
+            positions: positions,
+            radii: radii,
+            colors: _getThermodynamicColors(thermalTime),
+            blurSigma: _adaptiveBlurSigma,
+            layerCount: _layerCount,
           ),
           child: Container(),
         );
@@ -99,72 +144,114 @@ class _DynamicNebulaBackgroundState extends State<DynamicNebulaBackground>
     );
   }
 
-  /// Calculates the next position using sine and cosine for a smooth, orbital path.
-  Offset _calculateNewPosition(Offset initial, double amplitude, double phaseShift, double time) {
+  /// Calculates organic position with noise for more natural movement.
+  Offset _calculateOrganicPosition(LayerProperties layer, double time) {
+    // Base orbital movement
+    final baseX = layer.initialPosition.dx + 
+        layer.amplitude * sin(time * layer.orbitFrequencyX + layer.phaseShift);
+    final baseY = layer.initialPosition.dy + 
+        layer.amplitude * cos(time * layer.orbitFrequencyY + layer.phaseShift);
+    
+    // Add organic noise for less predictable movement
+    final noiseX = sin(time * 3.7 + layer.phaseShift) * widget.organicNoiseAmount;
+    final noiseY = cos(time * 2.3 + layer.phaseShift * 1.5) * widget.organicNoiseAmount * 0.8;
+    
     return Offset(
-      initial.dx + amplitude * sin(time + phaseShift),
-      initial.dy + amplitude * cos(time + phaseShift),
+      (baseX + noiseX).clamp(0.0, 1.0),
+      (baseY + noiseY).clamp(0.0, 1.0),
     );
   }
+  
+  /// Calculates dynamic radius with pulsation effect.
+  double _calculateDynamicRadius(int layerIndex, LayerProperties layer, double time) {
+    final baseRadii = [0.9, 0.7, 0.5]; // Different base sizes for each layer
+    final baseRadius = baseRadii[layerIndex % baseRadii.length];
+    
+    // Pulsation effect
+    final pulsation = 1.0 + widget.pulsationAmount * 
+        sin(time * layer.pulseFrequency + layer.pulsePhase);
+    
+    return baseRadius * pulsation;
+  }
 
-  /// Generates a list of 6 smoothly evolving colors.
-  List<Color> _getEvolvingColors() {
-    final double time = _colorController.value;
+  /// Generates thermodynamically evolving colors like a real lava lamp.
+  List<Color> _getThermodynamicColors(double thermalTime) {
+    final double temperature = sin(thermalTime); // -1 to 1 temperature cycle
+    final double colorTime = _colorController.value;
+    
     return List.generate(6, (i) {
-      final double hue = (time * 360 + i * 30) % 360;
-      return HSLColor.fromAHSL(1.0, hue, 0.8, 0.6).toColor();
+      // Base hue rotation
+      final double baseHue = (colorTime * 360 + i * 30) % 360;
+      
+      // Temperature affects saturation and lightness
+      final double saturation = (0.7 + 0.2 * temperature).clamp(0.4, 1.0);
+      final double lightness = (0.5 + 0.15 * temperature).clamp(0.3, 0.8);
+      
+      // Slightly shift hue based on temperature for color temperature effect
+      final double thermalHueShift = temperature * 15; // Warm/cool shift
+      final double finalHue = (baseHue + thermalHueShift) % 360;
+      
+      return HSLColor.fromAHSL(1.0, finalHue, saturation, lightness).toColor();
     });
   }
 }
 
+/// Data class to hold layer properties for better organization.
+class LayerProperties {
+  final Offset initialPosition;
+  final double amplitude;
+  final double phaseShift;
+  final double orbitFrequencyX;
+  final double orbitFrequencyY;
+  final double pulsePhase;
+  final double pulseFrequency;
+
+  const LayerProperties({
+    required this.initialPosition,
+    required this.amplitude,
+    required this.phaseShift,
+    required this.orbitFrequencyX,
+    required this.orbitFrequencyY,
+    required this.pulsePhase,
+    required this.pulseFrequency,
+  });
+}
+
 class NebulaBackgroundPainter extends CustomPainter {
   final List<Offset> positions;
+  final List<double> radii;
   final List<Color> colors;
   final double blurSigma;
+  final int layerCount;
 
   NebulaBackgroundPainter({
     required this.positions,
+    required this.radii,
     required this.colors,
     required this.blurSigma,
+    required this.layerCount,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Dark background
     canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF0C0C0C));
 
     final blurFilter = MaskFilter.blur(BlurStyle.normal, blurSigma);
+    final blendModes = [null, BlendMode.plus, BlendMode.plus]; // Base layer normal, others additive
 
-    // Layer 1: Base Layer (Largest)
-    _paintLayer(
-      canvas,
-      size,
-      positions[0],
-      [colors[0], colors[1]],
-      size.shortestSide * 0.9,
-      blurFilter,
-    );
-
-    // Layer 2: Middle Layer
-    _paintLayer(
-      canvas,
-      size,
-      positions[1],
-      [colors[2], colors[3]],
-      size.shortestSide * 0.7,
-      blurFilter,
-      blendMode: BlendMode.plus,
-    );
-
-    // Layer 3: Core Layer (Smallest)
-    _paintLayer(
-      canvas,
-      size,
-      positions[2],
-      [colors[4], colors[5]],
-      size.shortestSide * 0.5,
-      blurFilter,
-      blendMode: BlendMode.plus,
-    );
+    // Paint each layer
+    for (int i = 0; i < layerCount && i < positions.length; i++) {
+      _paintLayer(
+        canvas,
+        size,
+        positions[i],
+        [colors[i * 2], colors[i * 2 + 1]],
+        size.shortestSide * radii[i],
+        blurFilter,
+        blendMode: blendModes[i],
+      );
+    }
   }
 
   void _paintLayer(
@@ -189,6 +276,7 @@ class NebulaBackgroundPainter extends CustomPainter {
       center: centerAlignment,
       radius: 1.5,
       colors: layerColors,
+      stops: const [0.0, 1.0], // Sharper gradient for more defined blobs
     ).createShader(Rect.fromCircle(center: centerOffset, radius: radius));
     
     canvas.drawCircle(centerOffset, radius, paint);
@@ -197,7 +285,9 @@ class NebulaBackgroundPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant NebulaBackgroundPainter oldDelegate) {
     return oldDelegate.positions != positions ||
+        oldDelegate.radii != radii ||
         oldDelegate.colors != colors ||
-        oldDelegate.blurSigma != blurSigma;
+        oldDelegate.blurSigma != blurSigma ||
+        oldDelegate.layerCount != layerCount;
   }
 }
