@@ -1,12 +1,17 @@
-/ lib/pages/create_proposal_page.dart
+// lib/pages/create_proposal_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 // Assume these models and providers exist in your project
 import '../models/proposal_to_send.dart';
-import '../models/user.dart';
+import '../models/user.dart' as app_user;
+import '../services/api_service.dart';
+import '../config/api_config.dart';
 
 // -- RIVERPOD PROVIDERS --
 // A simple provider for the form's state. We'll use a `StateProvider` for a simple value.
@@ -16,27 +21,58 @@ final proposalTypeProvider = StateProvider<String>((ref) => 'General');
 final voteEndDateProvider = StateProvider<DateTime?>((ref) => null);
 final proposalDetailsProvider = StateProvider<String>((ref) => '');
 
-// This is a placeholder for your actual auth provider and user model.
-// In a real app, this would be a more complex provider.
-final authUserProvider = Provider<User?>((ref) => User(uid: 'user123', email: 'user@example.com'));
+// Firebase Auth provider
+final firebaseAuthProvider = Provider<FirebaseAuth>((ref) => FirebaseAuth.instance);
+
+// Current user provider that watches Firebase Auth state
+final currentUserProvider = StreamProvider<User?>((ref) {
+  return ref.watch(firebaseAuthProvider).authStateChanges();
+});
+
+// App user provider that converts Firebase User to your app's User model
+final authUserProvider = Provider<app_user.User?>((ref) {
+  final asyncUser = ref.watch(currentUserProvider);
+  return asyncUser.when(
+    data: (firebaseUser) => firebaseUser != null 
+        ? app_user.User(uid: firebaseUser.uid, email: firebaseUser.email ?? '') 
+        : null,
+    loading: () => null,
+    error: (_, __) => null,
+  );
+});
+
+// API Service provider
+final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
 
 // StateNotifier for the submission logic and state.
 class ProposalSubmitNotifier extends StateNotifier<AsyncValue<Map<String, dynamic>>> {
-  ProposalSubmitNotifier() : super(const AsyncValue.data({'success': false}));
+  final ApiService _apiService;
+  final FirebaseAuth _firebaseAuth;
+
+  ProposalSubmitNotifier(this._apiService, this._firebaseAuth) 
+      : super(const AsyncValue.data({'success': false}));
 
   Future<void> submitProposal({
     required ProposalToSend proposal,
-    required String idToken,
   }) async {
     state = const AsyncValue.loading();
     try {
-      // Simulate network request
-      await Future.delayed(const Duration(seconds: 2));
-      // In a real app, you would make an API call here
-      // final response = await api.createProposal(proposal, idToken);
+      // Get the current user's ID token
+      final user = _firebaseAuth.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
 
-      // Simulate a successful response
-      state = const AsyncValue.data({'success': true});
+      final idToken = await user.getIdToken();
+      
+      // Make API call to your Flask backend
+      final response = await _apiService.createProposal(proposal, idToken);
+      
+      if (response['success'] == true) {
+        state = AsyncValue.data({'success': true, 'data': response});
+      } else {
+        throw Exception(response['message'] ?? 'Failed to create proposal');
+      }
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
@@ -44,7 +80,10 @@ class ProposalSubmitNotifier extends StateNotifier<AsyncValue<Map<String, dynami
 }
 
 final proposalSubmitProvider = StateNotifierProvider<ProposalSubmitNotifier, AsyncValue<Map<String, dynamic>>>(
-  (ref) => ProposalSubmitNotifier(),
+  (ref) => ProposalSubmitNotifier(
+    ref.watch(apiServiceProvider),
+    ref.watch(firebaseAuthProvider),
+  ),
 );
 
 // -- WIDGETS --
@@ -107,7 +146,7 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: ColorScheme.dark(
-              primary: Theme.of(context).colorScheme.tertiary, // Use theme color
+              primary: Theme.of(context).colorScheme.tertiary,
               onPrimary: Theme.of(context).colorScheme.onTertiary,
               surface: Theme.of(context).colorScheme.surface,
               onSurface: Theme.of(context).colorScheme.onSurface,
@@ -129,24 +168,46 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
 
     if (user == null || isSubmitting) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: User not logged in or a submission is already in progress.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: User not logged in or a submission is already in progress.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Validate required fields
+    final title = ref.read(proposalTitleProvider);
+    final description = ref.read(proposalDescriptionProvider);
+    
+    if (title.isEmpty || description.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fill in all required fields.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
       }
       return;
     }
 
     final proposalToSend = ProposalToSend(
       proposerUserId: user.uid,
-      title: ref.read(proposalTitleProvider),
-      description: ref.read(proposalDescriptionProvider),
+      title: title,
+      description: description,
       proposalType: ref.read(proposalTypeProvider),
-      details: ref.read(proposalDetailsProvider).isNotEmpty ? {'custom_details': ref.read(proposalDetailsProvider)} : null,
+      details: ref.read(proposalDetailsProvider).isNotEmpty 
+          ? {'custom_details': ref.read(proposalDetailsProvider)} 
+          : null,
       voteEndTime: ref.read(voteEndDateProvider),
     );
 
-    // Assuming you have a way to get the ID token
-    const idToken = 'dummy_id_token'; 
-
-    await ref.read(proposalSubmitProvider.notifier).submitProposal(proposal: proposalToSend, idToken: idToken);
+    await ref.read(proposalSubmitProvider.notifier).submitProposal(
+      proposal: proposalToSend,
+    );
 
     final submissionResult = ref.read(proposalSubmitProvider);
     if (submissionResult.hasValue && submissionResult.value!['success'] == true) {
@@ -154,7 +215,21 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
         await _showSuccessAndExit();
       }
     } else if (submissionResult.hasError && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Submission failed: ${submissionResult.error}')));
+      String errorMessage = 'Submission failed';
+      if (submissionResult.error is Exception) {
+        errorMessage = submissionResult.error.toString().replaceFirst('Exception: ', '');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: _submitForm,
+          ),
+        ),
+      );
     }
   }
 
@@ -164,6 +239,7 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
       barrierDismissible: false,
       builder: (context) => const _SuccessDialog(),
     );
+    
     // Clear all the form state providers
     ref.invalidate(proposalTitleProvider);
     ref.invalidate(proposalDescriptionProvider);
@@ -207,7 +283,150 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isSubmitting = ref.watch(proposalSubmitProvider).isLoading;
+    final userAsync = ref.watch(currentUserProvider);
 
+    return userAsync.when(
+      data: (user) {
+        if (user == null) {
+          return _buildAuthRequiredView(theme);
+        }
+        return _buildMainContent(theme, isSubmitting);
+      },
+      loading: () => _buildLoadingView(theme),
+      error: (error, _) => _buildErrorView(theme, error.toString()),
+    );
+  }
+
+  Widget _buildAuthRequiredView(ThemeData theme) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text('Create New Proposal'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: const SizedBox.shrink(),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: widget.onFormCompleted,
+            tooltip: 'Close',
+          ),
+        ],
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.account_circle,
+              size: 80,
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Authentication Required',
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please sign in to create a proposal',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: widget.onFormCompleted,
+              child: const Text('Go Back'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingView(ThemeData theme) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text('Create New Proposal'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: const SizedBox.shrink(),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: widget.onFormCompleted,
+            tooltip: 'Close',
+          ),
+        ],
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: theme.colorScheme.tertiary),
+            const SizedBox(height: 16),
+            Text(
+              'Loading...',
+              style: theme.textTheme.bodyLarge,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorView(ThemeData theme, String error) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text('Create New Proposal'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: const SizedBox.shrink(),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: widget.onFormCompleted,
+            tooltip: 'Close',
+          ),
+        ],
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 80,
+              color: theme.colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Authentication Error',
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: widget.onFormCompleted,
+              child: const Text('Go Back'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainContent(ThemeData theme, bool isSubmitting) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -469,7 +688,7 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
     );
   }
 
-  Widget _buildInputDecoration(ThemeData theme, String label) {
+  InputDecoration _buildInputDecoration(ThemeData theme, String label) {
     return InputDecoration(
       labelText: label,
       labelStyle: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6)),
@@ -586,7 +805,7 @@ class _SuccessDialog extends ConsumerWidget {
   }
 }
 
-// Placeholder for your models for the code to be runnable
+// Enhanced ProposalToSend model with better JSON serialization
 class ProposalToSend {
   final String proposerUserId;
   final String title;
@@ -603,11 +822,28 @@ class ProposalToSend {
     this.details,
     this.voteEndTime,
   });
-}
 
-class User {
-  final String uid;
-  final String email;
-  User({required this.uid, required this.email});
-}
+  Map<String, dynamic> toJson() {
+    return {
+      'proposer_user_id': proposerUserId,
+      'title': title,
+      'description': description,
+      'proposal_type': proposalType,
+      'details': details,
+      'vote_end_time': voteEndTime?.toIso8601String(),
+    };
+  }
 
+  factory ProposalToSend.fromJson(Map<String, dynamic> json) {
+    return ProposalToSend(
+      proposerUserId: json['proposer_user_id'],
+      title: json['title'],
+      description: json['description'],
+      proposalType: json['proposal_type'],
+      details: json['details'],
+      voteEndTime: json['vote_end_time'] != null 
+          ? DateTime.parse(json['vote_end_time'])
+          : null,
+    );
+  }
+}
