@@ -449,6 +449,7 @@ class HomePageState extends ConsumerState<HomePage>
         ),
       ),
       bottomNavigationBar: _buildBottomNavBar(),
+      floatingActionButton: _buildFloatingActionButton(),
     );
   }
 
@@ -482,8 +483,8 @@ class HomePageState extends ConsumerState<HomePage>
   }
 
   Widget _buildWelcomeHeader() {
-    // Watch both providers and get their combined loading state
-    final userAccountAsync = ref.watch(userAccountProvider);
+    // Fixed: Use userAccountNotifierProvider for consistency with critical fixes
+    final userAccountAsync = ref.watch(userAccountNotifierProvider);
     final walletAsync = ref.watch(walletProvider);
 
     // This checks if EITHER provider is in a loading state.
@@ -541,7 +542,6 @@ class HomePageState extends ConsumerState<HomePage>
       ],
     );
   }
-}
 
   Widget _buildPageView() {
     return AnimatedOpacity(
@@ -617,6 +617,111 @@ class HomePageState extends ConsumerState<HomePage>
         },
       ),
     );
+  }
+
+  // Added: FloatingActionButton implementation from critical fixes
+  Widget? _buildFloatingActionButton() {
+    return FloatingActionButton(
+      onPressed: () {
+        HapticFeedback.mediumImpact();
+        _showActionMenu(context);
+      },
+      backgroundColor: AppColors.buttonPrimary,
+      child: const Icon(Icons.add),
+    );
+  }
+
+  // Added: Action menu implementation from critical fixes
+  void _showActionMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.75),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[700],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Quick Actions',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              NavigationCard(
+                title: 'Create Proposal',
+                icon: Icons.add_box,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const GovernancePage()),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              NavigationCard(
+                title: 'Add Goodwill Action',
+                icon: Icons.volunteer_activism,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const SubmitGoodwillPage()),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              NavigationCard(
+                title: 'Send Loves',
+                icon: Icons.send,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const MyWalletPage()),
+                  );
+                },
+              ),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Added: Sign out method from critical fixes with proper provider reference
+  Future<void> _signOut() async {
+    try {
+      // Fixed: Use authNotifierProvider for consistency with critical fixes
+      await ref.read(authNotifierProvider.notifier).signOut();
+    } catch (e) {
+      // Handle sign out error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to sign out: $e')),
+        );
+      }
+    }
   }
 }
 
@@ -849,7 +954,8 @@ class SettingsBottomSheet extends ConsumerWidget {
               onPressed: () async {
                 HapticFeedback.heavyImpact();
                 Navigator.of(context).pop();
-                await ref.read(authServiceProvider.notifier).signOut();
+                // Fixed: Use authNotifierProvider for consistency with critical fixes
+                await ref.read(authNotifierProvider.notifier).signOut();
               },
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom),

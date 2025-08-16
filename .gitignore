@@ -8,6 +8,7 @@
 *.iml
 *.ipr
 *.iws
+.vscode/
 
 # Flutter & Dart
 build/
@@ -23,16 +24,29 @@ build/
 node_modules/
 
 # Environment config
-.env
+*.env
+lib/config/*.env
 
 # Android Studio & iOS build files
 /android/app/debug/
 /android/app/profile/
 /android/app/release/
 /ios/Flutter/.last_build_id
+ios/Pods/
+ios/Podfile.lock
+ios/Runner.xcworkspace/
+ios/Runner/GeneratedPluginRegistrant.*
+macos/Flutter/ephemeral/
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+
+# Generated plugin files
+**/generated_plugin_registrant.*
+**/generated_plugins.*
+*.g.dart
 
 # Miscellaneous
 *.symbols
 app.*.map.json
-
 public/
+

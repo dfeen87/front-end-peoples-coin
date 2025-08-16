@@ -22,6 +22,9 @@ class User {
     this.isActive = true,
   });
 
+  // Add uid getter for Firebase Auth compatibility
+  String get uid => id;
+
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id']?.toString() ?? '',
@@ -88,4 +91,3 @@ class User {
     return null;
   }
 }
-

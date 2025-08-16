@@ -17,7 +17,7 @@ class GoodwillAction {
   final String performerUserId;
   final String actionType;
   final String description;
-  final UnmodifiableMapView<String, dynamic> contextualData;
+  final Map<String, dynamic> contextualData; // Changed from UnmodifiableMapView
   final int lovesValue;
   final GoodwillStatus status;
   final DateTime createdAt;
@@ -33,7 +33,7 @@ class GoodwillAction {
     required this.performerUserId,
     required this.actionType,
     required this.description,
-    required Map<String, dynamic> contextualData,
+    required this.contextualData, // Simplified - just store the map
     required this.lovesValue,
     required this.status,
     required this.createdAt,
@@ -41,7 +41,13 @@ class GoodwillAction {
     this.timeSpentMinutes = 0,
     this.userImpactScore = 50,
     this.calculatedScore,
-  }) : contextualData = UnmodifiableMapView(contextualData);
+  });
+
+  // Add timestamp getter for backward compatibility with error logs
+  DateTime get timestamp => createdAt;
+
+  // Add userId getter for backward compatibility
+  String get userId => performerUserId;
 
   /// Creates a GoodwillAction from a JSON map.
   factory GoodwillAction.fromJson(Map<String, dynamic> json) {
@@ -81,7 +87,7 @@ class GoodwillAction {
       performerUserId: performerUserId ?? this.performerUserId,
       actionType: actionType ?? this.actionType,
       description: description ?? this.description,
-      contextualData: contextualData ?? this.contextualData,
+      contextualData: contextualData ?? Map<String, dynamic>.from(this.contextualData),
       lovesValue: lovesValue ?? this.lovesValue,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
@@ -121,6 +127,8 @@ class GoodwillAction {
       'time_spent_minutes': timeSpentMinutes,
       'user_impact_score': userImpactScore,
       'calculated_score': calculatedScore,
+      // Add timestamp for API compatibility
+      'timestamp': createdAt.toIso8601String(),
     };
   }
 
@@ -177,4 +185,3 @@ class GoodwillAction {
     return {};
   }
 }
-

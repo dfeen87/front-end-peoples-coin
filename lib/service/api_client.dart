@@ -1,96 +1,155 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/user_account.dart';
+import '../models/wallet_models.dart';
+import '../models/proposal.dart';
+import '../models/goodwill_action.dart';
+import '../models/ledger_entry.dart';
 
-// Import all the new service classes
-import 'package:your_app_name/service/goodwill_action_service.dart';
-import 'package:your_app_name/service/proposal_service.dart';
-import 'package:your_app_name/service/vote_service.dart';
-import 'package:your_app_name/service/user_account_service.dart';
-import 'package:your_app_name/service/loves_ledger_service.dart';
-
-/// A service class responsible for all low-level API communication.
-/// It handles raw network requests and timeouts, and is not tied to any state management.
+/// Core API client for network operations
 class PeoplesCoinApiClient {
   final String _baseUrl;
   final http.Client _client;
-
-  PeoplesCoinApiClient({http.Client? client})
-      : _client = client ?? http.Client(),
-        _baseUrl = "https://peoples-coin-service-105378934751.us-central1.run.app";
-
-  // Default timeout for all HTTP requests
   static const Duration _timeoutDuration = Duration(seconds: 15);
 
-  /// Helper: Create auth headers with the Firebase ID token
-  Map<String, String> _buildAuthHeaders(String? idToken) {
-    if (idToken == null) {
-      return {
+  PeoplesCoinApiClient({http.Client? client, String? baseUrl})
+      : _client = client ?? http.Client(),
+        _baseUrl = baseUrl ??
+            'https://peoples-coin-service-105378934751.us-central1.run.app';
+
+  // --- Low-level helpers ---
+  Map<String, String> _headers({String? idToken}) => {
         'Content-Type': 'application/json',
+        if (idToken != null) 'Authorization': 'Bearer $idToken',
       };
+
+  Uri _buildUri(String endpoint, [Map<String, dynamic>? queryParams]) {
+    if (queryParams == null || queryParams.isEmpty) {
+      return Uri.parse('$_baseUrl/$endpoint');
     }
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $idToken',
-    };
+    final query = queryParams.entries
+        .map((e) =>
+            '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent('${e.value}')}')
+        .join('&');
+    return Uri.parse('$_baseUrl/$endpoint?$query');
   }
 
-  /// Generic HTTP GET method.
-  Future<http.Response> get(String url, {String? idToken}) async {
-    final fullUrl = Uri.parse('$_baseUrl/$url');
-    final headers = _buildAuthHeaders(idToken);
-    return _client.get(fullUrl, headers: headers).timeout(_timeoutDuration);
+  Map<String, dynamic> _handleResponse(http.Response response) {
+    final data = json.decode(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) return data;
+    throw ApiClientException(
+      data['message'] ?? 'Unknown error',
+      statusCode: response.statusCode,
+    );
   }
 
-  /// Generic HTTP POST method.
-  Future<http.Response> post(String url, String body, {String? idToken}) async {
-    final fullUrl = Uri.parse('$_baseUrl/$url');
-    final headers = _buildAuthHeaders(idToken);
-    return _client.post(fullUrl, headers: headers, body: body).timeout(_timeoutDuration);
+  // --- Generic requests ---
+  Future<Map<String, dynamic>> getJson(String endpoint,
+          {String? idToken, Map<String, dynamic>? queryParams}) async =>
+      _handleResponse(await _client
+          .get(_buildUri(endpoint, queryParams), headers: _headers(idToken: idToken))
+          .timeout(_timeoutDuration));
+
+  Future<Map<String, dynamic>> postJson(String endpoint,
+          {String? idToken, Map<String, dynamic>? body}) async =>
+      _handleResponse(await _client
+          .post(_buildUri(endpoint),
+              headers: _headers(idToken: idToken), body: json.encode(body))
+          .timeout(_timeoutDuration));
+
+  Future<Map<String, dynamic>> putJson(String endpoint,
+          {String? idToken, Map<String, dynamic>? body}) async =>
+      _handleResponse(await _client
+          .put(_buildUri(endpoint),
+              headers: _headers(idToken: idToken), body: json.encode(body))
+          .timeout(_timeoutDuration));
+
+  void dispose() => _client.close();
+
+  // --- High-level API methods ---
+
+  // User
+  Future<UserAccount> getAuthenticatedUserProfile({required String idToken}) async {
+    final json = await getJson('users/me', idToken: idToken);
+    return UserAccount.fromJson(json);
   }
 
-  /// Generic HTTP PUT method.
-  Future<http.Response> put(String url, String body, {String? idToken}) async {
-    final fullUrl = Uri.parse('$_baseUrl/$url');
-    final headers = _buildAuthHeaders(idToken);
-    return _client.put(fullUrl, headers: headers, body: body).timeout(_timeoutDuration);
+  Future<bool> checkUsernameAvailability(String username) async {
+    final json = await getJson('users/check-username', queryParams: {'username': username});
+    return json['available'] as bool;
+  }
+
+  // Goodwill Actions
+  Future<List<GoodwillAction>> getUserGoodwillActions({required String idToken}) async {
+    final json = await getJson('goodwill-actions', idToken: idToken);
+    return (json['actions'] as List)
+        .map((e) => GoodwillAction.fromJson(e))
+        .toList();
+  }
+
+  Future<void> submitGoodwill({required String idToken, required GoodwillAction action}) async {
+    await postJson('goodwill-actions', idToken: idToken, body: action.toJson());
+  }
+
+  // Loves/Currency Operations
+  Future<void> sendLoves({
+    required String idToken,
+    required String recipientId,
+    required int amount,
+    String? message,
+  }) async {
+    await postJson('loves/send', 
+      idToken: idToken, 
+      body: {
+        'recipientId': recipientId,
+        'amount': amount,
+        if (message != null) 'message': message,
+      }
+    );
+  }
+
+  // Proposals
+  Future<List<Proposal>> listProposals({String? status, required String idToken}) async {
+    final json = await getJson('proposals', idToken: idToken, queryParams: 
+      status != null ? {'status': status} : null);
+    return (json['proposals'] as List).map((e) => Proposal.fromJson(e)).toList();
+  }
+
+  Future<Proposal> getProposalDetails({required String proposalId, required String idToken}) async {
+    final json = await getJson('proposals/$proposalId', idToken: idToken);
+    return Proposal.fromJson(json);
+  }
+
+  Future<void> createProposal({required String idToken, required Proposal proposal}) async {
+    await postJson('proposals', idToken: idToken, body: proposal.toJson());
+  }
+
+  Future<void> submitVote({required String idToken, required String proposalId, required String choice}) async {
+    await postJson('proposals/$proposalId/vote', idToken: idToken, body: {'choice': choice});
+  }
+
+  // Ledger
+  Future<List<LedgerEntry>> getLedgerEntries({required String idToken}) async {
+    final json = await getJson('ledger', idToken: idToken);
+    return (json['entries'] as List).map((e) => LedgerEntry.fromJson(e)).toList();
+  }
+
+  Future<List<LedgerEntry>> searchLedger({required String idToken, required String query}) async {
+    final json = await getJson('ledger/search', idToken: idToken, queryParams: {'q': query});
+    return (json['entries'] as List).map((e) => LedgerEntry.fromJson(e)).toList();
   }
 }
 
-// A Riverpod provider to make the API client available throughout the app.
-final apiClientProvider = Provider<PeoplesCoinApiClient>((ref) {
-  return PeoplesCoinApiClient();
-});
+class ApiClientException implements Exception {
+  final String message;
+  final int? statusCode;
+  ApiClientException(this.message, {this.statusCode});
+  @override
+  String toString() =>
+      statusCode != null ? 'ApiClientException($statusCode): $message' : 'ApiClientException: $message';
+}
 
-// A Riverpod provider for the GoodwillActionService.
-final goodwillActionServiceProvider = Provider<GoodwillActionService>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return GoodwillActionService(client);
-});
-
-// A Riverpod provider for the ProposalService.
-final proposalServiceProvider = Provider<ProposalService>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return ProposalService(client);
-});
-
-// A Riverpod provider for the VoteService.
-final voteServiceProvider = Provider<VoteService>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return VoteService(client);
-});
-
-// A Riverpod provider for the UserAccountService.
-final userAccountServiceProvider = Provider<UserAccountService>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return UserAccountService(client);
-});
-
-// A Riverpod provider for the LovesLedgerService.
-final lovesLedgerServiceProvider = Provider<LovesLedgerService>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return LovesLedgerService(client);
-});
-
+/// Riverpod provider for global API client
+final apiClientProvider = Provider<PeoplesCoinApiClient>((ref) => PeoplesCoinApiClient());
