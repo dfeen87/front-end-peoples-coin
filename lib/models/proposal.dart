@@ -1,28 +1,19 @@
 import 'package:flutter/foundation.dart';
 
-/// Mirrors the 'proposal_status' ENUM in your database
-enum ProposalStatus {
-  draft,
-  active,
-  closed,
-  rejected,
-  unknown,
-}
+enum ProposalStatus { draft, active, closed, rejected, unknown }
 
-/// Represents the data structure for a governance proposal, mirroring the
-/// `proposals` table in the database.
 @immutable
 class Proposal {
-  final String id; // UUID
+  final String id;
   final String? proposerUserId;
   final String title;
   final String description;
   final ProposalStatus status;
   final DateTime? voteStartTime;
   final DateTime? voteEndTime;
-  final double requiredQuorum; // NUMERIC(5, 2)
+  final double requiredQuorum;
   final String proposalType;
-  final Map<String, dynamic>? details; // JSONB
+  final Map<String, dynamic>? details;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -41,7 +32,6 @@ class Proposal {
     required this.updatedAt,
   });
 
-  /// Creates a new instance of [Proposal] with optional new values.
   Proposal copyWith({
     String? id,
     String? proposerUserId,
@@ -55,60 +45,52 @@ class Proposal {
     Map<String, dynamic>? details,
     DateTime? createdAt,
     DateTime? updatedAt,
-  }) {
-    return Proposal(
-      id: id ?? this.id,
-      proposerUserId: proposerUserId ?? this.proposerUserId,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      status: status ?? this.status,
-      voteStartTime: voteStartTime ?? this.voteStartTime,
-      voteEndTime: voteEndTime ?? this.voteEndTime,
-      requiredQuorum: requiredQuorum ?? this.requiredQuorum,
-      proposalType: proposalType ?? this.proposalType,
-      details: details ?? this.details,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
+  }) =>
+      Proposal(
+        id: id ?? this.id,
+        proposerUserId: proposerUserId ?? this.proposerUserId,
+        title: title ?? this.title,
+        description: description ?? this.description,
+        status: status ?? this.status,
+        voteStartTime: voteStartTime ?? this.voteStartTime,
+        voteEndTime: voteEndTime ?? this.voteEndTime,
+        requiredQuorum: requiredQuorum ?? this.requiredQuorum,
+        proposalType: proposalType ?? this.proposalType,
+        details: details ?? this.details,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
 
-  /// Factory constructor to create a Proposal instance from a JSON map.
-  factory Proposal.fromJson(Map<String, dynamic> json) {
-    return Proposal(
-      id: json['id']?.toString() ?? '',
-      proposerUserId: json['proposer_user_id']?.toString(),
-      title: json['title']?.toString() ?? '',
-      description: json['description']?.toString() ?? '',
-      status: _statusFromString(json['status']?.toString()),
-      voteStartTime: _parseNullableDate(json['vote_start_time']),
-      voteEndTime: _parseNullableDate(json['vote_end_time']),
-      requiredQuorum: _parseDouble(json['required_quorum']),
-      proposalType: json['proposal_type']?.toString() ?? '',
-      details: (json['details'] as Map?)?.cast<String, dynamic>(),
-      createdAt: _parseDate(json['created_at']),
-      updatedAt: _parseDate(json['updated_at']),
-    );
-  }
+  factory Proposal.fromJson(Map<String, dynamic> json) => Proposal(
+        id: json['id']?.toString() ?? '',
+        proposerUserId: json['proposer_user_id']?.toString(),
+        title: json['title']?.toString() ?? '',
+        description: json['description']?.toString() ?? '',
+        status: _statusFromString(json['status']?.toString()),
+        voteStartTime: _parseNullableDate(json['vote_start_time']),
+        voteEndTime: _parseNullableDate(json['vote_end_time']),
+        requiredQuorum: _parseDouble(json['required_quorum']),
+        proposalType: json['proposal_type']?.toString() ?? '',
+        details: (json['details'] as Map?)?.cast<String, dynamic>(),
+        createdAt: _parseDate(json['created_at']),
+        updatedAt: _parseDate(json['updated_at']),
+      );
 
-  /// Serialize this Proposal instance to JSON map.
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'proposer_user_id': proposerUserId,
-      'title': title,
-      'description': description,
-      'status': status.name.toUpperCase(),
-      'vote_start_time': voteStartTime?.toIso8601String(),
-      'vote_end_time': voteEndTime?.toIso8601String(),
-      'required_quorum': requiredQuorum,
-      'proposal_type': proposalType,
-      'details': details,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'proposer_user_id': proposerUserId,
+        'title': title,
+        'description': description,
+        'status': status.name.toUpperCase(),
+        'vote_start_time': voteStartTime?.toIso8601String(),
+        'vote_end_time': voteEndTime?.toIso8601String(),
+        'required_quorum': requiredQuorum,
+        'proposal_type': proposalType,
+        'details': details,
+        'created_at': createdAt.toIso8601String(),
+        'updated_at': updatedAt.toIso8601String(),
+      };
 
-  /// Helper function to safely convert a string to a ProposalStatus enum.
   static ProposalStatus _statusFromString(String? status) {
     switch (status?.toUpperCase()) {
       case 'DRAFT':
@@ -124,26 +106,18 @@ class Proposal {
     }
   }
 
-  // Helper to parse DateTime with fallback
   static DateTime _parseDate(dynamic value) {
     if (value is DateTime) return value;
     if (value is String) {
       try {
         return DateTime.parse(value);
-      } catch (_) {
-        return DateTime.fromMillisecondsSinceEpoch(0);
-      }
+      } catch (_) {}
     }
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
-  // Helper to parse nullable DateTime
-  static DateTime? _parseNullableDate(dynamic value) {
-    if (value == null) return null;
-    return _parseDate(value);
-  }
+  static DateTime? _parseNullableDate(dynamic value) => value == null ? null : _parseDate(value);
 
-  // Helper to parse double safely
   static double _parseDouble(dynamic value) {
     if (value is double) return value;
     if (value is int) return value.toDouble();

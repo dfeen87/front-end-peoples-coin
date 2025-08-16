@@ -10,10 +10,12 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
 import 'service/api_client.dart';
 import 'models/tech_system.dart';
+import 'models/user.dart' as app_user;
 
 // --- Import all your refactored providers ---
 import 'state/auth_provider.dart';
@@ -378,7 +380,6 @@ class HomePageState extends ConsumerState<HomePage>
             'Influence the future of the platform. View active proposals, create new ones, and cast your votes on community-led initiatives.',
         icon: Icons.gavel,
         cardColor: AppColors.translucentGovernance,
-        buttonText: "View Proposals",
         pageToOpen: const GovernancePage(),
       ),
       _buildNavigationPage(
@@ -387,7 +388,6 @@ class HomePageState extends ConsumerState<HomePage>
             'Review your personal history of contributions, track your impact, and see how your acts have strengthened the community.',
         icon: Icons.account_balance_wallet,
         cardColor: AppColors.translucentPortfolio,
-        buttonText: "View My Acts",
         pageToOpen: const MyPortfolioPage(),
       ),
       _buildNavigationPage(
@@ -396,7 +396,6 @@ class HomePageState extends ConsumerState<HomePage>
             'Document a new act of kindness or contribution. Each verified act is rewarded with \'Loves\' and permanently added to the ledger.',
         icon: Icons.favorite,
         cardColor: AppColors.translucentRecordAct,
-        buttonText: "Submit a Bright Act",
         pageToOpen: const SubmitGoodwillPage(),
       ),
       _buildNavigationPage(
@@ -405,7 +404,6 @@ class HomePageState extends ConsumerState<HomePage>
             'Explore the transparent and immutable record of every act of goodwill submitted by the community. A testament to our collective impact.',
         icon: Icons.public,
         cardColor: AppColors.translucentLedger,
-        buttonText: "View Ledger",
         pageToOpen: const PublicLedgerPage(),
       ),
       _buildNavigationPage(
@@ -414,7 +412,6 @@ class HomePageState extends ConsumerState<HomePage>
             'Securely manage your \'Loves\' balance, view transaction history, and send tokens to other members of the community.',
         icon: Icons.wallet,
         cardColor: AppColors.translucentWallet,
-        buttonText: "Open Wallet",
         pageToOpen: const MyWalletPage(),
       ),
     ];
@@ -483,8 +480,8 @@ class HomePageState extends ConsumerState<HomePage>
   }
 
   Widget _buildWelcomeHeader() {
-    // Fixed: Use userAccountNotifierProvider for consistency with critical fixes
-    final userAccountAsync = ref.watch(userAccountNotifierProvider);
+    // Fixed: Use userAccountProvider for consistency with critical fixes
+    final userAccountAsync = ref.watch(userAccountProvider);
     final walletAsync = ref.watch(walletProvider);
 
     // This checks if EITHER provider is in a loading state.
@@ -600,17 +597,15 @@ class HomePageState extends ConsumerState<HomePage>
     required String description,
     required IconData icon,
     required Color cardColor,
-    required String buttonText,
     required Widget pageToOpen,
   }) {
     return Center(
       child: NavigationCard(
         icon: icon,
         title: title,
-        description: description,
+        description: description, // Fixed: Added missing description parameter
         cardColor: cardColor,
-        buttonText: buttonText,
-        onPressed: () {
+        onTap: () { // Fixed: Changed from onPressed to onTap
           HapticFeedback.selectionClick();
           Navigator.of(context)
               .push(MaterialPageRoute(builder: (context) => pageToOpen));
@@ -619,7 +614,6 @@ class HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  // Added: FloatingActionButton implementation from critical fixes
   Widget? _buildFloatingActionButton() {
     return FloatingActionButton(
       onPressed: () {
@@ -631,7 +625,6 @@ class HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  // Added: Action menu implementation from critical fixes
   void _showActionMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -671,6 +664,7 @@ class HomePageState extends ConsumerState<HomePage>
               const SizedBox(height: 20),
               NavigationCard(
                 title: 'Create Proposal',
+                description: 'Start a new community proposal', // Fixed: Added description
                 icon: Icons.add_box,
                 onTap: () {
                   Navigator.of(context).pop();
@@ -682,6 +676,7 @@ class HomePageState extends ConsumerState<HomePage>
               const SizedBox(height: 10),
               NavigationCard(
                 title: 'Add Goodwill Action',
+                description: 'Record a new act of kindness', // Fixed: Added description
                 icon: Icons.volunteer_activism,
                 onTap: () {
                   Navigator.of(context).pop();
@@ -693,6 +688,7 @@ class HomePageState extends ConsumerState<HomePage>
               const SizedBox(height: 10),
               NavigationCard(
                 title: 'Send Loves',
+                description: 'Transfer tokens to other users', // Fixed: Added description
                 icon: Icons.send,
                 onTap: () {
                   Navigator.of(context).pop();
@@ -709,7 +705,6 @@ class HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  // Added: Sign out method from critical fixes with proper provider reference
   Future<void> _signOut() async {
     try {
       // Fixed: Use authNotifierProvider for consistency with critical fixes

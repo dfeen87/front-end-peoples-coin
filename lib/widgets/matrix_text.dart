@@ -28,7 +28,6 @@ class _MatrixTextState extends State<MatrixText> with SingleTickerProviderStateM
   final _random = Random();
   Timer? _scrambleTimer;
   late String _displayedText;
-
   int _typingIndex = 0;
   List<String> _typingCharacters = [];
   bool _isTypingAnimating = false;
@@ -39,7 +38,6 @@ class _MatrixTextState extends State<MatrixText> with SingleTickerProviderStateM
     _displayedText = widget.isLoading
         ? _generateRandomString(widget.targetText.length)
         : widget.targetText;
-
     if (widget.isLoading) {
       _startScrambleAnimation();
     } else {
@@ -68,7 +66,6 @@ class _MatrixTextState extends State<MatrixText> with SingleTickerProviderStateM
     _typingIndex = 0;
     _typingCharacters = [];
     _displayedText = _generateRandomString(widget.targetText.length);
-
     _scrambleTimer = Timer.periodic(widget.speed, (timer) {
       if (mounted && widget.isLoading) {
         setState(() {
@@ -86,8 +83,7 @@ class _MatrixTextState extends State<MatrixText> with SingleTickerProviderStateM
     _typingCharacters = widget.targetText.split('');
     _displayedText = '';
     _typingIndex = 0;
-
-    if (widget.speed.inMilliseconds == 0 || widget(targetText ?? \'\').isEmpty) {
+    if (widget.speed.inMilliseconds == 0 || (widget.targetText ?? '').isEmpty) {
       setState(() {
         _displayedText = widget.targetText;
         _isTypingAnimating = false;
@@ -109,12 +105,10 @@ class _MatrixTextState extends State<MatrixText> with SingleTickerProviderStateM
       widget.onTypingComplete?.call();
       return;
     }
-
     setState(() {
       _displayedText += _typingCharacters[_typingIndex];
       _typingIndex++;
     });
-
     Future.delayed(widget.speed, _animateTyping);
   }
 
@@ -134,7 +128,6 @@ class _MatrixTextState extends State<MatrixText> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final textToRender = widget.isLoading ? _displayedText : widget.targetText;
-
     return RepaintBoundary(
       child: Container(
         color: Colors.black.withOpacity(0.001),
@@ -146,4 +139,3 @@ class _MatrixTextState extends State<MatrixText> with SingleTickerProviderStateM
     );
   }
 }
-

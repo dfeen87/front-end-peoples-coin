@@ -1,109 +1,105 @@
-// lib/providers/user_provider.dart
+// lib/state/user_provider.dart
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 
+import '../services/api_service.dart';
 import '../models/user_account.dart';
-import '../service/api_client.dart';
+import '../models/goodwill_token.dart';
 import '../models/goodwill_action.dart';
+import 'auth_provider.dart';
 
-// -----------------------------------------------------------------------------
-// USER ACCOUNT PROVIDER
-// -----------------------------------------------------------------------------
+/// -----------------------------------------------------------------------------
+/// USER ACCOUNT SERVICE PROVIDER
+/// -----------------------------------------------------------------------------
+final userAccountServiceProvider = Provider<UserAccountService>((ref) {
+  return UserAccountService();
+});
 
-/// StateNotifier that manages a single UserAccount object.
-/// This is responsible for fetching the user's profile on startup or on demand.
+/// -----------------------------------------------------------------------------
+/// USER ACCOUNT NOTIFIER
+/// -----------------------------------------------------------------------------
 class UserAccountNotifier extends StateNotifier<AsyncValue<UserAccount?>> {
-  final PeoplesCoinApiClient _apiClient;
+  final UserAccountService _service;
+  final Ref _ref;
 
-  UserAccountNotifier(this._apiClient) : super(const AsyncValue.data(null));
+  UserAccountNotifier(this._service, this._ref) : super(const AsyncValue.loading()) {
+    _init();
+  }
 
-  /// Fetches the authenticated user profile securely.
+  Future<void> _init() async {
+    await fetchUser();
+  }
+
+  /// Fetches the current authenticated user profile.
   Future<void> fetchUser() async {
     state = const AsyncValue.loading();
+    final firebaseUser = auth.FirebaseAuth.instance.currentUser;
+
+    if (firebaseUser == null) {
+      state = const AsyncValue.data(null);
+      return;
+    }
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        state = const AsyncValue.data(null);
-        return;
-      }
-      
-      final idToken = await user.getIdToken();
-      if (idToken == null || idToken.isEmpty) {
-        throw Exception('Failed to get Firebase ID token.');
-      }
-
-      final userAccount = await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
+      final idToken = await firebaseUser.getIdToken();
+      final userAccount = await _service.getUserAccount(firebaseUser.uid);
       state = AsyncValue.data(userAccount);
-      
+
       if (kDebugMode) {
         print('[UserAccountNotifier] Fetched user: ${userAccount.username}');
       }
     } catch (e, st) {
       state = AsyncValue.error('Failed to fetch user data: $e', st);
       if (kDebugMode) {
-        print('[UserAccountNotifier] Error fetching user: $e');
+        print('[UserAccountNotifier] Error: $e');
       }
     }
   }
 
   /// Clears the current user account state.
-  void clearUser() {
-    state = const AsyncValue.data(null);
-  }
+  void clearUser() => state = const AsyncValue.data(null);
 }
 
-/// The main provider for the UserAccountNotifier.
-final userAccountProvider = StateNotifierProvider<UserAccountNotifier, AsyncValue<UserAccount?>>(
-  (ref) => UserAccountNotifier(ref.watch(apiClientProvider)),
+/// -----------------------------------------------------------------------------
+/// PROVIDERS
+/// -----------------------------------------------------------------------------
+
+/// Provides the current authenticated user account state.
+final userAccountProvider =
+    StateNotifierProvider<UserAccountNotifier, AsyncValue<UserAccount?>>(
+  (ref) => UserAccountNotifier(ref.read(userAccountServiceProvider), ref),
 );
 
-// -----------------------------------------------------------------------------
-// USER GOODWILL ACTIONS PROVIDER
-// -----------------------------------------------------------------------------
+/// Provides a list of the current user's goodwill actions.
+final userGoodwillActionsProvider = FutureProvider<List<GoodwillAction>>((ref) async {
+  final userAccountState = ref.watch(userAccountProvider);
 
-/// A FutureProvider that fetches the user's goodwill actions.
-/// This provider depends on the userAccountProvider to get the user's ID.
-/// It automatically refreshes if the userAccountProvider changes.
-final userActionsProvider = FutureProvider<List<GoodwillAction>>((ref) async {
-  final userAccountAsync = ref.watch(userAccountProvider);
-  
-  if (userAccountAsync.isLoading || userAccountAsync.value == null) {
-    // Return an empty list or throw an error if the user is not available yet.
-    // The UI will handle the loading state automatically.
-    return [];
-  }
-  
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    return [];
-  }
-  
+  final user = userAccountState.value;
+  if (user == null) return [];
+
+  final service = ref.read(userAccountServiceProvider);
   try {
-    final idToken = await user.getIdToken();
-    if (idToken == null || idToken.isEmpty) {
-      return [];
-    }
+    return await service.getUserGoodwillActions(user.id);
+  } catch (e) {
+    if (kDebugMode) print('[UserGoodwillActionsProvider] Error: $e');
+    return [];
+  }
+});
 
-    final apiClient = ref.read(apiClientProvider);
-    final actions = await apiClient.getUserGoodwillActions(
-      userId: userAccountAsync.value!.id,
-      idToken: idToken,
-    );
-    
-    if (kDebugMode) {
-      print('[UserActionsProvider] Fetched ${actions.length} user actions.');
-    }
-    
-    return actions;
-  } catch (e, st) {
-    if (kDebugMode) {
-      print('[UserActionsProvider] Error fetching user actions: $e');
-    }
-    // Riverpod's FutureProvider handles the error state automatically.
-    // We can simply re-throw the error or return a handled state.
-    throw Exception('Failed to fetch user actions: $e');
+/// Provides a list of the current user's goodwill tokens.
+final userGoodwillTokensProvider = FutureProvider<List<GoodwillToken>>((ref) async {
+  final userAccountState = ref.watch(userAccountProvider);
+
+  final user = userAccountState.value;
+  if (user == null) return [];
+
+  final service = ref.read(userAccountServiceProvider);
+  try {
+    return await service.getUserGoodwillTokens(user.id);
+  } catch (e) {
+    if (kDebugMode) print('[UserGoodwillTokensProvider] Error: $e');
+    return [];
   }
 });
 
