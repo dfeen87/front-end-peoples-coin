@@ -187,15 +187,15 @@ class WalletKeyPair {
   Map<String, dynamic> toJson() => _$WalletKeyPairToJson(this);
 }
 
-/// Wallet State for UI
-class WalletState {
+/// Wallet State for UI/Views (to avoid conflict with provider state)
+class WalletUiState {
   final Wallet? currentWallet;
   final WalletBalance? currentBalance;
   final List<WalletTransaction> recentTransactions;
   final bool isLoading;
   final String? error;
 
-  const WalletState({
+  const WalletUiState({
     this.currentWallet,
     this.currentBalance,
     this.recentTransactions = const [],
@@ -203,14 +203,14 @@ class WalletState {
     this.error,
   });
 
-  WalletState copyWith({
+  WalletUiState copyWith({
     Wallet? currentWallet,
     WalletBalance? currentBalance,
     List<WalletTransaction>? recentTransactions,
     bool? isLoading,
     String? error,
   }) {
-    return WalletState(
+    return WalletUiState(
       currentWallet: currentWallet ?? this.currentWallet,
       currentBalance: currentBalance ?? this.currentBalance,
       recentTransactions: recentTransactions ?? this.recentTransactions,

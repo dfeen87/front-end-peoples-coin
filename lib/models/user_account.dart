@@ -1,22 +1,33 @@
-import 'package:flutter/foundation.dart';
+import 'package:json_annotation/json_annotation.dart';
 
-/// An immutable data model for a user's account, including sensitive details.
-/// This mirrors the `user_accounts` table in the database.
-@immutable
+part 'user_account.g.dart';
+
+/// Immutable data model for a user account.
+/// Mirrors the `user_accounts` table in the backend.
+@JsonSerializable()
 class UserAccount {
   final String id;
+  @JsonKey(name: 'firebase_uid')
   final String firebaseUid;
   final String email;
   final String username;
   final double balance;
-  final String bio;
-  final String profileImageUrl;
+  final String? bio;
+  @JsonKey(name: 'profile_image_url')
+  final String? profileImageUrl;
+  @JsonKey(name: 'created_at')
   final DateTime createdAt;
+  @JsonKey(name: 'updated_at')
   final DateTime updatedAt;
-  final String walletId;
-  final String publicKey;
-  final String encryptedPrivateKey;
+  @JsonKey(name: 'wallet_id')
+  final String? walletId;
+  @JsonKey(name: 'public_key')
+  final String? publicKey;
+  @JsonKey(name: 'encrypted_private_key')
+  final String? encryptedPrivateKey;
   final String role;
+  @JsonKey(name: 'is_email_verified')
+  final bool isEmailVerified;
 
   const UserAccount({
     required this.id,
@@ -24,55 +35,25 @@ class UserAccount {
     required this.email,
     required this.username,
     required this.balance,
-    required this.bio,
-    required this.profileImageUrl,
+    this.bio,
+    this.profileImageUrl,
     required this.createdAt,
     required this.updatedAt,
-    required this.walletId,
-    required this.publicKey,
-    required this.encryptedPrivateKey,
-    required this.role,
+    this.walletId,
+    this.publicKey,
+    this.encryptedPrivateKey,
+    this.role = 'user',
+    this.isEmailVerified = false,
   });
 
-  /// Creates a new instance of [UserAccount] from a JSON map.
-  factory UserAccount.fromJson(Map<String, dynamic> json) {
-    return UserAccount(
-      id: json['id']?.toString() ?? '',
-      firebaseUid: json['firebase_uid']?.toString() ?? '',
-      email: json['email']?.toString() ?? '',
-      username: json['username']?.toString() ?? '',
-      balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
-      bio: json['bio']?.toString() ?? '',
-      profileImageUrl: json['profile_image_url']?.toString() ?? '',
-      createdAt: _parseDate(json['created_at']),
-      updatedAt: _parseDate(json['updated_at']),
-      walletId: json['wallet_id']?.toString() ?? '',
-      publicKey: json['public_key']?.toString() ?? '',
-      encryptedPrivateKey: json['encrypted_private_key']?.toString() ?? '',
-      role: json['role']?.toString() ?? 'user',
-    );
-  }
+  /// Factory constructor for creating a new `UserAccount` instance from JSON.
+  factory UserAccount.fromJson(Map<String, dynamic> json) =>
+      _$UserAccountFromJson(json);
 
-  /// Converts this model into a JSON map.
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'firebase_uid': firebaseUid,
-      'email': email,
-      'username': username,
-      'balance': balance,
-      'bio': bio,
-      'profile_image_url': profileImageUrl,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-      'wallet_id': walletId,
-      'public_key': publicKey,
-      'encrypted_private_key': encryptedPrivateKey,
-      'role': role,
-    };
-  }
+  /// Converts this instance into JSON.
+  Map<String, dynamic> toJson() => _$UserAccountToJson(this);
 
-  /// Creates a new instance of [UserAccount] with optional new values.
+  /// Clone with optional overrides.
   UserAccount copyWith({
     String? id,
     String? firebaseUid,
@@ -87,6 +68,7 @@ class UserAccount {
     String? publicKey,
     String? encryptedPrivateKey,
     String? role,
+    bool? isEmailVerified,
   }) {
     return UserAccount(
       id: id ?? this.id,
@@ -102,40 +84,20 @@ class UserAccount {
       publicKey: publicKey ?? this.publicKey,
       encryptedPrivateKey: encryptedPrivateKey ?? this.encryptedPrivateKey,
       role: role ?? this.role,
+      isEmailVerified: isEmailVerified ?? this.isEmailVerified,
     );
-  }
-  
-  /// Helper to deserialize a list of user accounts from a JSON array.
-  static List<UserAccount> fromJsonList(List<dynamic> jsonList) {
-    return jsonList.map((json) => UserAccount.fromJson(json)).toList();
   }
 
   @override
-  String toString() {
-    return 'UserAccount(id: $id, username: $username, balance: $balance, role: $role)';
-  }
+  String toString() =>
+      'UserAccount(id: $id, username: $username, balance: $balance, role: $role)';
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UserAccount &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      other is UserAccount && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
-
-  /// Helper to safely parse a DateTime.
-  static DateTime _parseDate(dynamic value) {
-    if (value is DateTime) return value;
-    if (value is String) {
-      try {
-        return DateTime.parse(value);
-      } catch (_) {
-        return DateTime.fromMillisecondsSinceEpoch(0);
-      }
-    }
-    return DateTime.fromMillisecondsSinceEpoch(0);
-  }
 }
 

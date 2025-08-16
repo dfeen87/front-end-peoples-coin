@@ -3,35 +3,30 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 
-import '../services/api_service.dart';
+import '../service/api_client.dart';
 import '../models/user_account.dart';
 import '../models/goodwill_token.dart';
 import '../models/goodwill_action.dart';
-import 'auth_provider.dart';
 
 /// -----------------------------------------------------------------------------
-/// USER ACCOUNT SERVICE PROVIDER
+/// AUTH STATE PROVIDER (fixes: firebaseAuthStateChangesProvider missing)
 /// -----------------------------------------------------------------------------
-final userAccountServiceProvider = Provider<UserAccountService>((ref) {
-  return UserAccountService();
-});
+final firebaseAuthStateChangesProvider =
+    StreamProvider<auth.User?>((ref) => auth.FirebaseAuth.instance.authStateChanges());
 
 /// -----------------------------------------------------------------------------
 /// USER ACCOUNT NOTIFIER
 /// -----------------------------------------------------------------------------
 class UserAccountNotifier extends StateNotifier<AsyncValue<UserAccount?>> {
-  final UserAccountService _service;
-  final Ref _ref;
+  final PeoplesCoinApiClient _apiClient;
 
-  UserAccountNotifier(this._service, this._ref) : super(const AsyncValue.loading()) {
+  UserAccountNotifier(this._apiClient) : super(const AsyncValue.loading()) {
     _init();
   }
 
-  Future<void> _init() async {
-    await fetchUser();
-  }
+  Future<void> _init() async => fetchUser();
 
-  /// Fetches the current authenticated user profile.
+  /// Fetches the current authenticated user profile from API.
   Future<void> fetchUser() async {
     state = const AsyncValue.loading();
     final firebaseUser = auth.FirebaseAuth.instance.currentUser;
@@ -43,7 +38,13 @@ class UserAccountNotifier extends StateNotifier<AsyncValue<UserAccount?>> {
 
     try {
       final idToken = await firebaseUser.getIdToken();
-      final userAccount = await _service.getUserAccount(firebaseUser.uid);
+      if (idToken.isEmpty) {
+        throw Exception('Failed to obtain Firebase ID token.');
+      }
+
+      final userAccount =
+          await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
+
       state = AsyncValue.data(userAccount);
 
       if (kDebugMode) {
@@ -68,7 +69,7 @@ class UserAccountNotifier extends StateNotifier<AsyncValue<UserAccount?>> {
 /// Provides the current authenticated user account state.
 final userAccountProvider =
     StateNotifierProvider<UserAccountNotifier, AsyncValue<UserAccount?>>(
-  (ref) => UserAccountNotifier(ref.read(userAccountServiceProvider), ref),
+  (ref) => UserAccountNotifier(ref.read(apiClientProvider)),
 );
 
 /// Provides a list of the current user's goodwill actions.
@@ -78,9 +79,18 @@ final userGoodwillActionsProvider = FutureProvider<List<GoodwillAction>>((ref) a
   final user = userAccountState.value;
   if (user == null) return [];
 
-  final service = ref.read(userAccountServiceProvider);
   try {
-    return await service.getUserGoodwillActions(user.id);
+    final firebaseUser = auth.FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) return [];
+
+    final idToken = await firebaseUser.getIdToken();
+    if (idToken.isEmpty) return [];
+
+    final apiClient = ref.read(apiClientProvider);
+    return await apiClient.getUserGoodwillActions(
+      userId: user.id,
+      idToken: idToken,
+    );
   } catch (e) {
     if (kDebugMode) print('[UserGoodwillActionsProvider] Error: $e');
     return [];
@@ -94,9 +104,18 @@ final userGoodwillTokensProvider = FutureProvider<List<GoodwillToken>>((ref) asy
   final user = userAccountState.value;
   if (user == null) return [];
 
-  final service = ref.read(userAccountServiceProvider);
   try {
-    return await service.getUserGoodwillTokens(user.id);
+    final firebaseUser = auth.FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) return [];
+
+    final idToken = await firebaseUser.getIdToken();
+    if (idToken.isEmpty) return [];
+
+    final apiClient = ref.read(apiClientProvider);
+    return await apiClient.getUserGoodwillTokens(
+      userId: user.id,
+      idToken: idToken,
+    );
   } catch (e) {
     if (kDebugMode) print('[UserGoodwillTokensProvider] Error: $e');
     return [];

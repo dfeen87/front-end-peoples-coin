@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 @immutable
-class User {
+class AppUser {
   final String id;
   final String? username;
   final String? email;
@@ -11,7 +11,7 @@ class User {
   final DateTime? updatedAt;
   final bool isActive;
 
-  const User({
+  const AppUser({
     required this.id,
     this.username,
     this.email,
@@ -61,7 +61,7 @@ class User {
     DateTime? updatedAt,
     bool? isActive,
   }) {
-    return User(
+    return AppUser(
       id: id ?? this.id,
       username: username ?? this.username,
       email: email ?? this.email,

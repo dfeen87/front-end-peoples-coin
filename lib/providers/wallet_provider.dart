@@ -1,33 +1,31 @@
-// lib/providers/wallet_provider.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../service/api_client.dart';
+import '../models/wallet_models.dart'; // <-- ensure you have Wallet model
 
 enum WalletStatus { idle, loading, loaded, error }
 
 // --- State ---
 class WalletState {
-  final String? walletId;
-  final double balance;
+  final Wallet? wallet;
   final WalletStatus status;
   final String? error;
 
   const WalletState({
-    this.walletId,
-    this.balance = 0.0,
+    this.wallet,
     this.status = WalletStatus.idle,
     this.error,
   });
 
   WalletState copyWith({
-    String? walletId,
-    double? balance,
+    Wallet? wallet,
     WalletStatus? status,
     String? error,
   }) {
     return WalletState(
-      walletId: walletId ?? this.walletId,
-      balance: balance ?? this.balance,
+      wallet: wallet ?? this.wallet,
       status: status ?? this.status,
       error: error,
     );
@@ -50,47 +48,57 @@ class WalletNotifier extends StateNotifier<WalletState> {
     return token;
   }
 
+  /// Fetch wallet details from API
   Future<void> fetchWallet(String walletIdFromUser) async {
     state = state.copyWith(status: WalletStatus.loading, error: null);
 
     try {
       final idToken = await _getIdToken();
-      final walletData = await _apiClient.getWalletDetails(walletIdFromUser, idToken);
+      final walletJson =
+          await _apiClient.getWalletDetails(walletIdFromUser, idToken);
+
+      final wallet = Wallet.fromJson(walletJson);
 
       state = state.copyWith(
-        walletId: walletData['wallet_id'] as String? ?? walletIdFromUser,
-        balance: (walletData['balance'] as num?)?.toDouble() ?? 0.0,
+        wallet: wallet,
         status: WalletStatus.loaded,
       );
     } catch (e) {
-      state = state.copyWith(status: WalletStatus.error, error: 'Failed to fetch wallet: $e');
+      state = state.copyWith(
+        status: WalletStatus.error,
+        error: 'Failed to fetch wallet: $e',
+      );
       if (kDebugMode) print('[WalletNotifier] Error fetching wallet: $e');
     }
   }
 
+  /// Send funds and refresh wallet balance
   Future<void> sendFunds({
     required String recipientWalletId,
     required double amount,
   }) async {
-    if (state.walletId == null) throw Exception('No wallet loaded');
+    if (state.wallet?.id == null) throw Exception('No wallet loaded');
 
     state = state.copyWith(status: WalletStatus.loading, error: null);
 
     try {
       final idToken = await _getIdToken();
       await _apiClient.sendFunds(
-        fromWalletId: state.walletId!,
+        fromWalletId: state.wallet!.id,
         toWalletId: recipientWalletId,
         amount: amount,
         idToken: idToken,
       );
 
-      // Refresh wallet balance
-      await fetchWallet(state.walletId!);
+      // Refresh wallet balance after transaction
+      await fetchWallet(state.wallet!.id);
 
       state = state.copyWith(status: WalletStatus.loaded);
     } catch (e) {
-      state = state.copyWith(status: WalletStatus.error, error: 'Failed to send funds: $e');
+      state = state.copyWith(
+        status: WalletStatus.error,
+        error: 'Failed to send funds: $e',
+      );
       if (kDebugMode) print('[WalletNotifier] Error sending funds: $e');
       rethrow;
     }
@@ -104,7 +112,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
 // --- Provider ---
 final walletProviderNotifier =
     StateNotifierProvider<WalletNotifier, WalletState>((ref) {
-  final apiClient = PeoplesCoinApiClient();
+  final apiClient = ref.read(apiClientProvider);
   return WalletNotifier(apiClient);
 });
 

@@ -18,7 +18,7 @@ import '../service/api_client.dart'; // Assuming this is your API client
 /// 2. Fetches the wallet balance from the backend.
 /// 3. Provides methods for wallet actions like signing transactions.
 class WalletNotifier extends AsyncNotifier<WalletState> {
-  final _apiClient = ApiClient();
+  final _apiClient = PeoplesCoinApiClient();
 
   @override
   Future<WalletState> build() async {

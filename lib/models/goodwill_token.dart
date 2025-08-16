@@ -1,0 +1,124 @@
+import 'package:flutter/foundation.dart';
+
+/// Represents a goodwill token earned from verified blockchain actions
+/// Each token grants 1-100 "loves" that can be sent/received
+@immutable
+class GoodwillToken {
+  final String id;
+  final String userId;
+  final int lovesAmount; // 1-100 loves earned from this goodwill action
+  final String? actionDescription;
+  final String? actionType;
+  final String blockchainTxId; // Reference to blockchain verification
+  final DateTime createdAt;
+  final DateTime? usedAt;
+  final int lovesUsed; // How many loves from this token have been spent
+  final bool isFullyUsed;
+
+  const GoodwillToken({
+    required this.id,
+    required this.userId,
+    required this.lovesAmount,
+    this.actionDescription,
+    this.actionType,
+    required this.blockchainTxId,
+    required this.createdAt,
+    this.usedAt,
+    required this.lovesUsed,
+    required this.isFullyUsed,
+  });
+
+  factory GoodwillToken.fromJson(Map<String, dynamic> json) {
+    return GoodwillToken(
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      lovesAmount: (json['loves_amount'] as num?)?.toInt() ?? 1,
+      actionDescription: json['action_description']?.toString(),
+      actionType: json['action_type']?.toString(),
+      blockchainTxId: json['blockchain_tx_id']?.toString() ?? '',
+      createdAt: _parseDate(json['created_at']),
+      usedAt: json['used_at'] != null ? _parseDate(json['used_at']) : null,
+      lovesUsed: (json['loves_used'] as num?)?.toInt() ?? 0,
+      isFullyUsed: json['is_fully_used'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'loves_amount': lovesAmount,
+      'action_description': actionDescription,
+      'action_type': actionType,
+      'blockchain_tx_id': blockchainTxId,
+      'created_at': createdAt.toIso8601String(),
+      'used_at': usedAt?.toIso8601String(),
+      'loves_used': lovesUsed,
+      'is_fully_used': isFullyUsed,
+    };
+  }
+
+  /// Get remaining loves that can still be sent from this token
+  int get remainingLoves => lovesAmount - lovesUsed;
+
+  /// Check if this token has any loves left to spend
+  bool get hasLovesRemaining => remainingLoves > 0;
+
+  GoodwillToken copyWith({
+    String? id,
+    String? userId,
+    int? lovesAmount,
+    String? actionDescription,
+    String? actionType,
+    String? blockchainTxId,
+    DateTime? createdAt,
+    DateTime? usedAt,
+    int? lovesUsed,
+    bool? isFullyUsed,
+  }) {
+    return GoodwillToken(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      lovesAmount: lovesAmount ?? this.lovesAmount,
+      actionDescription: actionDescription ?? this.actionDescription,
+      actionType: actionType ?? this.actionType,
+      blockchainTxId: blockchainTxId ?? this.blockchainTxId,
+      createdAt: createdAt ?? this.createdAt,
+      usedAt: usedAt ?? this.usedAt,
+      lovesUsed: lovesUsed ?? this.lovesUsed,
+      isFullyUsed: isFullyUsed ?? this.isFullyUsed,
+    );
+  }
+
+  static List<GoodwillToken> fromJsonList(List<dynamic> jsonList) {
+    return jsonList.map((json) => GoodwillToken.fromJson(json)).toList();
+  }
+
+  @override
+  String toString() {
+    return 'GoodwillToken(id: $id, loves: $lovesAmount, remaining: $remainingLoves, action: $actionType)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GoodwillToken &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  /// Helper to safely parse a DateTime
+  static DateTime _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+}

@@ -81,6 +81,39 @@ class PeoplesCoinApiClient {
     return json['available'] as bool;
   }
 
+  Future<void> createUserAndWallet({
+    required String username,
+    required String recaptchaToken,
+    required String idToken,
+  }) async {
+    await postJson('users/create',
+        idToken: idToken,
+        body: {
+          'username': username,
+          'recaptchaToken': recaptchaToken,
+        });
+  }
+
+  // Wallet
+  Future<Map<String, dynamic>> getWalletDetails(String walletId, String idToken) async {
+    return await getJson('wallets/$walletId', idToken: idToken);
+  }
+
+  Future<void> sendFunds({
+    required String fromWalletId,
+    required String toWalletId,
+    required double amount,
+    required String idToken,
+  }) async {
+    await postJson('wallets/send',
+        idToken: idToken,
+        body: {
+          'fromWalletId': fromWalletId,
+          'toWalletId': toWalletId,
+          'amount': amount,
+        });
+  }
+
   // Goodwill Actions
   Future<List<GoodwillAction>> getUserGoodwillActions({required String idToken}) async {
     final json = await getJson('goodwill-actions', idToken: idToken);
@@ -153,3 +186,4 @@ class ApiClientException implements Exception {
 
 /// Riverpod provider for global API client
 final apiClientProvider = Provider<PeoplesCoinApiClient>((ref) => PeoplesCoinApiClient());
+
