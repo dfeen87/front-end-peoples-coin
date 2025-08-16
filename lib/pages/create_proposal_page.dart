@@ -10,7 +10,7 @@ import 'dart:convert';
 // Assume these models and providers exist in your project
 import '../models/proposal_to_send.dart';
 import '../models/user.dart' as app_user;
-import '../services/api_service.dart';
+import '../service/api_service.dart';
 import '../config/api_config.dart';
 
 // -- RIVERPOD PROVIDERS --

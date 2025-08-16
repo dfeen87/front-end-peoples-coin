@@ -7,9 +7,9 @@ import 'dart:ui';
 import 'dart:async';
 
 // Import the actual service and model files
-import 'package:goodwill/service/proposal_service.dart';
-import 'package:goodwill/models/proposal.dart';
-import 'package:goodwill/models/vote.dart';
+import '../service/proposal_service.dart';
+import '../models/proposal.dart';
+import '../models/vote.dart';
 
 // --- DATA MODELS AND PROVIDERS ---
 
