@@ -1,0 +1,622 @@
+Analyzing front-end-peoples-coin...                             
+
+   info • The import of 'package:flutter/material.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/foundation.dart' • lib/app_state_providers.dart:4:8 • unnecessary_import
+warning • Unused import: 'package:firebase_auth/firebase_auth.dart' • lib/main.dart:13:8 • unused_import
+warning • Unused import: 'service/api_client.dart' • lib/main.dart:16:8 • unused_import
+warning • Unused import: 'models/user.dart' • lib/main.dart:18:8 • unused_import
+warning • Unused import: 'state/proposal_provider.dart' • lib/main.dart:23:8 • unused_import
+warning • Unused import: 'state/ledger_provider.dart' • lib/main.dart:24:8 • unused_import
+warning • Unused import: 'state/goodwill_processing_provider.dart' • lib/main.dart:25:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:92:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:93:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:94:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:95:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:96:43 • deprecated_member_use
+   info • 'stream' is deprecated and shouldn't be used. .stream will be removed in 3.0.0. As a replacement, either listen to the provider itself (AsyncValue) or .future • lib/main.dart:193:74 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:581:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:638:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:643:64 • deprecated_member_use
+warning • The declaration '_signOut' isn't referenced • lib/main.dart:708:16 • unused_element
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:886:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:891:62 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/main.dart:943:41 • deprecated_member_use
+warning • Unused import: 'dart:collection' • lib/models/goodwill_action.dart:1:8 • unused_import
+  error • Undefined name 'as' • lib/models/goodwill_token.dart:42:43 • undefined_identifier
+  error • Conditions must have a static type of 'bool' • lib/models/goodwill_token.dart:42:46 • non_bool_condition
+  error • Expected to find ',' • lib/models/goodwill_token.dart:42:46 • expected_token
+  error • Expected an identifier • lib/models/goodwill_token.dart:42:51 • missing_identifier
+  error • Expected to find ':' • lib/models/goodwill_token.dart:42:51 • expected_token
+   info • 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion • lib/models/tech_system.dart:47:22 • deprecated_member_use
+  error • Undefined name 'as' • lib/models/tech_system.dart:59:64 • undefined_identifier
+  error • Conditions must have a static type of 'bool' • lib/models/tech_system.dart:59:67 • non_bool_condition
+  error • Expected to find ',' • lib/models/tech_system.dart:59:67 • expected_token
+  error • Expected an identifier • lib/models/tech_system.dart:59:72 • missing_identifier
+  error • Expected to find ':' • lib/models/tech_system.dart:59:72 • expected_token
+  error • Expected an identifier • lib/models/user.dart:37:44 • missing_identifier
+  error • Expected an identifier • lib/models/user.dart:37:51 • missing_identifier
+  error • Expected to find ':' • lib/models/user.dart:37:51 • expected_token
+  error • Undefined name 'as' • lib/models/user_account.g.dart:23:47 • undefined_identifier
+  error • Conditions must have a static type of 'bool' • lib/models/user_account.g.dart:23:50 • non_bool_condition
+  error • Expected to find ',' • lib/models/user_account.g.dart:23:50 • expected_token
+  error • Expected an identifier • lib/models/user_account.g.dart:23:55 • missing_identifier
+  error • Expected to find ':' • lib/models/user_account.g.dart:23:55 • expected_token
+  error • Undefined name 'as' • lib/models/wallet_models.g.dart:15:33 • undefined_identifier
+  error • Conditions must have a static type of 'bool' • lib/models/wallet_models.g.dart:15:36 • non_bool_condition
+  error • Expected to find ',' • lib/models/wallet_models.g.dart:15:36 • expected_token
+  error • Expected an identifier • lib/models/wallet_models.g.dart:15:41 • missing_identifier
+  error • Expected to find ':' • lib/models/wallet_models.g.dart:15:41 • expected_token
+  error • Expected an identifier • lib/models/wallet_models.g.dart:18:39 • missing_identifier
+  error • Expected an identifier • lib/models/wallet_models.g.dart:18:46 • missing_identifier
+  error • Expected to find ':' • lib/models/wallet_models.g.dart:18:46 • expected_token
+warning • Unused import: 'package:http/http.dart' • lib/pages/create_proposal_page.dart:7:8 • unused_import
+warning • Unused import: 'dart:convert' • lib/pages/create_proposal_page.dart:8:8 • unused_import
+warning • Unused import: '../models/proposal_to_send.dart' • lib/pages/create_proposal_page.dart:11:8 • unused_import
+warning • Unused import: '../config/api_config.dart' • lib/pages/create_proposal_page.dart:14:8 • unused_import
+   info • Unnecessary use of multiple underscores • lib/pages/create_proposal_page.dart:40:16 • unnecessary_underscores
+  error • The argument type 'ProposalToSend' can't be assigned to the parameter type 'Map<String, dynamic>'.  • lib/pages/create_proposal_page.dart:69:57 • argument_type_not_assignable
+  error • Too many positional arguments: 1 expected, but 2 found • lib/pages/create_proposal_page.dart:69:67 • extra_positional_arguments_could_be_named
+  error • The operator '[]' isn't defined for the type 'Proposal' • lib/pages/create_proposal_page.dart:71:19 • undefined_operator
+  error • The operator '[]' isn't defined for the type 'Proposal' • lib/pages/create_proposal_page.dart:74:33 • undefined_operator
+   info • 'dialogBackgroundColor' is deprecated and shouldn't be used. Use DialogThemeData.backgroundColor instead. This feature was deprecated after v3.27.0-0.1.pre • lib/pages/create_proposal_page.dart:154:13 • deprecated_member_use
+   info • 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/create_proposal_page.dart:154:66 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/create_proposal_page.dart:185:14 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/create_proposal_page.dart:185:46 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:323:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:334:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:414:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:493:68 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:495:68 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:513:131 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:518:137 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:526:133 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/create_proposal_page.dart:546:51 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/create_proposal_page.dart:556:51 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:590:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:590:101 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:597:107 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:602:90 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:615:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:648:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:675:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:694:90 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:697:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:738:67 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:739:69 • deprecated_member_use
+   info • Unnecessary use of multiple underscores • lib/pages/create_proposal_page.dart:768:11 • unnecessary_underscores
+   info • 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/create_proposal_page.dart:779:44 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/create_proposal_page.dart:789:42 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/create_proposal_page.dart:798:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/create_proposal_page.dart:798:55 • deprecated_member_use
+warning • Unused import: '../models/proposal.dart' • lib/pages/governance_page.dart:10:8 • unused_import
+  error • The returned type 'AppUser?' isn't returnable from a 'User?' function, as required by the closure's context • lib/pages/governance_page.dart:29:21 • return_of_invalid_type_from_closure
+   info • Unnecessary use of multiple underscores • lib/pages/governance_page.dart:33:16 • unnecessary_underscores
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/governance_page.dart:115:58 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/governance_page.dart:135:27 • unnecessary_non_null_assertion
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:364:50 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/governance_page.dart:396:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:408:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:436:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:466:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:467:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:474:57 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:482:61 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:507:68 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:548:55 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:558:62 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:562:55 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:594:50 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/governance_page.dart:609:22 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:618:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:629:58 • deprecated_member_use
+  error • The argument type 'Proposal (where Proposal is defined in /Users/donfeeney/front-end-peoples-coin/lib/pages/governance_page.dart)' can't be assigned to the parameter type 'Proposal (where Proposal is defined in /Users/donfeeney/front-end-peoples-coin/lib/models/proposal.dart)'.  • lib/pages/governance_page.dart:675:53 • argument_type_not_assignable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:694:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:695:55 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/governance_page.dart:699:50 • deprecated_member_use
+   info • The constant name 'BACKEND_URL' isn't a lowerCamelCase identifier • lib/pages/my_portfolio_page.dart:14:14 • constant_identifier_names
+warning • The stack trace variable 'stack' isn't used and can be removed • lib/pages/my_portfolio_page.dart:287:17 • unused_catch_stack
+warning • The stack trace variable 'stack' isn't used and can be removed • lib/pages/my_portfolio_page.dart:302:17 • unused_catch_stack
+   info • 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/my_portfolio_page.dart:427:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:427:70 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:445:65 • deprecated_member_use
+   info • 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/my_portfolio_page.dart:467:42 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_portfolio_page.dart:488:26 • invalid_null_aware_operator
+   info • Use a 'SizedBox' to add whitespace to a layout • lib/pages/my_portfolio_page.dart:499:26 • sized_box_for_whitespace
+   info • 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/my_portfolio_page.dart:557:42 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_portfolio_page.dart:577:26 • invalid_null_aware_operator
+   info • Unnecessary use of multiple underscores • lib/pages/my_portfolio_page.dart:588:35 • unnecessary_underscores
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:653:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:654:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:661:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:668:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:675:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:682:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:700:43 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/my_portfolio_page.dart:707:107 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/my_portfolio_page.dart:755:46 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/my_portfolio_page.dart:766:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:766:51 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/my_portfolio_page.dart:785:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:785:55 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:868:44 • deprecated_member_use
+   info • 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/pages/my_portfolio_page.dart:881:63 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:900:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:929:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:1021:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:1036:40 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:1039:61 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:1073:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:1084:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:1168:67 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:1197:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:1213:52 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_portfolio_page.dart:1257:14 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_portfolio_page.dart:1257:46 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_portfolio_page.dart:1257:76 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_portfolio_page.dart:1281:27 • invalid_null_aware_operator
+warning • The value of the local variable 'theme' isn't used • lib/pages/my_portfolio_page.dart:1387:11 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_portfolio_page.dart:1441:48 • deprecated_member_use
+   info • The constant name 'BACKEND_URL' isn't a lowerCamelCase identifier • lib/pages/my_wallet_page.dart:13:14 • constant_identifier_names
+  error • The getter 'stream' isn't defined for the type 'AsyncValue<User?>' • lib/pages/my_wallet_page.dart:225:38 • undefined_getter
+   info • Use 'rethrow' to rethrow a caught exception • lib/pages/my_wallet_page.dart:236:11 • use_rethrow_when_possible
+  error • The getter 'stream' isn't defined for the type 'AsyncValue<User?>' • lib/pages/my_wallet_page.dart:248:38 • undefined_getter
+   info • Use 'rethrow' to rethrow a caught exception • lib/pages/my_wallet_page.dart:258:11 • use_rethrow_when_possible
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_wallet_page.dart:508:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_wallet_page.dart:510:71 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_wallet_page.dart:513:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_wallet_page.dart:583:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_wallet_page.dart:587:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_wallet_page.dart:600:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_wallet_page.dart:607:59 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_wallet_page.dart:647:25 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_wallet_page.dart:676:74 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/my_wallet_page.dart:676:104 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/pages/my_wallet_page.dart:706:9 • use_super_parameters
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/my_wallet_page.dart:741:23 • unnecessary_non_null_assertion
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_wallet_page.dart:742:49 • invalid_null_aware_operator
+   info • Don't use 'BuildContext's across async gaps • lib/pages/my_wallet_page.dart:749:28 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/pages/my_wallet_page.dart:753:28 • use_build_context_synchronously
+   info • Parameter 'key' could be a super parameter • lib/pages/my_wallet_page.dart:822:9 • use_super_parameters
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_wallet_page.dart:847:14 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_wallet_page.dart:847:79 • invalid_null_aware_operator
+   info • Don't use 'BuildContext's across async gaps • lib/pages/my_wallet_page.dart:859:28 • use_build_context_synchronously
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/my_wallet_page.dart:873:23 • unnecessary_non_null_assertion
+   info • Don't use 'BuildContext's across async gaps • lib/pages/my_wallet_page.dart:886:28 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/pages/my_wallet_page.dart:890:28 • use_build_context_synchronously
+   info • Parameter 'key' could be a super parameter • lib/pages/my_wallet_page.dart:953:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/pages/my_wallet_page.dart:980:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/pages/my_wallet_page.dart:1027:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/pages/my_wallet_page.dart:1068:9 • use_super_parameters
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_wallet_page.dart:1091:14 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/my_wallet_page.dart:1091:43 • invalid_null_aware_operator
+   info • Don't use 'BuildContext's across async gaps • lib/pages/my_wallet_page.dart:1134:28 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/pages/my_wallet_page.dart:1138:28 • use_build_context_synchronously
+warning • Unused import: '../models/vote.dart' • lib/pages/proposal_detail_page.dart:12:8 • unused_import
+  error • The method 'fetchProposalDetails' isn't defined for the type 'ProposalService' • lib/pages/proposal_detail_page.dart:60:46 • undefined_method
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/proposal_detail_page.dart:60:95 • unnecessary_non_null_assertion
+  error • The named parameter 'choice' is required, but there's no corresponding argument • lib/pages/proposal_detail_page.dart:73:38 • missing_required_argument
+  error • The named parameter 'proposalId' is required, but there's no corresponding argument • lib/pages/proposal_detail_page.dart:73:38 • missing_required_argument
+  error • The named parameter 'vote' isn't defined • lib/pages/proposal_detail_page.dart:73:49 • undefined_named_parameter
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/proposal_detail_page.dart:73:77 • unnecessary_non_null_assertion
+  error • Conditions must have a static type of 'bool' • lib/pages/proposal_detail_page.dart:74:11 • non_bool_condition
+  error • The getter 'forVotes' isn't defined for the type 'Proposal' • lib/pages/proposal_detail_page.dart:77:71 • undefined_getter
+  error • The getter 'forVotes' isn't defined for the type 'Proposal' • lib/pages/proposal_detail_page.dart:77:102 • undefined_getter
+  error • The getter 'againstVotes' isn't defined for the type 'Proposal' • lib/pages/proposal_detail_page.dart:78:79 • undefined_getter
+  error • The getter 'againstVotes' isn't defined for the type 'Proposal' • lib/pages/proposal_detail_page.dart:78:114 • undefined_getter
+  error • The named parameter 'forVotes' isn't defined • lib/pages/proposal_detail_page.dart:82:13 • undefined_named_parameter
+  error • The named parameter 'againstVotes' isn't defined • lib/pages/proposal_detail_page.dart:83:13 • undefined_named_parameter
+  error • The named parameter 'userHasVoted' isn't defined • lib/pages/proposal_detail_page.dart:84:13 • undefined_named_parameter
+  error • A value of type 'Vote' can't be returned from the method 'submitVote' because it has a return type of 'Future<bool>' • lib/pages/proposal_detail_page.dart:90:14 • return_of_invalid_type
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/proposal_detail_page.dart:146:29 • unnecessary_non_null_assertion
+   info • Don't use 'BuildContext's across async gaps • lib/pages/proposal_detail_page.dart:197:30 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps • lib/pages/proposal_detail_page.dart:204:9 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/proposal_detail_page.dart:208:48 • deprecated_member_use
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/proposal_detail_page.dart:227:141 • unnecessary_non_null_assertion
+   info • Don't use 'BuildContext's across async gaps • lib/pages/proposal_detail_page.dart:242:28 • use_build_context_synchronously
+  error • The getter 'forVotes' isn't defined for the type 'Proposal' • lib/pages/proposal_detail_page.dart:338:60 • undefined_getter
+  error • The getter 'againstVotes' isn't defined for the type 'Proposal' • lib/pages/proposal_detail_page.dart:338:93 • undefined_getter
+  error • The getter 'userHasVoted' isn't defined for the type 'Proposal' • lib/pages/proposal_detail_page.dart:354:63 • undefined_getter
+  error • The getter 'userHasVoted' isn't defined for the type 'Proposal' • lib/pages/proposal_detail_page.dart:361:24 • undefined_getter
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/proposal_detail_page.dart:402:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/proposal_detail_page.dart:404:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/proposal_detail_page.dart:444:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/proposal_detail_page.dart:445:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/proposal_detail_page.dart:450:79 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/proposal_detail_page.dart:452:80 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/proposal_detail_page.dart:454:65 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/proposal_detail_page.dart:456:79 • deprecated_member_use
+   info • Don't invoke 'print' in production code • lib/pages/public_ledger_page.dart:167:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/pages/public_ledger_page.dart:194:7 • avoid_print
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/public_ledger_page.dart:267:46 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/public_ledger_page.dart:306:27 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/public_ledger_page.dart:336:23 • unnecessary_non_null_assertion
+   info • Don't invoke 'print' in production code • lib/pages/public_ledger_page.dart:340:7 • avoid_print
+  error • A value of type 'StreamSubscription<User?>' can't be assigned to a variable of type 'StreamSubscription<User?>?' • lib/pages/public_ledger_page.dart:353:25 • invalid_assignment
+   info • Don't invoke 'print' in production code • lib/pages/public_ledger_page.dart:367:7 • avoid_print
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/public_ledger_page.dart:446:16 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:527:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:550:39 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/public_ledger_page.dart:568:40 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:576:35 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/public_ledger_page.dart:632:71 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/public_ledger_page.dart:640:54 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/public_ledger_page.dart:642:35 • unnecessary_non_null_assertion
+   info • Don't use 'BuildContext's across async gaps • lib/pages/public_ledger_page.dart:651:40 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:666:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:667:36 • deprecated_member_use
+   info • Unnecessary use of multiple underscores • lib/pages/public_ledger_page.dart:671:26 • unnecessary_underscores
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:673:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:766:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:769:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:802:41 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/public_ledger_page.dart:877:39 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/public_ledger_page.dart:878:43 • unnecessary_non_null_assertion
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:912:31 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/pages/public_ledger_page.dart:925:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/pages/public_ledger_page.dart:951:9 • use_super_parameters
+  error • The argument type 'Stream<User?>' can't be assigned to the parameter type 'Stream<User?>?'.  • lib/pages/public_ledger_page.dart:956:15 • argument_type_not_assignable
+   info • Parameter 'key' could be a super parameter • lib/pages/public_ledger_page.dart:978:9 • use_super_parameters
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/public_ledger_page.dart:990:30 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/public_ledger_page.dart:990:75 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:1096:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/public_ledger_page.dart:1113:45 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/pages/sign_in_page.dart:9:9 • use_super_parameters
+   info • Don't use 'BuildContext's across async gaps • lib/pages/sign_in_page.dart:44:9 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/sign_in_page.dart:79:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/sign_in_page.dart:81:64 • deprecated_member_use
+   info • The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/pages/submit_goodwill_page.dart:8:8 • unnecessary_import
+   info • Don't invoke 'print' in production code • lib/pages/submit_goodwill_page.dart:171:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/pages/submit_goodwill_page.dart:210:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/pages/submit_goodwill_page.dart:231:7 • avoid_print
+   info • Use 'rethrow' to rethrow a caught exception • lib/pages/submit_goodwill_page.dart:232:7 • use_rethrow_when_possible
+   info • Don't invoke 'print' in production code • lib/pages/submit_goodwill_page.dart:266:7 • avoid_print
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/submit_goodwill_page.dart:281:50 • invalid_null_aware_operator
+   info • Don't invoke 'print' in production code • lib/pages/submit_goodwill_page.dart:337:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/pages/submit_goodwill_page.dart:410:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/pages/submit_goodwill_page.dart:446:7 • avoid_print
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/submit_goodwill_page.dart:545:20 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/submit_goodwill_page.dart:545:60 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/submit_goodwill_page.dart:594:24 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/submit_goodwill_page.dart:793:40 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/submit_goodwill_page.dart:796:19 • invalid_null_aware_operator
+warning • The receiver can't be 'null' because of short-circuiting, so the null-aware operator '?.' can't be used • lib/pages/submit_goodwill_page.dart:796:27 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/submit_goodwill_page.dart:878:44 • unnecessary_non_null_assertion
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/submit_goodwill_page.dart:885:35 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/submit_goodwill_page.dart:886:44 • unnecessary_non_null_assertion
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/submit_goodwill_page.dart:1153:57 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/submit_goodwill_page.dart:1180:56 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/submit_goodwill_page.dart:1225:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/submit_goodwill_page.dart:1279:44 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/pages/submit_goodwill_page.dart:1374:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/pages/submit_goodwill_page.dart:1462:9 • use_super_parameters
+   info • Unnecessary use of multiple underscores • lib/pages/submit_goodwill_page.dart:1468:20 • unnecessary_underscores
+   info • Parameter 'key' could be a super parameter • lib/pages/submit_goodwill_page.dart:1510:9 • use_super_parameters
+   info • Unnecessary use of multiple underscores • lib/pages/submit_goodwill_page.dart:1516:20 • unnecessary_underscores
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/submit_goodwill_page.dart:1540:32 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/pages/submit_goodwill_page.dart:1572:9 • use_super_parameters
+   info • Unnecessary use of multiple underscores • lib/pages/submit_goodwill_page.dart:1578:20 • unnecessary_underscores
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/submit_goodwill_page.dart:1600:34 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/views/receive_loves_view.dart:73:89 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/receive_loves_view.dart:122:41 • deprecated_member_use
+   info • 'foregroundColor' is deprecated and shouldn't be used. use colors in eyeStyle and dataModuleStyle instead • lib/pages/views/receive_loves_view.dart:166:19 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/receive_loves_view.dart:175:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/receive_loves_view.dart:177:58 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/send_loves_view.dart:95:37 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/views/send_loves_view.dart:148:49 • invalid_null_aware_operator
+  error • Undefined name 'ledgerProvider' • lib/pages/views/send_loves_view.dart:167:22 • undefined_identifier
+warning • The '!' will have no effect because the receiver can't be null • lib/pages/views/send_loves_view.dart:170:27 • unnecessary_non_null_assertion
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/views/send_loves_view.dart:253:35 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/send_loves_view.dart:267:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/send_loves_view.dart:269:63 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/send_loves_view.dart:331:66 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/views/send_loves_view.dart:344:47 • invalid_null_aware_operator
+warning • The receiver can't be 'null' because of short-circuiting, so the null-aware operator '?.' can't be used • lib/pages/views/send_loves_view.dart:344:55 • invalid_null_aware_operator
+  error • Conditions must have a static type of 'bool' • lib/pages/views/send_loves_view.dart:347:25 • non_bool_condition
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/views/send_loves_view.dart:347:30 • invalid_null_aware_operator
+warning • The receiver can't be 'null' because of short-circuiting, so the null-aware operator '?.' can't be used • lib/pages/views/send_loves_view.dart:347:38 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/views/send_loves_view.dart:352:55 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/send_loves_view.dart:374:66 • deprecated_member_use
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/views/send_loves_view.dart:386:47 • invalid_null_aware_operator
+warning • The receiver can't be 'null' because of short-circuiting, so the null-aware operator '?.' can't be used • lib/pages/views/send_loves_view.dart:386:55 • invalid_null_aware_operator
+  error • The argument type 'String?' can't be assigned to the parameter type 'String'.  • lib/pages/views/send_loves_view.dart:389:52 • argument_type_not_assignable
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/pages/views/send_loves_view.dart:389:57 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/send_loves_view.dart:440:68 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/pages/views/send_loves_view.dart:460:64 • deprecated_member_use
+   info • The file name 'Multi_provider.dart' isn't a lower_case_with_underscores identifier • lib/providers/Multi_provider.dart:1:1 • file_names
+  error • Target of URI doesn't exist: 'goodwill_processing_provider.dart' • lib/providers/Multi_provider.dart:4:8 • uri_does_not_exist
+  error • Target of URI doesn't exist: 'proposal_provider.dart' • lib/providers/Multi_provider.dart:5:8 • uri_does_not_exist
+  error • The name 'UserProvider' isn't a type, so it can't be used as a type argument • lib/providers/Multi_provider.dart:15:45 • non_type_as_type_argument
+  error • The function 'UserProvider' isn't defined • lib/providers/Multi_provider.dart:17:10 • undefined_function
+  error • The name 'GoodwillProcessingProvider' isn't a type, so it can't be used as a type argument • lib/providers/Multi_provider.dart:20:59 • non_type_as_type_argument
+  error • The function 'GoodwillProcessingProvider' isn't defined • lib/providers/Multi_provider.dart:22:10 • undefined_function
+  error • The name 'ProposalProvider' isn't a type, so it can't be used as a type argument • lib/providers/Multi_provider.dart:25:49 • non_type_as_type_argument
+  error • The function 'ProposalProvider' isn't defined • lib/providers/Multi_provider.dart:27:10 • undefined_function
+  error • The name 'LedgerProvider' isn't a type, so it can't be used as a type argument • lib/providers/Multi_provider.dart:30:47 • non_type_as_type_argument
+  error • The function 'LedgerProvider' isn't defined • lib/providers/Multi_provider.dart:32:10 • undefined_function
+  error • The name 'VotingProvider' isn't a type, so it can't be used as a type argument • lib/providers/Multi_provider.dart:35:47 • non_type_as_type_argument
+  error • The function 'VotingProvider' isn't defined • lib/providers/Multi_provider.dart:37:10 • undefined_function
+   info • The file name 'Proposals_provider.dart' isn't a lower_case_with_underscores identifier • lib/providers/Proposals_provider.dart:1:1 • file_names
+  error • Target of URI doesn't exist: 'app_state_providers.dart' • lib/providers/Proposals_provider.dart:6:8 • uri_does_not_exist
+  error • The method 'getProposals' isn't defined for the type 'PeoplesCoinApiClient' • lib/providers/Proposals_provider.dart:75:40 • undefined_method
+  error • The named parameter 'idToken' is required, but there's no corresponding argument • lib/providers/Proposals_provider.dart:88:37 • missing_required_argument
+  error • The argument type 'Proposal' can't be assigned to the parameter type 'Map<String, dynamic>'.  • lib/providers/Proposals_provider.dart:89:66 • argument_type_not_assignable
+  error • The named parameter 'idToken' is required, but there's no corresponding argument • lib/providers/Proposals_provider.dart:100:24 • missing_required_argument
+  error • The named parameter 'proposal' is required, but there's no corresponding argument • lib/providers/Proposals_provider.dart:100:24 • missing_required_argument
+  error • Too many positional arguments: 0 expected, but 1 found • lib/providers/Proposals_provider.dart:100:39 • extra_positional_arguments_could_be_named
+  error • The named parameter 'choice' is required, but there's no corresponding argument • lib/providers/Proposals_provider.dart:112:24 • missing_required_argument
+  error • The named parameter 'idToken' is required, but there's no corresponding argument • lib/providers/Proposals_provider.dart:112:24 • missing_required_argument
+  error • The named parameter 'proposalId' is required, but there's no corresponding argument • lib/providers/Proposals_provider.dart:112:24 • missing_required_argument
+  error • Too many positional arguments: 0 expected, but 1 found • lib/providers/Proposals_provider.dart:112:35 • extra_positional_arguments_could_be_named
+warning • Unused import: 'package:flutter/foundation.dart' • lib/providers/goodwill_actions_provider.dart:2:8 • unused_import
+  error • Target of URI doesn't exist: 'app_state_providers.dart' • lib/providers/goodwill_actions_provider.dart:6:8 • uri_does_not_exist
+  error • The named parameter 'userId' isn't defined • lib/providers/goodwill_actions_provider.dart:55:9 • undefined_named_parameter
+warning • The '!' will have no effect because the receiver can't be null • lib/providers/goodwill_actions_provider.dart:56:25 • unnecessary_non_null_assertion
+  error • The argument type 'GoodwillAction' can't be assigned to the parameter type 'Map<String, dynamic>'.  • lib/providers/goodwill_actions_provider.dart:58:69 • argument_type_not_assignable
+  error • The named parameter 'action' is required, but there's no corresponding argument • lib/providers/goodwill_actions_provider.dart:74:41 • missing_required_argument
+  error • The named parameter 'goodwillAction' isn't defined • lib/providers/goodwill_actions_provider.dart:75:9 • undefined_named_parameter
+warning • The '!' will have no effect because the receiver can't be null • lib/providers/goodwill_actions_provider.dart:76:25 • unnecessary_non_null_assertion
+  error • This expression has a type of 'void' so its value can't be used • lib/providers/goodwill_actions_provider.dart:79:39 • use_of_void_result
+  error • The method 'getGoodwillStatus' isn't defined for the type 'PeoplesCoinApiClient' • lib/providers/goodwill_actions_provider.dart:106:47 • undefined_method
+  error • The method '_statusFromString' isn't defined for the type 'GoodwillAction' • lib/providers/goodwill_actions_provider.dart:112:39 • undefined_method
+  error • The named parameter 'idToken' is required, but there's no corresponding argument • lib/providers/ledger_provider.dart:64:43 • missing_required_argument
+  error • The named parameter 'lastId' isn't defined • lib/providers/ledger_provider.dart:65:9 • undefined_named_parameter
+  error • The named parameter 'query' isn't defined • lib/providers/ledger_provider.dart:66:9 • undefined_named_parameter
+  error • The argument type 'List<Object>' can't be assigned to the parameter type 'List<PublicLedgerEntry>?'.  • lib/providers/ledger_provider.dart:70:18 • argument_type_not_assignable
+  error • The element type 'LedgerEntry' can't be assigned to the list type 'PublicLedgerEntry' • lib/providers/ledger_provider.dart:70:65 • list_element_type_not_assignable
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/providers/ledger_provider.dart:82:60 • invalid_null_aware_operator
+  error • The named parameter 'idToken' is required, but there's no corresponding argument • lib/providers/ledger_provider.dart:96:24 • missing_required_argument
+  error • The named parameter 'recipientId' is required, but there's no corresponding argument • lib/providers/ledger_provider.dart:96:24 • missing_required_argument
+  error • The named parameter 'senderWalletId' isn't defined • lib/providers/ledger_provider.dart:97:9 • undefined_named_parameter
+  error • The named parameter 'recipientWalletId' isn't defined • lib/providers/ledger_provider.dart:98:9 • undefined_named_parameter
+warning • The '!' will have no effect because the receiver can't be null • lib/providers/ledger_provider.dart:99:23 • unnecessary_non_null_assertion
+  error • The named parameter 'memo' isn't defined • lib/providers/ledger_provider.dart:100:9 • undefined_named_parameter
+  error • Target of URI doesn't exist: 'app_state_providers.dart' • lib/providers/user_provider.dart:7:8 • uri_does_not_exist
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/providers/user_provider.dart:73:22 • invalid_null_aware_operator
+  error • The method 'getUserAccount' isn't defined for the type 'PeoplesCoinApiClient' • lib/providers/user_provider.dart:84:37 • undefined_method
+  error • The named parameter 'userId' isn't defined • lib/providers/user_provider.dart:100:9 • undefined_named_parameter
+warning • The '!' will have no effect because the receiver can't be null • lib/providers/user_provider.dart:101:25 • unnecessary_non_null_assertion
+  error • The method 'getVotingResults' isn't defined for the type 'ApiService' • lib/providers/voting_provider.dart:49:41 • undefined_method
+warning • The '!' will have no effect because the receiver can't be null • lib/providers/wallet_provider.dart:89:23 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/providers/wallet_provider.dart:90:25 • unnecessary_non_null_assertion
+   info • 'dart:js' is deprecated and shouldn't be used. Use dart:js_interop instead • lib/recaptcha_helper.dart:2:1 • deprecated_member_use
+   info • Don't use web-only libraries outside Flutter web plugins • lib/recaptcha_helper.dart:2:1 • avoid_web_libraries_in_flutter
+   info • 'dart:js_util' is deprecated and shouldn't be used. Use dart:js_interop instead • lib/recaptcha_helper.dart:3:1 • deprecated_member_use
+   info • Don't use web-only libraries outside Flutter web plugins • lib/recaptcha_helper.dart:3:1 • avoid_web_libraries_in_flutter
+   info • Don't invoke 'print' in production code • lib/recaptcha_helper.dart:24:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/recaptcha_helper.dart:54:9 • avoid_print
+   info • String literals shouldn't be concatenated by the '+' operator • lib/screens/code_display_page.dart:43:83 • prefer_adjacent_string_concatenation
+   info • 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead • lib/screens/sign_in_screen.dart:4:1 • deprecated_member_use
+   info • Don't use web-only libraries outside Flutter web plugins • lib/screens/sign_in_screen.dart:4:1 • avoid_web_libraries_in_flutter
+   info • The import of 'package:flutter/services.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/screens/sign_in_screen.dart:6:8 • unnecessary_import
+warning • The '!' will have no effect because the receiver can't be null • lib/screens/sign_in_screen.dart:145:19 • unnecessary_non_null_assertion
+  error • The method 'callMethod' isn't defined for the type 'Window' • lib/screens/sign_in_screen.dart:158:17 • undefined_method
+  error • The operator '[]=' isn't defined for the type 'Window' • lib/screens/sign_in_screen.dart:175:16 • undefined_operator
+   info • Don't invoke 'print' in production code • lib/screens/sign_in_screen.dart:228:7 • avoid_print
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_in_screen.dart:234:31 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/screens/sign_in_screen.dart:237:35 • unnecessary_non_null_assertion
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_in_screen.dart:243:31 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_in_screen.dart:244:15 • invalid_null_aware_operator
+   info • Don't use 'BuildContext's across async gaps • lib/screens/sign_in_screen.dart:260:19 • use_build_context_synchronously
+  error • The named parameter 'recaptchaToken' isn't defined • lib/screens/sign_in_screen.dart:269:9 • undefined_named_parameter
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_in_screen.dart:357:41 • deprecated_member_use
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/sign_in_screen.dart:379:34 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_in_screen.dart:406:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_in_screen.dart:454:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_in_screen.dart:474:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_in_screen.dart:591:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_in_screen.dart:593:71 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_in_screen.dart:621:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_in_screen.dart:623:70 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_in_screen.dart:659:57 • deprecated_member_use
+   info • 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead • lib/screens/sign_up_screen.dart:4:1 • deprecated_member_use
+   info • Don't use web-only libraries outside Flutter web plugins • lib/screens/sign_up_screen.dart:4:1 • avoid_web_libraries_in_flutter
+warning • The '!' will have no effect because the receiver can't be null • lib/screens/sign_up_screen.dart:206:19 • unnecessary_non_null_assertion
+  error • The method 'callMethod' isn't defined for the type 'Window' • lib/screens/sign_up_screen.dart:219:17 • undefined_method
+  error • The operator '[]=' isn't defined for the type 'Window' • lib/screens/sign_up_screen.dart:236:16 • undefined_operator
+   info • Don't invoke 'print' in production code • lib/screens/sign_up_screen.dart:289:7 • avoid_print
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_up_screen.dart:295:17 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_up_screen.dart:376:17 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_up_screen.dart:419:31 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/screens/sign_up_screen.dart:422:35 • unnecessary_non_null_assertion
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_up_screen.dart:428:31 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_up_screen.dart:430:26 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/screens/sign_up_screen.dart:436:16 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/screens/sign_up_screen.dart:440:53 • unnecessary_non_null_assertion
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_up_screen.dart:461:31 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_up_screen.dart:462:15 • invalid_null_aware_operator
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_up_screen.dart:472:31 • invalid_null_aware_operator
+   info • Don't use 'BuildContext's across async gaps • lib/screens/sign_up_screen.dart:502:19 • use_build_context_synchronously
+  error • The named parameter 'email' is required, but there's no corresponding argument • lib/screens/sign_up_screen.dart:507:25 • missing_required_argument
+  error • The named parameter 'password' is required, but there's no corresponding argument • lib/screens/sign_up_screen.dart:507:25 • missing_required_argument
+  error • Too many positional arguments: 0 expected, but 2 found • lib/screens/sign_up_screen.dart:508:9 • extra_positional_arguments_could_be_named
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_up_screen.dart:637:31 • deprecated_member_use
+warning • This default clause is covered by the previous cases • lib/screens/sign_up_screen.dart:683:7 • unreachable_switch_default
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/screens/sign_up_screen.dart:689:33 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_up_screen.dart:764:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_up_screen.dart:784:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_up_screen.dart:910:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_up_screen.dart:972:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_up_screen.dart:974:71 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_up_screen.dart:1002:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_up_screen.dart:1004:70 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/sign_up_screen.dart:1040:57 • deprecated_member_use
+  error • Invalid constant value • lib/screens/sign_up_screen.dart:1107:27 • invalid_constant
+   info • Unnecessary 'const' keyword • lib/screens/sign_up_screen.dart:1110:34 • unnecessary_const
+warning • The value of the field '_isVerified' isn't used • lib/screens/verify_email_screen.dart:16:8 • unused_field
+   info • The 'child' argument should be last in widget constructor invocations • lib/screens/verify_email_screen.dart:99:19 • sort_child_properties_last
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/welcome_screen.dart:392:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/welcome_screen.dart:394:55 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/welcome_screen.dart:395:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/welcome_screen.dart:401:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/welcome_screen.dart:431:58 • deprecated_member_use
+   info • The imported package 'your_app_name' isn't a dependency of the importing package • lib/service/account_service.dart:2:8 • depend_on_referenced_packages
+  error • Target of URI doesn't exist: 'package:your_app_name/service/api_client.dart' • lib/service/account_service.dart:2:8 • uri_does_not_exist
+   info • The imported package 'your_app_name' isn't a dependency of the importing package • lib/service/account_service.dart:3:8 • depend_on_referenced_packages
+  error • Target of URI doesn't exist: 'package:your_app_name/models/user_account.dart' • lib/service/account_service.dart:3:8 • uri_does_not_exist
+   info • The imported package 'your_app_name' isn't a dependency of the importing package • lib/service/account_service.dart:4:8 • depend_on_referenced_packages
+  error • Target of URI doesn't exist: 'package:your_app_name/models/wallet.dart' • lib/service/account_service.dart:4:8 • uri_does_not_exist
+  error • Undefined class 'PeoplesCoinApiClient' • lib/service/account_service.dart:9:9 • undefined_class
+  error • The name 'UserAccount' isn't a type, so it can't be used as a type argument • lib/service/account_service.dart:32:10 • non_type_as_type_argument
+warning • The '!' will have no effect because the receiver can't be null • lib/service/account_service.dart:43:68 • unnecessary_non_null_assertion
+  error • Undefined name 'UserAccount' • lib/service/account_service.dart:46:14 • undefined_identifier
+  error • The name 'UserAccount' isn't a type, so it can't be used as a type argument • lib/service/account_service.dart:54:10 • non_type_as_type_argument
+warning • The '!' will have no effect because the receiver can't be null • lib/service/account_service.dart:56:61 • unnecessary_non_null_assertion
+  error • Undefined name 'UserAccount' • lib/service/account_service.dart:60:16 • undefined_identifier
+  error • The name 'Wallet' isn't a type, so it can't be used as a type argument • lib/service/account_service.dart:70:10 • non_type_as_type_argument
+warning • The '!' will have no effect because the receiver can't be null • lib/service/account_service.dart:75:61 • unnecessary_non_null_assertion
+  error • Undefined name 'Wallet' • lib/service/account_service.dart:77:14 • undefined_identifier
+warning • Unused import: '../models/wallet_models.dart' • lib/service/api_client.dart:6:8 • unused_import
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/api_client.dart:29:43 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:75:60 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:90:25 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:99:63 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:109:25 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:119:68 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:126:56 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:137:23 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:148:61 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:154:73 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:159:49 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:163:66 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:168:58 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/api_client.dart:173:65 • unnecessary_non_null_assertion
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/api_service.dart:25:43 • invalid_null_aware_operator
+  error • A value of type 'Map<dynamic, dynamic>' can't be returned from the method '_request' because it has a return type of 'Future<Map<String, dynamic>>' • lib/service/api_service.dart:62:75 • return_of_invalid_type
+  error • The method 'fetchBackendStatus' isn't defined for the type 'PeoplesCoinApiClient' • lib/service/backend_status_service.dart:45:42 • undefined_method
+  error • The getter 'backendEventsStream' isn't defined for the type 'PeoplesCoinApiClient' • lib/service/backend_status_service.dart:64:37 • undefined_getter
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/goodwill_action_service.dart:73:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/goodwill_action_service.dart:75:13 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/goodwill_action_service.dart:167:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/goodwill_action_service.dart:169:13 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/service/goodwill_action_service.dart:210:27 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/goodwill_action_service.dart:283:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/goodwill_action_service.dart:285:13 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/loves_ledger_service.dart:91:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/loves_ledger_service.dart:93:13 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/service/loves_ledger_service.dart:128:27 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/loves_ledger_service.dart:197:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/loves_ledger_service.dart:199:13 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/loves_ledger_service.dart:228:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/loves_ledger_service.dart:230:13 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/loves_ledger_service.dart:290:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/loves_ledger_service.dart:292:13 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/loves_ledger_service.dart:336:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/loves_ledger_service.dart:338:13 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/loves_ledger_service.dart:407:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/loves_ledger_service.dart:409:13 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/loves_ledger_service.dart:432:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/loves_ledger_service.dart:434:13 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/proposal_service.dart:22:43 • invalid_null_aware_operator
+  error • A value of type 'Map<dynamic, dynamic>' can't be returned from the method '_request' because it has a return type of 'Future<Map<String, dynamic>>' • lib/service/proposal_service.dart:31:70 • return_of_invalid_type
+warning • Unused import: 'dart:io' • lib/service/recaptcha_service.dart:2:8 • unused_import
+   info • 'dart:js' is deprecated and shouldn't be used. Use dart:js_interop instead • lib/service/recaptcha_service.dart:6:1 • deprecated_member_use
+   info • Don't use web-only libraries outside Flutter web plugins • lib/service/recaptcha_service.dart:6:1 • avoid_web_libraries_in_flutter
+   info • The file name 'user_Account_service.dart' isn't a lower_case_with_underscores identifier • lib/service/user_Account_service.dart:1:1 • file_names
+  error • Undefined name 'as' • lib/service/user_Account_service.dart:130:36 • undefined_identifier
+  error • Conditions must have a static type of 'bool' • lib/service/user_Account_service.dart:130:39 • non_bool_condition
+  error • Expected to find ',' • lib/service/user_Account_service.dart:130:39 • expected_token
+  error • Expected an identifier • lib/service/user_Account_service.dart:130:44 • missing_identifier
+  error • Expected to find ':' • lib/service/user_Account_service.dart:130:44 • expected_token
+warning • The '!' will have no effect because the receiver can't be null • lib/service/user_Account_service.dart:157:64 • unnecessary_non_null_assertion
+  error • The operator '+' isn't defined for the type 'FutureOr<int>' • lib/service/user_Account_service.dart:158:47 • undefined_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/service/user_Account_service.dart:163:67 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/user_Account_service.dart:169:73 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/service/user_Account_service.dart:175:64 • unnecessary_non_null_assertion
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/user_Account_service.dart:299:30 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/user_Account_service.dart:301:11 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/user_Account_service.dart:326:30 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/user_Account_service.dart:328:11 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/user_Account_service.dart:385:30 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/user_Account_service.dart:387:11 • prefer_interpolation_to_compose_strings
+warning • The '!' will have no effect because the receiver can't be null • lib/service/user_Account_service.dart:443:55 • unnecessary_non_null_assertion
+   info • Use interpolation to compose strings and values • lib/service/vote_service.dart:145:21 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/service/vote_service.dart:182:21 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/vote_service.dart:272:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/vote_service.dart:274:13 • prefer_interpolation_to_compose_strings
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/vote_service.dart:328:32 • invalid_null_aware_operator
+   info • Use interpolation to compose strings and values • lib/service/vote_service.dart:330:13 • prefer_interpolation_to_compose_strings
+  error • The named parameter 'createdAt' is required, but there's no corresponding argument • lib/service/wallet_manager.dart:54:25 • missing_required_argument
+  error • The named parameter 'updatedAt' is required, but there's no corresponding argument • lib/service/wallet_manager.dart:54:25 • missing_required_argument
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/service/wallet_manager.dart:91:20 • invalid_null_aware_operator
+warning • Unused import: 'package:flutter_secure_storage/flutter_secure_storage.dart' • lib/service/wallet_service.dart:7:8 • unused_import
+warning • The value of the field '_aesKeyLength' isn't used • lib/service/wallet_service.dart:48:20 • unused_field
+  error • The argument type 'List<int>' can't be assigned to the parameter type 'Uint8List'.  • lib/service/wallet_service.dart:67:9 • argument_type_not_assignable
+warning • Unnecessary cast • lib/service/wallet_service.dart:106:90 • unnecessary_cast
+   info • 'updateEmail' is deprecated and shouldn't be used. updateEmail() has been deprecated. Please use verifyBeforeUpdateEmail() instead • lib/state/auth_provider.dart:103:37 • deprecated_member_use
+   info • Unnecessary use of multiple underscores • lib/state/auth_provider.dart:158:16 • unnecessary_underscores
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/state/goodwill_processing_provider.dart:32:31 • invalid_null_aware_operator
+warning • The '!' will have no effect because the receiver can't be null • lib/state/goodwill_processing_provider.dart:33:17 • unnecessary_non_null_assertion
+  error • The named parameter 'createdAt' is required, but there's no corresponding argument • lib/state/goodwill_processing_provider.dart:65:27 • missing_required_argument
+  error • The named parameter 'updatedAt' is required, but there's no corresponding argument • lib/state/goodwill_processing_provider.dart:65:27 • missing_required_argument
+  error • The argument type 'Null' can't be assigned to the parameter type 'String'.  • lib/state/goodwill_processing_provider.dart:66:11 • argument_type_not_assignable
+  error • The named parameter 'timestamp' isn't defined • lib/state/goodwill_processing_provider.dart:72:7 • undefined_named_parameter
+  error • The argument type 'String' can't be assigned to the parameter type 'GoodwillStatus'.  • lib/state/goodwill_processing_provider.dart:73:15 • argument_type_not_assignable
+  error • The named parameter 'action' is required, but there's no corresponding argument • lib/state/goodwill_processing_provider.dart:83:39 • missing_required_argument
+  error • The named parameter 'goodwillAction' isn't defined • lib/state/goodwill_processing_provider.dart:84:9 • undefined_named_parameter
+warning • The '!' will have no effect because the receiver can't be null • lib/state/goodwill_processing_provider.dart:85:25 • unnecessary_non_null_assertion
+  error • This expression has a type of 'void' so its value can't be used • lib/state/goodwill_processing_provider.dart:88:17 • use_of_void_result
+  error • This expression has a type of 'void' so its value can't be used • lib/state/goodwill_processing_provider.dart:94:62 • use_of_void_result
+  error • This expression has a type of 'void' so its value can't be used • lib/state/goodwill_processing_provider.dart:98:24 • use_of_void_result
+  error • The named parameter 'page' isn't defined • lib/state/ledger_provider.dart:82:11 • undefined_named_parameter
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/state/ledger_provider.dart:89:21 • invalid_null_aware_operator
+  error • The named parameter 'amount' is required, but there's no corresponding argument • lib/state/ledger_provider.dart:161:23 • missing_required_argument
+  error • The named parameter 'recipientId' is required, but there's no corresponding argument • lib/state/ledger_provider.dart:161:23 • missing_required_argument
+  error • The named parameter 'sendLovesData' isn't defined • lib/state/ledger_provider.dart:162:9 • undefined_named_parameter
+  error • The argument type 'String?' can't be assigned to the parameter type 'String'.  • lib/state/ledger_provider.dart:168:18 • argument_type_not_assignable
+   info • The import of 'package:flutter/material.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/foundation.dart' • lib/state/proposal_provider.dart:2:8 • unnecessary_import
+warning • The '!' will have no effect because the receiver can't be null • lib/state/proposal_provider.dart:43:83 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/state/proposal_provider.dart:63:25 • unnecessary_non_null_assertion
+  error • The argument type 'ProposalToSend' can't be assigned to the parameter type 'Proposal'.  • lib/state/proposal_provider.dart:83:19 • argument_type_not_assignable
+warning • The '!' will have no effect because the receiver can't be null • lib/state/proposal_provider.dart:84:25 • unnecessary_non_null_assertion
+  error • This expression has a type of 'void' so its value can't be used • lib/state/proposal_provider.dart:87:40 • use_of_void_result
+  error • The named parameter 'choice' is required, but there's no corresponding argument • lib/state/proposal_provider.dart:103:41 • missing_required_argument
+  error • The named parameter 'proposalId' is required, but there's no corresponding argument • lib/state/proposal_provider.dart:103:41 • missing_required_argument
+  error • The named parameter 'vote' isn't defined • lib/state/proposal_provider.dart:104:9 • undefined_named_parameter
+warning • The '!' will have no effect because the receiver can't be null • lib/state/proposal_provider.dart:105:25 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/state/proposal_provider.dart:111:75 • unnecessary_non_null_assertion
+  error • This expression has a type of 'void' so its value can't be used • lib/state/proposal_provider.dart:113:40 • use_of_void_result
+  error • The named parameter 'userId' isn't defined • lib/state/user_provider.dart:91:7 • undefined_named_parameter
+  error • The returned type 'List<GoodwillAction>' isn't returnable from a 'Future<List<GoodwillToken>>' function, as required by the closure's context • lib/state/user_provider.dart:115:14 • return_of_invalid_type_from_closure
+  error • The named parameter 'userId' isn't defined • lib/state/user_provider.dart:116:7 • undefined_named_parameter
+  error • The getter 'future' isn't defined for the type 'StateNotifierProvider<UserAccountNotifier, AsyncValue<UserAccount?>>' • lib/state/wallet_provider.dart:39:61 • undefined_getter
+  error • The argument type 'Object' can't be assigned to the parameter type 'UserAccount'.  • lib/state/wallet_provider.dart:41:30 • argument_type_not_assignable
+  error • The argument type 'Object?' can't be assigned to the parameter type 'UserAccount?'.  • lib/state/wallet_provider.dart:47:20 • argument_type_not_assignable
+  error • This expression has a type of 'void' so its value can't be used • lib/state/wallet_provider.dart:64:50 • use_of_void_result
+  error • This expression has a type of 'void' so its value can't be used • lib/state/wallet_provider.dart:68:26 • use_of_void_result
+  error • 2 positional arguments expected by 'getWalletDetails', but 1 found • lib/state/wallet_provider.dart:82:66 • not_enough_positional_arguments
+   info • Parameter 'key' could be a super parameter • lib/widgets/animated_digit_widget.dart:14:9 • use_super_parameters
+   info • Invalid use of a private type in a public API • lib/widgets/animated_digit_widget.dart:26:3 • library_private_types_in_public_api
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/base_card.dart:39:58 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/base_card.dart:43:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/base_card.dart:67:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/base_card.dart:68:41 • deprecated_member_use
+   info • The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/widgets/dynamic_nebula_background.dart:4:8 • unnecessary_import
+warning • The value of the local variable 'theme' isn't used • lib/widgets/goodwill_action_card.dart:25:11 • unused_local_variable
+warning • This default clause is covered by the previous cases • lib/widgets/goodwill_action_card.dart:44:7 • unreachable_switch_default
+  error • The getter 'headline6' isn't defined for the type 'TextTheme' • lib/widgets/goodwill_action_card.dart:81:42 • undefined_getter
+warning • The left operand can't be null, so the right operand is never executed • lib/widgets/goodwill_action_card.dart:93:35 • dead_null_aware_expression
+  error • The getter 'bodyText2' isn't defined for the type 'TextTheme' • lib/widgets/goodwill_action_card.dart:94:36 • undefined_getter
+  error • The getter 'subtitle1' isn't defined for the type 'TextTheme' • lib/widgets/goodwill_action_card.dart:104:40 • undefined_getter
+  error • The getter 'caption' isn't defined for the type 'TextTheme' • lib/widgets/goodwill_action_card.dart:111:40 • undefined_getter
+warning • The left operand can't be null, so the right operand is never executed • lib/widgets/matrix_text.dart:86:67 • dead_null_aware_expression
+warning • The receiver can't be null, so the null-aware operator '?.' is unnecessary • lib/widgets/matrix_text.dart:86:70 • invalid_null_aware_operator
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/matrix_text.dart:133:29 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/navigation_card.dart:119:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/navigation_card.dart:119:62 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/nebula_background_painter.dart:46:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/proposal_card.dart:61:22 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/proposal_card.dart:63:41 • deprecated_member_use
+  error • The getter 'performerWalletAddress' isn't defined for the type 'PublicLedgerEntry' • lib/widgets/public_action_card.dart:19:49 • undefined_getter
+  error • The getter 'actionType' isn't defined for the type 'PublicLedgerEntry' • lib/widgets/public_action_card.dart:44:25 • undefined_getter
+  error • The getter 'actionType' isn't defined for the type 'PublicLedgerEntry' • lib/widgets/public_action_card.dart:51:57 • undefined_getter
+  error • The getter 'performerWalletAddress' isn't defined for the type 'PublicLedgerEntry' • lib/widgets/public_action_card.dart:73:43 • undefined_getter
+  error • The getter 'performerWalletAddress' isn't defined for the type 'PublicLedgerEntry' • lib/widgets/public_action_card.dart:80:50 • undefined_getter
+   info • 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead • lib/widgets/recaptcha_widget.dart:2:1 • deprecated_member_use
+   info • Don't use web-only libraries outside Flutter web plugins • lib/widgets/recaptcha_widget.dart:2:1 • avoid_web_libraries_in_flutter
+warning • Unused import: '../state/user_provider.dart' • lib/widgets/user_welcome.dart:3:8 • unused_import
+  error • The name 'UserProvider' isn't a type, so it can't be used as a type argument • lib/widgets/user_welcome.dart:20:25 • non_type_as_type_argument
+  error • The property 'isLoading' can't be unconditionally accessed because the receiver can be 'null' • lib/widgets/user_welcome.dart:22:30 • unchecked_use_of_nullable_value
+  error • The property 'userAccount' can't be unconditionally accessed because the receiver can be 'null' • lib/widgets/user_welcome.dart:29:37 • unchecked_use_of_nullable_value
+  error • The property 'userAccount' can't be unconditionally accessed because the receiver can be 'null' • lib/widgets/user_welcome.dart:30:45 • unchecked_use_of_nullable_value
+  error • The property 'userAccount' can't be unconditionally accessed because the receiver can be 'null' • lib/widgets/user_welcome.dart:31:44 • unchecked_use_of_nullable_value
+  error • The name 'MyApp' isn't a class • test/widget_test.dart:16:35 • creation_with_non_type
+

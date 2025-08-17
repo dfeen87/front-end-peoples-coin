@@ -1,35 +1,51 @@
-// lib/models/goodwill_action_to_send.dart
 import 'package:flutter/foundation.dart';
 
-/// A model for sending a new goodwill action to the API.
+/// Immutable model representing a goodwill action to send to the backend API.
 @immutable
 class GoodwillActionToSend {
-  final String performerUserId; // Correct parameter name
+  final String performerUserId; // Matches backend expected field name
   final String actionType;
   final String description;
   final int lovesValue;
-  final Map<String, dynamic>? contextualData;
-  final DateTime timestamp; // Field for timestamp
+  final Map<String, dynamic> contextualData;
+  final DateTime timestamp;
 
   const GoodwillActionToSend({
     required this.performerUserId,
     required this.actionType,
     required this.description,
     required this.lovesValue,
-    this.contextualData,
+    Map<String, dynamic>? contextualData,
     required this.timestamp,
-  });
+  }) : contextualData = contextualData ?? const {};
 
-  /// Converts this object into a JSON map for the API request body.
-  Map<String, dynamic> toJson() {
-    return {
-      'performer_user_id': performerUserId, // Matches backend expected key
-      'action_type': actionType,
-      'description': description,
-      'loves_value': lovesValue,
-      'contextual_data': contextualData ?? {},
-      'timestamp': timestamp.toIso8601String(),
-    };
+  /// Creates a new instance of [GoodwillActionToSend] with optional new values.
+  GoodwillActionToSend copyWith({
+    String? performerUserId,
+    String? actionType,
+    String? description,
+    int? lovesValue,
+    Map<String, dynamic>? contextualData,
+    DateTime? timestamp,
+  }) {
+    return GoodwillActionToSend(
+      performerUserId: performerUserId ?? this.performerUserId,
+      actionType: actionType ?? this.actionType,
+      description: description ?? this.description,
+      lovesValue: lovesValue ?? this.lovesValue,
+      contextualData: contextualData ?? this.contextualData,
+      timestamp: timestamp ?? this.timestamp,
+    );
   }
+
+  /// Converts this model into a JSON map suitable for API requests.
+  Map<String, dynamic> toJson() => {
+    'performer_user_id': performerUserId,
+    'action_type': actionType,
+    'description': description,
+    'loves_value': lovesValue,
+    'contextual_data': contextualData,
+    'timestamp': timestamp.toIso8601String(),
+  };
 }
 

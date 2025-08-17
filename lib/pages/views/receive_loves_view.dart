@@ -70,7 +70,7 @@ class ReceiveLovesView extends ConsumerWidget {
       // Once data is available, build the main content.
       data: (userAccount) {
         // Handle case where user account is null or wallet address is missing
-        if (userAccount == null || userAccount.walletId == null || userAccount.walletId!.isEmpty) {
+        if (userAccount == null || userAccount.walletId == null || userAccount.walletId!?.isEmpty == true) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,

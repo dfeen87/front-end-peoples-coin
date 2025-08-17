@@ -1,6 +1,7 @@
 // lib/providers/ledger_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/public_ledger_entry.dart';
+import '../models/ledger_entry.dart'; // Add this import
 import '../service/api_client.dart';
 
 // --- State ---
@@ -49,7 +50,10 @@ class LedgerNotifier extends StateNotifier<LedgerState> {
   LedgerNotifier(this._apiClient) : super(LedgerState.initial());
 
   /// Fetch ledger entries (with optional refresh)
-  Future<void> fetchPublicLedgerEntries({bool isRefresh = false}) async {
+  Future<void> fetchPublicLedgerEntries({
+    bool isRefresh = false,
+    required String idToken, // Add required idToken
+  }) async {
     if (state.isInitialLoading || state.isFetchingMore) return;
 
     state = state.copyWith(
@@ -60,12 +64,22 @@ class LedgerNotifier extends StateNotifier<LedgerState> {
     );
 
     try {
-      final lastId = state.entries.isNotEmpty ? state.entries.last.id : null;
-      final newEntries = await _apiClient.getLedgerEntries(
-        lastId: lastId,
-        query: state.currentSearchQuery,
-      );
-
+      List<LedgerEntry> apiEntries;
+      
+      if (state.currentSearchQuery != null && state.currentSearchQuery!.isNotEmpty) {
+        // Use search API when there's a query
+        apiEntries = await _apiClient.searchLedger(
+          idToken: idToken,
+          query: state.currentSearchQuery!,
+        );
+      } else {
+        // Use regular fetch API
+        apiEntries = await _apiClient.getLedgerEntries(idToken: idToken);
+      }
+      
+      // Convert LedgerEntry to PublicLedgerEntry if needed
+      final newEntries = apiEntries.map((entry) => _convertToPublicLedgerEntry(entry)).toList();
+      
       state = state.copyWith(
         entries: isRefresh ? newEntries : [...state.entries, ...newEntries],
       );
@@ -76,33 +90,73 @@ class LedgerNotifier extends StateNotifier<LedgerState> {
     }
   }
 
+  /// Convert LedgerEntry to PublicLedgerEntry
+  PublicLedgerEntry _convertToPublicLedgerEntry(LedgerEntry entry) {
+    // You'll need to adjust this based on your actual model structures
+    return PublicLedgerEntry(
+      id: entry.id,
+      // Map other fields as needed based on your models
+      // This is a placeholder - adjust according to your actual PublicLedgerEntry structure
+    );
+  }
+
   /// Set search query and refresh ledger
-  Future<void> search(String? query) async {
+  Future<void> search(String? query, {required String idToken}) async {
     final cleanedQuery = (query ?? '').trim();
-    state = state.copyWith(currentSearchQuery: cleanedQuery.isEmpty ? null : cleanedQuery);
-    await fetchPublicLedgerEntries(isRefresh: true);
+    state = state.copyWith(
+      currentSearchQuery: cleanedQuery.isEmpty ? null : cleanedQuery
+    );
+    await fetchPublicLedgerEntries(isRefresh: true, idToken: idToken);
   }
 
   /// Send loves and refresh ledger
   Future<void> sendLoves({
-    required String senderWalletId,
-    required String recipientWalletId,
+    required String recipientId, // Changed to match API client
     required int amount,
-    String? memo,
+    required String idToken, // Add required idToken
+    String? message, // Changed from memo to message to match API client
   }) async {
     state = state.copyWith(isSendingLoves: true, errorMessage: null);
 
     try {
+      // Use the correct API method signature
       await _apiClient.sendLoves(
-        senderWalletId: senderWalletId,
-        recipientWalletId: recipientWalletId,
-        amount: amount,
-        memo: memo,
+        idToken: idToken,
+        recipientId: recipientId,
+        amount: amount, // Remove the ! since amount is already non-nullable
+        message: message,
       );
-
-      await fetchPublicLedgerEntries(isRefresh: true);
+      
+      // Refresh the ledger after sending
+      await fetchPublicLedgerEntries(isRefresh: true, idToken: idToken);
     } catch (e) {
       state = state.copyWith(errorMessage: 'Failed to send loves: $e');
+    } finally {
+      state = state.copyWith(isSendingLoves: false);
+    }
+  }
+
+  /// Send funds between wallets
+  Future<void> sendFunds({
+    required String fromWalletId,
+    required String toWalletId,
+    required double amount,
+    required String idToken,
+  }) async {
+    state = state.copyWith(isSendingLoves: true, errorMessage: null); // Reuse loading state
+
+    try {
+      await _apiClient.sendFunds(
+        fromWalletId: fromWalletId,
+        toWalletId: toWalletId,
+        amount: amount,
+        idToken: idToken,
+      );
+      
+      // Refresh the ledger after sending
+      await fetchPublicLedgerEntries(isRefresh: true, idToken: idToken);
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to send funds: $e');
     } finally {
       state = state.copyWith(isSendingLoves: false);
     }
@@ -112,7 +166,6 @@ class LedgerNotifier extends StateNotifier<LedgerState> {
 // --- Provider ---
 final ledgerProviderNotifier =
     StateNotifierProvider<LedgerNotifier, LedgerState>((ref) {
-  final apiClient = PeoplesCoinApiClient();
+  final apiClient = ref.watch(apiClientProvider); // Use the provider instead of creating new instance
   return LedgerNotifier(apiClient);
 });
-

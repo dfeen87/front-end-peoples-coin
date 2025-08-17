@@ -145,7 +145,7 @@ class _SendLovesViewState extends ConsumerState<SendLovesView> {
       final userAccount = ref.read(userAccountProvider);
       final currentWallet = userAccount.value?.walletId;
 
-      if (currentWallet == null || currentWallet.isEmpty) {
+      if (currentWallet == null || currentWallet?.isEmpty == true) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -167,7 +167,7 @@ class _SendLovesViewState extends ConsumerState<SendLovesView> {
       await ref.read(ledgerProvider).sendLoves(
             senderWallet: currentWallet,
             recipientWallet: recipient,
-            amount: amount,
+            amount: amount!,
             memo: memo,
           );
 
@@ -341,15 +341,15 @@ class _SendLovesViewState extends ConsumerState<SendLovesView> {
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    if (value == null || value?.trim()?.isEmpty == true) {
                       return 'Please enter a recipient address.';
                     }
-                    if (value.trim().length < 10) {
+                    if (value?.trim()?.length ?? 0 < 10) {
                       return 'Please enter a valid address.';
                     }
                     // Check if sending to self
                     final currentWallet = userAccount.value?.walletId;
-                    if (currentWallet != null && value.trim() == currentWallet) {
+                    if (currentWallet != null && value?.trim() == currentWallet) {
                       return 'Cannot send Loves to yourself.';
                     }
                     return null;
@@ -383,10 +383,10 @@ class _SendLovesViewState extends ConsumerState<SendLovesView> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    if (value == null || value?.trim()?.isEmpty == true) {
                       return 'Please enter an amount.';
                     }
-                    final amount = double.tryParse(value.trim());
+                    final amount = double.tryParse(value?.trim());
                     if (amount == null || amount <= 0) {
                       return 'Please enter a valid amount greater than zero.';
                     }
@@ -405,7 +405,7 @@ class _SendLovesViewState extends ConsumerState<SendLovesView> {
                       value: _showMemo,
                       onChanged: (value) {
                         setState(() {
-                          _showMemo = value ?? false;
+                          _showMemo = value == false;
                           if (!_showMemo) {
                             _memoController.clear();
                           }

@@ -220,9 +220,9 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 // Wallet stream provider with real Firebase data
 final walletStreamProvider = StreamProvider<Wallet>((ref) async* {
   final apiService = ref.read(apiServiceProvider);
-  final authState = ref.watch(authStateProvider);
+  final userStream = ref.watch(authStateProvider.stream);
   
-  await for (final user in authState.stream) {
+  await for (final user in userStream) {
     if (user != null) {
       // Initial load
       yield await apiService.getWallet();
@@ -243,9 +243,9 @@ final walletStreamProvider = StreamProvider<Wallet>((ref) async* {
 // Transaction history provider with real Firebase data
 final transactionHistoryProvider = StreamProvider<List<Transaction>>((ref) async* {
   final apiService = ref.read(apiServiceProvider);
-  final authState = ref.watch(authStateProvider);
+  final userStream = ref.watch(authStateProvider.stream);
   
-  await for (final user in authState.stream) {
+  await for (final user in userStream) {
     if (user != null) {
       // Initial load
       yield await apiService.getTransactions();
@@ -644,7 +644,7 @@ class _TransactionHistoryView extends ConsumerWidget {
         ),
       ),
       data: (transactions) {
-        if (transactions.isEmpty) {
+        if (transactions?.isEmpty == true) {
           return const Padding(
             padding: EdgeInsets.all(24.0),
             child: Text(
@@ -738,8 +738,8 @@ class _ReceiveLovesViewState extends ConsumerState<ReceiveLovesView> {
     try {
       final apiService = ref.read(apiServiceProvider);
       final result = await apiService.generateReceiveLink(
-        amount: amount,
-        description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
+        amount: amount!,
+        description: _descriptionController.text?.isEmpty == true ? null : _descriptionController.text,
       );
       
       setState(() {
@@ -844,7 +844,7 @@ class _SendLovesViewState extends ConsumerState<SendLovesView> {
     final amount = double.tryParse(_amountController.text);
     final description = _descriptionController.text.trim();
 
-    if (email.isEmpty || amount == null || amount <= 0 || description.isEmpty) {
+    if (email?.isEmpty == true || amount == null || amount <= 0 || description?.isEmpty == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields with valid values')),
       );
@@ -870,7 +870,7 @@ class _SendLovesViewState extends ConsumerState<SendLovesView> {
       final apiService = ref.read(apiServiceProvider);
       await apiService.sendLoves(
         recipientEmail: email,
-        amount: amount,
+        amount: amount!,
         description: description,
       );
 
@@ -1088,7 +1088,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
+    if (email?.isEmpty == true || password?.isEmpty == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );

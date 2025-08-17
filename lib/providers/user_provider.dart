@@ -70,11 +70,11 @@ class UserNotifier extends StateNotifier<UserState> {
       onTimeout: () => throw TimeoutException('ID token fetch timed out'),
     );
 
-    if ((token ?? '').isEmpty) {
+    if ((token ?? '')?.isEmpty == true) {
       throw Exception('Failed to get Firebase ID token.');
     }
 
-    return token;
+    return token!;
   }
 
   Future<void> fetchUser({required String userId}) async {
@@ -98,7 +98,7 @@ class UserNotifier extends StateNotifier<UserState> {
       final idToken = await _getIdToken();
       final actions = await _apiClient.getUserGoodwillActions(
         userId: userId,
-        idToken: idToken,
+        idToken: idToken!,
       );
       state = state.copyWith(userActions: actions, isLoadingActions: false);
     } catch (e) {

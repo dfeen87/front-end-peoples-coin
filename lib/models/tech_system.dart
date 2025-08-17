@@ -56,7 +56,7 @@ class TechSystem {
         json['icon_code_point'] as int,
         fontFamily: json['icon_font_family'] as String?,
         fontPackage: json['icon_font_package'] as String?,
-        matchTextDirection: json['icon_match_text_direction'] as bool? ?? false,
+        matchTextDirection: (json['icon_match_text_direction'] as bool?) ?? false,
       ),
       title: json['title'] as String,
       description: json['description'] as String,

@@ -30,11 +30,11 @@ final currentUserProvider = StreamProvider<User?>((ref) {
 });
 
 // App user provider that converts Firebase User to your app's User model
-final authUserProvider = Provider<app_user.User?>((ref) {
+final authUserProvider = Provider<app_user.AppUser?>((ref) {
   final asyncUser = ref.watch(currentUserProvider);
   return asyncUser.when(
     data: (firebaseUser) => firebaseUser != null 
-        ? app_user.User(uid: firebaseUser.uid, email: firebaseUser.email ?? '') 
+        ? app_user.AppUser(id: firebaseUser.uid, email: firebaseUser.email ?? '') 
         : null,
     loading: () => null,
     error: (_, __) => null,
@@ -182,7 +182,7 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
     final title = ref.read(proposalTitleProvider);
     final description = ref.read(proposalDescriptionProvider);
     
-    if (title.isEmpty || description.isEmpty) {
+    if (title?.isEmpty == true || description?.isEmpty == true) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -260,7 +260,7 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
   void _nextStep() async {
     bool isValid = false;
     if (_currentStep == 0) {
-      isValid = _formKeyStep1.currentState?.validate() ?? false;
+      isValid = _formKeyStep1.currentState?.validate() == false;
     } else if (_currentStep == 1) {
       isValid = true; // Step 2 has no validation fields
     }
@@ -543,7 +543,7 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
             initialValue: ref.read(proposalTitleProvider),
             decoration: _buildInputDecoration(theme, 'Proposal Title'),
             style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
-            validator: (val) => val == null || val.isEmpty ? 'A great proposal starts with a strong title.' : null,
+            validator: (val) => val == null || val?.isEmpty == true ? 'A great proposal starts with a strong title.' : null,
             onChanged: (val) => ref.read(proposalTitleProvider.notifier).state = val,
             autovalidateMode: AutovalidateMode.onUserInteraction,
           ),
@@ -553,7 +553,7 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
             decoration: _buildInputDecoration(theme, 'Description'),
             style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
             maxLines: 5,
-            validator: (val) => val == null || val.isEmpty ? 'Please provide a clear description of your idea.' : null,
+            validator: (val) => val == null || val?.isEmpty == true ? 'Please provide a clear description of your idea.' : null,
             onChanged: (val) => ref.read(proposalDescriptionProvider.notifier).state = val,
             autovalidateMode: AutovalidateMode.onUserInteraction,
           ),

@@ -38,12 +38,12 @@ class UserAccountNotifier extends StateNotifier<AsyncValue<UserAccount?>> {
 
     try {
       final idToken = await firebaseUser.getIdToken();
-      if (idToken.isEmpty) {
+      if (idToken?.isEmpty == true) {
         throw Exception('Failed to obtain Firebase ID token.');
       }
 
       final userAccount =
-          await _apiClient.getAuthenticatedUserProfile(idToken: idToken);
+          await _apiClient.getAuthenticatedUserProfile(idToken: idToken!);
 
       state = AsyncValue.data(userAccount);
 
@@ -84,12 +84,14 @@ final userGoodwillActionsProvider = FutureProvider<List<GoodwillAction>>((ref) a
     if (firebaseUser == null) return [];
 
     final idToken = await firebaseUser.getIdToken();
-    if (idToken.isEmpty) return [];
+    if (idToken?.isEmpty == true) return [];
 
     final apiClient = ref.read(apiClientProvider);
+    
+    // Fix: Remove userId parameter - the API method doesn't expect it
+    // The user identity comes from the idToken
     return await apiClient.getUserGoodwillActions(
-      userId: user.id,
-      idToken: idToken,
+      idToken: idToken!,
     );
   } catch (e) {
     if (kDebugMode) print('[UserGoodwillActionsProvider] Error: $e');
@@ -109,16 +111,17 @@ final userGoodwillTokensProvider = FutureProvider<List<GoodwillToken>>((ref) asy
     if (firebaseUser == null) return [];
 
     final idToken = await firebaseUser.getIdToken();
-    if (idToken.isEmpty) return [];
+    if (idToken?.isEmpty == true) return [];
 
     final apiClient = ref.read(apiClientProvider);
+    
+    // Fix: This should probably call getUserGoodwillTokens, not getUserGoodwillActions
+    // And remove the userId parameter
     return await apiClient.getUserGoodwillTokens(
-      userId: user.id,
-      idToken: idToken,
+      idToken: idToken!,
     );
   } catch (e) {
     if (kDebugMode) print('[UserGoodwillTokensProvider] Error: $e');
     return [];
   }
 });
-

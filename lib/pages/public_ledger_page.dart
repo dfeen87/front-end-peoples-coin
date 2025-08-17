@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'dart:async';
 import 'dart:ui';
 import 'dart:convert';
@@ -71,7 +71,7 @@ class User {
 
 class FlaskLedgerService {
   final String baseUrl;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
 
   FlaskLedgerService({required this.baseUrl});
 
@@ -343,17 +343,24 @@ class LedgerNotifier extends StateNotifier<LedgerState> {
   }
 }
 
-// User state notifier
+// User state notifier - Fixed subscription type
 class UserNotifier extends StateNotifier<User?> {
   final FlaskLedgerService _service;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  StreamSubscription<User?>? _authSubscription;
+  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
+  // Fix: Use correct type for auth subscription
+  StreamSubscription<firebase_auth.User?>? _authSubscription;
 
   UserNotifier(this._service) : super(null) {
+    // Fix the subscription type
     _authSubscription = _auth.authStateChanges().listen((firebaseUser) {
+      // Handle authentication state changes
       if (firebaseUser != null) {
+        // User is signed in
+        print('User signed in: ${firebaseUser.uid}');
         _fetchUserProfile();
       } else {
+        // User is signed out
+        print('User signed out');
         state = null;
       }
     });
@@ -399,7 +406,7 @@ final ledgerProvider = StateNotifierProvider<LedgerNotifier, LedgerState>((ref) 
   return LedgerNotifier(service);
 });
 
-// --- WIDGETS (same as before, but with error handling improvements) ---
+// --- WIDGETS ---
 
 class PublicLedgerPage extends ConsumerStatefulWidget {
   const PublicLedgerPage({super.key});
@@ -413,6 +420,10 @@ class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with Ticker
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
+  
+  // Fix line 353 - Use correct type for auth subscription
+  StreamSubscription<firebase_auth.User?>? _authSubscription;
+  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
 
   @override
   void initState() {
@@ -422,6 +433,26 @@ class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with Ticker
       duration: const Duration(milliseconds: 1000),
     );
     _scrollController.addListener(_onScroll);
+    
+    // Fix the subscription type
+    _authSubscription = _auth.authStateChanges().listen((firebaseUser) {
+      // Handle authentication state changes
+      if (firebaseUser != null) {
+        // User is signed in
+        print('User signed in: ${firebaseUser.uid}');
+        // Refresh ledger data or update UI
+        _fetchInitialData();
+      } else {
+        // User is signed out
+        print('User signed out');
+        // Clear data or redirect to login
+        // Optionally clear the ledger state
+        if (mounted) {
+          ref.read(ledgerProvider.notifier).state = LedgerState(publicLedgerEntries: []);
+        }
+      }
+    });
+    
     _fetchInitialData();
   }
 
@@ -453,6 +484,7 @@ class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with Ticker
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _listAnimationController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
@@ -496,7 +528,29 @@ class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with Ticker
               onRefresh: () async => _fetchInitialData(),
               color: Colors.amber,
               backgroundColor: Colors.grey[800],
-              child: _buildBody(ledgerState, currentUserWalletId),
+              child: // Fix line 956 - Use correct stream type
+              StreamBuilder<firebase_auth.User?>(
+                stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  final authUser = snapshot.data;
+                  if (authUser == null) {
+                    return const Center(
+                      child: Text(
+                        'Please sign in to view the public ledger',
+                        style: TextStyle(color: Colors.white70),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  }
+                  
+                  // User is authenticated, show ledger content
+                  return _buildLedgerContent(ledgerState, currentUserWalletId);
+                },
+              ),
             ),
           ),
         ],
@@ -534,7 +588,8 @@ class _PublicLedgerPageState extends ConsumerState<PublicLedgerPage> with Ticker
     );
   }
 
-  Widget _buildBody(LedgerState ledgerState, String? currentUserWalletId) {
+  // Separated ledger content builder for better organization
+  Widget _buildLedgerContent(LedgerState ledgerState, String? currentUserWalletId) {
     if (ledgerState.isInitialLoading) {
       return _buildLoadingShimmer();
     }
@@ -946,19 +1001,64 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Auth wrapper to handle Firebase Authentication state
+// Auth wrapper to handle Firebase Authentication state - Enhanced with proper error handling
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+    return StreamBuilder<firebase_auth.User?>(
+      stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
+            backgroundColor: Colors.deepPurple,
             body: Center(
-              child: CircularProgressIndicator(color: Colors.amber),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Colors.amber),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading...',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        if (snapshot.hasError) {
+          return Scaffold(
+            backgroundColor: Colors.deepPurple,
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.redAccent,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Authentication Error: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.redAccent),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Restart the app or navigate to sign in
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => const AuthWrapper()),
+                      );
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -973,7 +1073,7 @@ class AuthWrapper extends StatelessWidget {
   }
 }
 
-// Simple sign-in page for demonstration
+// Simple sign-in page for demonstration - Enhanced with better validation
 class SignInPage extends StatefulWidget {
   const SignInPage({Key? key}) : super(key: key);
 
@@ -982,26 +1082,45 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
+  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Email is required';
+    }
+      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+      return 'Please enter a valid email address';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters long';
+    }
+    return null;
+  }
 
   Future<void> _signIn() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter email and password')),
-      );
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
     setState(() => _isLoading = true);
     
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await firebase_auth.FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-    } on FirebaseAuthException catch (e) {
+    } on firebase_auth.FirebaseAuthException catch (e) {
       String message = 'Sign in failed';
       switch (e.code) {
         case 'user-not-found':
@@ -1016,17 +1135,31 @@ class _SignInPageState extends State<SignInPage> {
         case 'user-disabled':
           message = 'This account has been disabled';
           break;
+        case 'too-many-requests':
+          message = 'Too many failed attempts. Please try again later';
+          break;
+        case 'network-request-failed':
+          message = 'Network error. Please check your connection';
+          break;
+        default:
+          message = e.message ?? 'An unknown error occurred';
       }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -1059,106 +1192,136 @@ class _SignInPageState extends State<SignInPage> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.favorite,
-                  size: 80,
-                  color: Colors.amber,
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Welcome to Ledger',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.favorite,
+                    size: 80,
+                    color: Colors.amber,
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Sign in to continue',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                TextField(
-                  controller: _emailController,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Welcome to Ledger',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
-                    prefixIcon: const Icon(Icons.email, color: Colors.white70),
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _passwordController,
-                  style: const TextStyle(color: Colors.white),
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Sign in to continue',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white70,
                     ),
-                    prefixIcon: const Icon(Icons.lock, color: Colors.white70),
                   ),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _signIn,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
+                  const SizedBox(height: 48),
+                  TextFormField(
+                    controller: _emailController,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: _validateEmail,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.1),
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
+                      prefixIcon: const Icon(Icons.email, color: Colors.white70),
+                      errorStyle: const TextStyle(color: Colors.redAccent),
                     ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(
-                            color: Colors.black,
-                            strokeWidth: 2,
-                          )
-                        : const Text(
-                            'Sign In',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    style: const TextStyle(color: Colors.white),
+                    obscureText: _obscurePassword,
+                    validator: _validatePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.1),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      prefixIcon: const Icon(Icons.lock, color: Colors.white70),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                      ),
+                      errorStyle: const TextStyle(color: Colors.redAccent),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _signIn,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        disabledBackgroundColor: Colors.amber.withOpacity(0.5),
+                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(
+                              color: Colors.black,
+                              strokeWidth: 2,
+                            )
+                          : const Text(
+                              'Sign In',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    // Add sign up navigation or functionality here
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Sign up functionality coming soon!')),
-                    );
-                  },
-                  child: const Text(
-                    'Don\'t have an account? Sign up',
-                    style: TextStyle(color: Colors.white70),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: _isLoading ? null : () {
+                      // Add sign up navigation or functionality here
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Sign up functionality coming soon!')),
+                      );
+                    },
+                    child: const Text(
+                      'Don\'t have an account? Sign up',
+                      style: TextStyle(color: Colors.white70),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: _isLoading ? null : () {
+                      // Add forgot password functionality
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Forgot password functionality coming soon!')),
+                      );
+                    },
+                    child: const Text(
+                      'Forgot Password?',
+                      style: TextStyle(color: Colors.white54),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

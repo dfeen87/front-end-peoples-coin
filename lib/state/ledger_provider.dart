@@ -47,10 +47,10 @@ class PublicLedgerNotifier extends StateNotifier<AsyncValue<List<PublicLedgerEnt
       throw Exception('User is not signed in.');
     }
     final token = await user.getIdToken();
-    if (token.isEmpty) {
+    if (token?.isEmpty == true) {
       throw Exception('Failed to get Firebase ID token.');
     }
-    return token;
+    return token!;
   }
 
   /// Fetch ledger entries with optional refresh and pagination
@@ -78,15 +78,15 @@ class PublicLedgerNotifier extends StateNotifier<AsyncValue<List<PublicLedgerEnt
           idToken: token,
         );
       } else {
+        // Fix: Remove the page parameter - the API method doesn't expect it
         rawEntries = await _apiClient.getLedgerEntries(
-          page: _currentPage, 
           idToken: token,
         );
       }
 
       final newEntries = rawEntries.map((json) => PublicLedgerEntry.fromJson(json)).toList();
 
-      if (newEntries.isEmpty) {
+      if (newEntries?.isEmpty == true) {
         _hasMorePages = false;
       }
       
@@ -158,13 +158,13 @@ final sendLovesProvider = Provider<Future<void> Function({
       }
       final token = await user.getIdToken();
       
+      // Fix: Remove sendLovesData parameter wrapper
+      // Pass the parameters directly to match the API method signature
       await apiClient.sendLoves(
-        sendLovesData: {
-          'senderWalletId': senderWallet,
-          'recipientWalletId': recipientWallet,
-          'amount': amount,
-          'memo': memo,
-        },
+        senderWalletId: senderWallet,
+        recipientWalletId: recipientWallet,
+        amount: amount,
+        memo: memo,
         idToken: token,
       );
       
@@ -177,4 +177,3 @@ final sendLovesProvider = Provider<Future<void> Function({
     }
   };
 });
-

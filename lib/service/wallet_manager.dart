@@ -15,6 +15,7 @@ class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
   final Uuid _uuid = const Uuid();
 
   static const _keyPrefix = 'wallet_keys_';
+  static const _userWalletMapPrefix = 'user_wallet_';
   Timer? _balanceSyncTimer;
 
   WalletManager(this._walletService, this._secureStorage)
@@ -51,9 +52,21 @@ class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
     state = const AsyncValue.loading();
     try {
       final keys = await _walletService.generateWalletKeys(sessionToken: sessionToken);
-      final newWallet = Wallet(id: _uuid.v4(), userId: userAccount.id);
+      
+      // Fix: Add required createdAt and updatedAt parameters
+      final now = DateTime.now();
+      final newWallet = Wallet(
+        id: _uuid.v4(), 
+        userId: userAccount.id,
+        createdAt: now,
+        updatedAt: now,
+      );
 
       await _saveWalletKeysToStorage(newWallet.id, keys);
+      await _secureStorage.write(
+        key: '$_userWalletMapPrefix${userAccount.id}',
+        value: newWallet.id,
+      );
 
       state = AsyncValue.data(newWallet);
     } catch (e, st) {
@@ -61,7 +74,10 @@ class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
     }
   }
 
-  Future<String> signTransaction({required String dataToSign, required String sessionToken}) async {
+  Future<String> signTransaction({
+    required String dataToSign,
+    required String sessionToken,
+  }) async {
     final wallet = state.value;
     if (wallet == null) {
       throw Exception('No active wallet found.');
@@ -87,7 +103,11 @@ class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
 
   Future<bool> sendTransaction(String dataToSend, String sessionToken) async {
     try {
-      final signature = await signTransaction(dataToSign: dataToSend, sessionToken: sessionToken);
+      final signature = await signTransaction(
+        dataToSign: dataToSend,
+        sessionToken: sessionToken,
+      );
+
       if (signature.isEmpty) return false;
 
       // TODO: Replace with actual blockchain/backend call
@@ -99,9 +119,20 @@ class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
   }
 
   Future<Wallet?> _loadWalletFromStorage(String userId) async {
-      // TODO: Implement a mechanism to retrieve the wallet ID associated with the user ID
-      // For now, this is a placeholder. You may need to save this mapping on your backend.
-      return null;
+    final walletId = await _secureStorage.read(key: '$_userWalletMapPrefix$userId');
+    if (walletId == null) return null;
+
+    final walletKeysJson = await _secureStorage.read(key: '$_keyPrefix$walletId');
+    if (walletKeysJson == null) return null;
+
+    // Fix: Add required createdAt and updatedAt parameters
+    final now = DateTime.now();
+    return Wallet(
+      id: walletId, 
+      userId: userId,
+      createdAt: now, // In real implementation, this should come from storage/API
+      updatedAt: now,
+    );
   }
 
   Future<void> _saveWalletKeysToStorage(String walletId, WalletKeys keys) async {
@@ -118,6 +149,8 @@ class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
     _balanceSyncTimer?.cancel();
     _balanceSyncTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       // TODO: Implement actual balance sync with the backend/blockchain
+      print('Syncing balance for user: ${userAccount.id}');
+
       if (state is! AsyncLoading) {
         state = AsyncValue.data(state.value);
       }

@@ -22,7 +22,7 @@ class ApiService {
   }
 
   Uri _uri(String endpoint, [Map<String, dynamic>? queryParams]) {
-    if (queryParams == null || queryParams.isEmpty) return Uri.parse('$baseUrl$endpoint');
+    if (queryParams == null || queryParams?.isEmpty == true) return Uri.parse('$baseUrl$endpoint');
     final query = queryParams.entries
         .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent('${e.value}')}')
         .join('&');
@@ -58,7 +58,7 @@ class ApiService {
           throw ApiException('Unsupported HTTP method: $method');
       }
 
-      final jsonBody = response.body.isNotEmpty ? json.decode(response.body) as Map<String, dynamic> : {};
+      final jsonBody = (response.body.isNotEmpty ? json.decode(response.body) : {}) as Map<String, dynamic>;
       if (response.statusCode >= 200 && response.statusCode < 300) return jsonBody;
       throw ApiException(jsonBody['message'] ?? 'API error', statusCode: response.statusCode);
     } catch (e) {

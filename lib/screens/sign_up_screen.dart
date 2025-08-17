@@ -140,12 +140,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
   }
 
   void _onUsernameChanged() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    if (_debounce?.isActive == true) _debounce!.cancel();
     _debounce = Timer(_debounceDuration, _checkUsernameAvailability);
   }
 
   void _onPasswordChanged() {
-    if (_passwordDebounce?.isActive ?? false) _passwordDebounce!.cancel();
+    if (_passwordDebounce?.isActive == true) _passwordDebounce!.cancel();
     _passwordDebounce = Timer(const Duration(milliseconds: 200), () {
       final newStrength = _calculatePasswordStrength(_passwordController.text);
       if (newStrength != _passwordStrength) {
@@ -738,11 +738,84 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+  // Method to build submit button - handles dynamic state properly
+  Widget _buildSubmitButton() {
     final authStatus = ref.watch(authStatusProvider);
     final isLoading = authStatus == AuthStatus.loading || _isRecaptchaVerifying;
+    
+    return SizedBox(
+      height: 56,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.amber[700],
+          foregroundColor: Colors.black,
+          disabledBackgroundColor: Colors.blueGrey[700],
+          disabledForegroundColor: Colors.blueGrey[400],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 8,
+          shadowColor: Colors.amber.withOpacity(0.3),
+        ),
+        onPressed: (isLoading || !_acceptedTerms || !_recaptchaLoaded) ? null : _signUpWithEmail,
+        child: isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                ),
+              )
+            : Text(
+                _isRecaptchaVerifying ? 'Verifying...' : 'Create Account',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+      ),
+    );
+  }
 
+  // Method to build loading overlay - handles dynamic state properly  
+  Widget? _buildLoadingOverlay() {
+    final authStatus = ref.watch(authStatusProvider);
+    final isLoading = authStatus == AuthStatus.loading || _isRecaptchaVerifying;
+    
+    if (!isLoading) return null;
+    
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Card(
+          color: Colors.black87,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Colors.amber),
+                const SizedBox(height: 16),
+                Text(
+                  _isRecaptchaVerifying 
+                    ? 'Verifying security...' 
+                    : 'Creating your account...',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -825,7 +898,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                           validator: _validateEmail,
-                          enabled: !isLoading,
+                          enabled: !_isRecaptchaVerifying,
                           onFieldSubmitted: (_) => _usernameFocusNode.requestFocus(),
                         ),
                         const SizedBox(height: 20),
@@ -843,7 +916,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
                           ),
                           textInputAction: TextInputAction.next,
                           validator: _validateUsername,
-                          enabled: !isLoading,
+                          enabled: !_isRecaptchaVerifying,
                           inputFormatters: [
                             LengthLimitingTextInputFormatter(_maxUsernameLength),
                             FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_]')),
@@ -872,7 +945,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
                           ),
                           textInputAction: TextInputAction.next,
                           validator: _validatePassword,
-                          enabled: !isLoading,
+                          enabled: !_isRecaptchaVerifying,
                           onFieldSubmitted: (_) => _confirmPasswordFocusNode.requestFocus(),
                         ),
                         _buildPasswordStrengthIndicator(),
@@ -898,7 +971,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
                           ),
                           textInputAction: TextInputAction.done,
                           validator: _validateConfirmPassword,
-                          enabled: !isLoading,
+                          enabled: !_isRecaptchaVerifying,
                           onFieldSubmitted: (_) => _signUpWithEmail(),
                         ),
                         const SizedBox(height: 24),
@@ -918,7 +991,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
                                 height: 24,
                                 child: Checkbox(
                                   value: _acceptedTerms,
-                                  onChanged: isLoading ? null : (value) => setState(() => _acceptedTerms = value ?? false),
+                                  onChanged: _isRecaptchaVerifying ? null : (value) => setState(() => _acceptedTerms = value ?? false),
                                   activeColor: Colors.amber,
                                   checkColor: Colors.black,
                                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1024,40 +1097,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
 
                         const SizedBox(height: 28),
 
-                        // Sign Up Button
-                        SizedBox(
-                          height: 56,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.amber[700],
-                              foregroundColor: Colors.black,
-                              disabledBackgroundColor: Colors.blueGrey[700],
-                              disabledForegroundColor: Colors.blueGrey[400],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              elevation: 8,
-                              shadowColor: Colors.amber.withOpacity(0.3),
-                            ),
-                            onPressed: (isLoading || !_acceptedTerms || !_recaptchaLoaded) ? null : _signUpWithEmail,
-                            child: isLoading
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 3,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                                    ),
-                                  )
-                                : Text(
-                                    _isRecaptchaVerifying ? 'Verifying...' : 'Create Account',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                          ),
-                        ),
+                        // Sign Up Button - using the fixed method
+                        _buildSubmitButton(),
                         const SizedBox(height: 24),
 
                         // Sign In Link
@@ -1089,35 +1130,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
             ),
           ),
           
-          // Loading Overlay
-          if (isLoading)
-            Container(
-              color: Colors.black54,
-              child: const Center(
-                child: Card(
-                  color: Colors.black87,
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(color: Colors.amber),
-                        SizedBox(height: 16),
-                        Text(
-                          _isRecaptchaVerifying 
-                            ? 'Verifying security...' 
-                            : 'Creating your account...',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          // Loading Overlay - using the fixed method
+          if (_buildLoadingOverlay() != null) _buildLoadingOverlay()!,
         ],
       ),
     );

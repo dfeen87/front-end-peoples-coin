@@ -36,7 +36,7 @@ dependencies:
   local_auth: ^2.1.6
 
   # JSON Serialization
-  json_annotation: ^4.8.1
+  json_annotation: ^4.9.0
 
   # Crypto & Security
   cryptography: ^2.0.0

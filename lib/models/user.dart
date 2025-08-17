@@ -25,16 +25,16 @@ class AppUser {
   // Add uid getter for Firebase Auth compatibility
   String get uid => id;
 
-  factory User.fromJson(Map<String, dynamic> json) {
-    return User(
+  factory AppUser.fromJson(Map<String, dynamic> json) {
+    return AppUser(
       id: json['id']?.toString() ?? '',
       username: json['username'] as String?,
       email: json['email'] as String?,
       displayName: json['display_name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       createdAt: _parseDate(json['created_at']),
-      updatedAt: _parseDate(json['updated_at']),
-      isActive: json['is_active'] as bool? ?? true,
+      updatedAt: _parseDate(json['updated_at']),  
+      isActive: (json['is_active'] as bool?) ?? true,
     );
   }
 
@@ -51,7 +51,7 @@ class AppUser {
     };
   }
 
-  User copyWith({
+  AppUser copyWith({
     String? id,
     String? username,
     String? email,
@@ -75,7 +75,7 @@ class AppUser {
 
   @override
   String toString() {
-    return 'User(id: $id, username: $username, email: $email, displayName: $displayName, isActive: $isActive)';
+    return 'AppUser(id: $id, username: $username, email: $email, displayName: $displayName, isActive: $isActive)';  // Fixed class name
   }
 
   static DateTime? _parseDate(dynamic value) {

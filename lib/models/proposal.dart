@@ -16,6 +16,11 @@ class Proposal {
   final Map<String, dynamic>? details;
   final DateTime createdAt;
   final DateTime updatedAt;
+  
+  // Add missing voting-related properties
+  final int forVotes;
+  final int againstVotes;
+  final bool userHasVoted;
 
   const Proposal({
     required this.id,
@@ -30,6 +35,9 @@ class Proposal {
     this.details,
     required this.createdAt,
     required this.updatedAt,
+    this.forVotes = 0,
+    this.againstVotes = 0,
+    this.userHasVoted = false,
   });
 
   Proposal copyWith({
@@ -45,6 +53,9 @@ class Proposal {
     Map<String, dynamic>? details,
     DateTime? createdAt,
     DateTime? updatedAt,
+    int? forVotes,
+    int? againstVotes,
+    bool? userHasVoted,
   }) =>
       Proposal(
         id: id ?? this.id,
@@ -59,6 +70,9 @@ class Proposal {
         details: details ?? this.details,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        forVotes: forVotes ?? this.forVotes,
+        againstVotes: againstVotes ?? this.againstVotes,
+        userHasVoted: userHasVoted ?? this.userHasVoted,
       );
 
   factory Proposal.fromJson(Map<String, dynamic> json) => Proposal(
@@ -74,6 +88,9 @@ class Proposal {
         details: (json['details'] as Map?)?.cast<String, dynamic>(),
         createdAt: _parseDate(json['created_at']),
         updatedAt: _parseDate(json['updated_at']),
+        forVotes: _parseInt(json['for_votes']),
+        againstVotes: _parseInt(json['against_votes']),
+        userHasVoted: json['user_has_voted'] == true,
       );
 
   Map<String, dynamic> toJson() => {
@@ -89,6 +106,9 @@ class Proposal {
         'details': details,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
+        'for_votes': forVotes,
+        'against_votes': againstVotes,
+        'user_has_voted': userHasVoted,
       };
 
   static ProposalStatus _statusFromString(String? status) {
@@ -124,5 +144,11 @@ class Proposal {
     if (value is String) return double.tryParse(value) ?? 0.0;
     return 0.0;
   }
-}
 
+  static int _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+}

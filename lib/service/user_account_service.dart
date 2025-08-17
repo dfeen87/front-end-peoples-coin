@@ -127,7 +127,7 @@ class UserAccountService {
         Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/check-username?username=${Uri.encodeComponent(username)}'),
         headers: _getHeaders(),
       ),
-      (data) => data['available'] as bool? ?? false,
+      (data) => (data['available'] as bool?) ?? false,
       'Failed to check username availability',
     );
   }
@@ -154,25 +154,25 @@ class UserAccountService {
 
   /// Get total available loves that can be sent
   Future<int> getTotalAvailableLoves({required String idToken}) async {
-    final tokens = await getUserGoodwillTokens(idToken: idToken);
+    final tokens = await getUserGoodwillTokens(idToken: idToken!);
     return tokens.fold(0, (sum, token) => sum + token.remainingLoves);
   }
 
   /// Get tokens that still have loves remaining to send
   Future<List<GoodwillToken>> getActiveGoodwillTokens({required String idToken}) async {
-    final allTokens = await getUserGoodwillTokens(idToken: idToken);
+    final allTokens = await getUserGoodwillTokens(idToken: idToken!);
     return allTokens.where((token) => token.hasLovesRemaining).toList();
   }
 
   /// Check if user has enough loves to send a specific amount
   Future<bool> canSendLoves({required String idToken, required int lovesToSend}) async {
-    final availableLoves = await getTotalAvailableLoves(idToken: idToken);
+    final availableLoves = await getTotalAvailableLoves(idToken: idToken!);
     return availableLoves >= lovesToSend;
   }
 
   /// Get summary of user's goodwill economy stats
   Future<Map<String, dynamic>> getGoodwillSummary({required String idToken}) async {
-    final tokens = await getUserGoodwillTokens(idToken: idToken);
+    final tokens = await getUserGoodwillTokens(idToken: idToken!);
     
     final totalTokens = tokens.length;
     final totalLovesEarned = tokens.fold(0, (sum, token) => sum + token.lovesAmount);
@@ -323,7 +323,7 @@ class UserAccountService {
     if (limit != null) queryParams['limit'] = limit.toString();
     if (offset != null) queryParams['offset'] = offset.toString();
 
-    final query = queryParams.isEmpty 
+    final query = queryParams?.isEmpty == true 
         ? '' 
         : '?' + queryParams.entries.map((e) => '${e.key}=${e.value}').join('&');
 
@@ -382,7 +382,7 @@ class UserAccountService {
     if (limit != null) queryParams['limit'] = limit.toString();
     if (offset != null) queryParams['offset'] = offset.toString();
 
-    final query = queryParams.isEmpty 
+    final query = queryParams?.isEmpty == true 
         ? '' 
         : '?' + queryParams.entries.map((e) => '${e.key}=${e.value}').join('&');
 
@@ -440,7 +440,7 @@ class UserAccountService {
 
   /// Get user's current balance (may include both loves and other currency)
   Future<double> getUserBalance({required String idToken}) async {
-    final user = await getCurrentUser(idToken: idToken);
+    final user = await getCurrentUser(idToken: idToken!);
     return user.balance;
   }
 

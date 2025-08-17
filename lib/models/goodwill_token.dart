@@ -39,7 +39,7 @@ class GoodwillToken {
       createdAt: _parseDate(json['created_at']),
       usedAt: json['used_at'] != null ? _parseDate(json['used_at']) : null,
       lovesUsed: (json['loves_used'] as num?)?.toInt() ?? 0,
-      isFullyUsed: json['is_fully_used'] as bool? ?? false,
+      isFullyUsed: (json['is_fully_used'] as bool?) ?? false,
     );
   }
 

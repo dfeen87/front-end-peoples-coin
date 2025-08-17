@@ -485,7 +485,7 @@ class _MyPortfolioPageState extends ConsumerState<MyPortfolioPage> with TickerPr
           ),
         ),
         data: (userActions) {
-          if (userActions.isEmpty) {
+          if (userActions?.isEmpty == true) {
             return const _EmptyPortfolioState();
           }
 
@@ -574,7 +574,7 @@ class _MyPortfolioPageState extends ConsumerState<MyPortfolioPage> with TickerPr
           ),
         ),
         data: (userActions) {
-          if (userActions.isEmpty) {
+          if (userActions?.isEmpty == true) {
             return const Center(
               child: Text(
                 'No Goodwill Actions found.',
@@ -1254,7 +1254,7 @@ class _AddActionDialogState extends ConsumerState<AddActionDialog> {
     final scoreText = _scoreController.text.trim();
     final evidence = _evidenceController.text.trim();
 
-    if (title.isEmpty || description.isEmpty || scoreText.isEmpty) {
+    if (title?.isEmpty == true || description?.isEmpty == true || scoreText?.isEmpty == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all required fields')),
       );
@@ -1278,7 +1278,7 @@ class _AddActionDialogState extends ConsumerState<AddActionDialog> {
         title: title,
         description: description,
         score: score,
-        evidence: evidence.isEmpty ? null : evidence,
+        evidence: evidence?.isEmpty == true ? null : evidence,
       );
 
       if (mounted) {

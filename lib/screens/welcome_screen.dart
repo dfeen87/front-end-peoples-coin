@@ -20,7 +20,7 @@ final List<TechSystem> backendSystems = [
     code: r'''
 class ActValidator {
   bool validate(ActSubmission submission) {
-    if (submission(description ?? \'\').isEmpty) return false;
+    if (submission(description ?? \'\')?.isEmpty == true) return false;
     if (submission.evidence.isNotProvided) return false;
     print("Act validated successfully.");
     return true;

@@ -1,12 +1,17 @@
+// lib/service/api_client.dart
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../models/user_account.dart';
 import '../models/wallet_models.dart';
 import '../models/proposal.dart';
 import '../models/goodwill_action.dart';
+import '../models/goodwill_token.dart';
 import '../models/ledger_entry.dart';
+import '../models/proposal_to_send.dart';
+import '../models/vote_to_send.dart';
 
 /// Core API client for network operations
 class PeoplesCoinApiClient {
@@ -37,34 +42,66 @@ class PeoplesCoinApiClient {
   }
 
   Map<String, dynamic> _handleResponse(http.Response response) {
-    final data = json.decode(response.body);
-    if (response.statusCode >= 200 && response.statusCode < 300) return data;
+    final decoded = response.body.isNotEmpty ? json.decode(response.body) : {};
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (decoded is Map<String, dynamic>) return decoded;
+      // Normalize non-map JSON success into a map wrapper to keep callers happy.
+      return {'data': decoded};
+    }
+    // Try to surface a meaningful error message
+    String message = 'Unknown error';
+    if (decoded is Map && decoded['message'] is String) {
+      message = decoded['message'] as String;
+    } else if (decoded is String) {
+      message = decoded;
+    }
     throw ApiClientException(
-      data['message'] ?? 'Unknown error',
+      message,
       statusCode: response.statusCode,
     );
   }
 
   // --- Generic requests ---
-  Future<Map<String, dynamic>> getJson(String endpoint,
-          {String? idToken, Map<String, dynamic>? queryParams}) async =>
-      _handleResponse(await _client
-          .get(_buildUri(endpoint, queryParams), headers: _headers(idToken: idToken))
-          .timeout(_timeoutDuration));
+  Future<Map<String, dynamic>> getJson(
+    String endpoint, {
+    String? idToken,
+    Map<String, dynamic>? queryParams,
+  }) async {
+    final res = await _client
+        .get(_buildUri(endpoint, queryParams), headers: _headers(idToken: idToken))
+        .timeout(_timeoutDuration);
+    return _handleResponse(res);
+  }
 
-  Future<Map<String, dynamic>> postJson(String endpoint,
-          {String? idToken, Map<String, dynamic>? body}) async =>
-      _handleResponse(await _client
-          .post(_buildUri(endpoint),
-              headers: _headers(idToken: idToken), body: json.encode(body))
-          .timeout(_timeoutDuration));
+  Future<Map<String, dynamic>> postJson(
+    String endpoint, {
+    String? idToken,
+    Map<String, dynamic>? body,
+  }) async {
+    final res = await _client
+        .post(
+          _buildUri(endpoint),
+          headers: _headers(idToken: idToken),
+          body: json.encode(body ?? {}),
+        )
+        .timeout(_timeoutDuration);
+    return _handleResponse(res);
+  }
 
-  Future<Map<String, dynamic>> putJson(String endpoint,
-          {String? idToken, Map<String, dynamic>? body}) async =>
-      _handleResponse(await _client
-          .put(_buildUri(endpoint),
-              headers: _headers(idToken: idToken), body: json.encode(body))
-          .timeout(_timeoutDuration));
+  Future<Map<String, dynamic>> putJson(
+    String endpoint, {
+    String? idToken,
+    Map<String, dynamic>? body,
+  }) async {
+    final res = await _client
+        .put(
+          _buildUri(endpoint),
+          headers: _headers(idToken: idToken),
+          body: json.encode(body ?? {}),
+        )
+        .timeout(_timeoutDuration);
+    return _handleResponse(res);
+  }
 
   void dispose() => _client.close();
 
@@ -72,26 +109,55 @@ class PeoplesCoinApiClient {
 
   // User
   Future<UserAccount> getAuthenticatedUserProfile({required String idToken}) async {
-    final json = await getJson('users/me', idToken: idToken);
-    return UserAccount.fromJson(json);
+    final jsonMap = await getJson('users/me', idToken: idToken);
+    // If server returned {data: {...}} normalize:
+    final data = (jsonMap['data'] is Map) ? jsonMap['data'] : jsonMap;
+    return UserAccount.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  /// Goodwill Tokens for current user
+  /// Accepts either:
+  ///   { "tokens": [ ... ] }
+  /// or a raw list in { "data": [ ... ] }
+  Future<List<GoodwillToken>> getUserGoodwillTokens({required String idToken}) async {
+    final jsonMap = await getJson('users/goodwill-tokens', idToken: idToken);
+    dynamic raw = jsonMap['tokens'] ?? jsonMap['data'];
+    if (raw is! List) {
+      // Some backends might return the array at the root (normalized to 'data' in _handleResponse)
+      raw = jsonMap['data'] ?? [];
+    }
+    final list = (raw as List)
+        .map((e) => GoodwillToken.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+    return list;
   }
 
   Future<bool> checkUsernameAvailability(String username) async {
-    final json = await getJson('users/check-username', queryParams: {'username': username});
-    return json['available'] as bool;
+    final jsonMap =
+        await getJson('users/check-username', queryParams: {'username': username});
+    if (jsonMap.containsKey('data') && jsonMap['available'] == null) {
+      // Normalize {data: {...}}
+      return (jsonMap['data'] as Map)['available'] == true;
+    }
+    return jsonMap['available'] == true;
   }
 
-  Future<void> createUserAndWallet({
+  /// Create backend user + wallet and return the created UserAccount
+  Future<UserAccount> createUserAndWallet({
     required String username,
     required String recaptchaToken,
     required String idToken,
   }) async {
-    await postJson('users/create',
-        idToken: idToken,
-        body: {
-          'username': username,
-          'recaptchaToken': recaptchaToken,
-        });
+    final jsonMap = await postJson(
+      'users/create',
+      idToken: idToken,
+      body: {
+        'username': username,
+        'recaptchaToken': recaptchaToken,
+      },
+    );
+    final data = (jsonMap['data'] is Map) ? jsonMap['data'] : jsonMap;
+    return UserAccount.fromJson(Map<String, dynamic>.from(data));
   }
 
   // Wallet
@@ -104,26 +170,38 @@ class PeoplesCoinApiClient {
     required String toWalletId,
     required double amount,
     required String idToken,
+    String? senderWalletId, // matches your ledger_provider usage
   }) async {
-    await postJson('wallets/send',
-        idToken: idToken,
-        body: {
-          'fromWalletId': fromWalletId,
-          'toWalletId': toWalletId,
-          'amount': amount,
-        });
+    await postJson(
+      'wallets/send',
+      idToken: idToken,
+      body: {
+        'fromWalletId': fromWalletId,
+        'toWalletId': toWalletId,
+        'amount': amount,
+        if (senderWalletId != null) 'senderWalletId': senderWalletId,
+      },
+    );
   }
 
   // Goodwill Actions
   Future<List<GoodwillAction>> getUserGoodwillActions({required String idToken}) async {
-    final json = await getJson('goodwill-actions', idToken: idToken);
-    return (json['actions'] as List)
-        .map((e) => GoodwillAction.fromJson(e))
+    final jsonMap = await getJson('goodwill-actions', idToken: idToken);
+    final raw = (jsonMap['actions'] ?? jsonMap['data']) as List;
+    return raw
+        .map((e) => GoodwillAction.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
 
-  Future<void> submitGoodwill({required String idToken, required GoodwillAction action}) async {
-    await postJson('goodwill-actions', idToken: idToken, body: action.toJson());
+  Future<Map<String, dynamic>> submitGoodwill({
+    required String idToken,
+    required Map<String, dynamic> goodwillAction,
+  }) async {
+    return await postJson(
+      'goodwill-actions',
+      idToken: idToken,
+      body: goodwillAction,
+    );
   }
 
   // Loves/Currency Operations
@@ -133,45 +211,98 @@ class PeoplesCoinApiClient {
     required int amount,
     String? message,
   }) async {
-    await postJson('loves/send', 
-      idToken: idToken, 
+    await postJson(
+      'loves/send',
+      idToken: idToken,
       body: {
         'recipientId': recipientId,
         'amount': amount,
         if (message != null) 'message': message,
-      }
+      },
     );
   }
 
   // Proposals
-  Future<List<Proposal>> listProposals({String? status, required String idToken}) async {
-    final json = await getJson('proposals', idToken: idToken, queryParams: 
-      status != null ? {'status': status} : null);
-    return (json['proposals'] as List).map((e) => Proposal.fromJson(e)).toList();
+  Future<List<Proposal>> listProposals({
+    String? status,
+    required String idToken,
+  }) async {
+    final jsonMap = await getJson(
+      'proposals',
+      idToken: idToken,
+      queryParams: status != null ? {'status': status} : null,
+    );
+    final raw = (jsonMap['proposals'] ?? jsonMap['data']) as List;
+    return raw
+        .map((e) => Proposal.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
-  Future<Proposal> getProposalDetails({required String proposalId, required String idToken}) async {
-    final json = await getJson('proposals/$proposalId', idToken: idToken);
-    return Proposal.fromJson(json);
+  Future<Proposal> getProposalDetails({
+    required String proposalId,
+    required String idToken,
+  }) async {
+    final jsonMap = await getJson('proposals/$proposalId', idToken: idToken);
+    final data = (jsonMap['data'] is Map) ? jsonMap['data'] : jsonMap;
+    return Proposal.fromJson(Map<String, dynamic>.from(data));
   }
 
-  Future<void> createProposal({required String idToken, required Proposal proposal}) async {
-    await postJson('proposals', idToken: idToken, body: proposal.toJson());
+  /// Create a proposal; returns backend response map (e.g., includes id/status)
+  Future<Map<String, dynamic>> createProposal({
+    required String idToken,
+    required ProposalToSend proposal,
+  }) async {
+    return await postJson(
+      'proposals',
+      idToken: idToken,
+      body: proposal.toJson(),
+    );
   }
 
-  Future<void> submitVote({required String idToken, required String proposalId, required String choice}) async {
-    await postJson('proposals/$proposalId/vote', idToken: idToken, body: {'choice': choice});
+  /// Submit a vote; returns backend response map (ack/status)
+  Future<Map<String, dynamic>> submitVote({
+    required VoteToSend vote,
+    required String idToken,
+  }) async {
+    return await postJson(
+      'proposals/${vote.proposalId}/vote',
+      idToken: idToken,
+      body: vote.toJson(),
+    );
+  }
+
+  // LEGACY: Keep old method for backward compatibility
+  Future<void> submitVoteLegacy({
+    required String idToken,
+    required String proposalId,
+    required String choice,
+  }) async {
+    await postJson(
+      'proposals/$proposalId/vote',
+      idToken: idToken,
+      body: {'choice': choice},
+    );
   }
 
   // Ledger
   Future<List<LedgerEntry>> getLedgerEntries({required String idToken}) async {
-    final json = await getJson('ledger', idToken: idToken);
-    return (json['entries'] as List).map((e) => LedgerEntry.fromJson(e)).toList();
+    final jsonMap = await getJson('ledger', idToken: idToken);
+    final raw = (jsonMap['entries'] ?? jsonMap['data']) as List;
+    return raw
+        .map((e) => LedgerEntry.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
-  Future<List<LedgerEntry>> searchLedger({required String idToken, required String query}) async {
-    final json = await getJson('ledger/search', idToken: idToken, queryParams: {'q': query});
-    return (json['entries'] as List).map((e) => LedgerEntry.fromJson(e)).toList();
+  Future<List<LedgerEntry>> searchLedger({
+    required String idToken,
+    required String query,
+  }) async {
+    final jsonMap =
+        await getJson('ledger/search', idToken: idToken, queryParams: {'q': query});
+    final raw = (jsonMap['entries'] ?? jsonMap['data']) as List;
+    return raw
+        .map((e) => LedgerEntry.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 }
 
@@ -185,5 +316,7 @@ class ApiClientException implements Exception {
 }
 
 /// Riverpod provider for global API client
-final apiClientProvider = Provider<PeoplesCoinApiClient>((ref) => PeoplesCoinApiClient());
+final apiClientProvider = Provider<PeoplesCoinApiClient>(
+  (ref) => PeoplesCoinApiClient(),
+);
 

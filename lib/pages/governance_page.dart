@@ -2,12 +2,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:shimmer/shimmer.dart';
 import 'dart:ui';
 
 // Assume these models and widgets exist in your project
-import '../models/proposal.dart';
+import '../models/proposal.dart' as app_models;
 import '../widgets/proposal_card.dart';
 import 'create_proposal_page.dart';
 import '../models/user.dart';
@@ -18,16 +18,26 @@ import '../models/user.dart';
 final selectedStatusProvider = StateProvider<String>((ref) => 'ACTIVE');
 
 // Firebase Auth user provider
-final firebaseAuthUserProvider = StreamProvider<User?>((ref) {
-  return FirebaseAuth.instance.authStateChanges();
+final firebaseAuthUserProvider = StreamProvider<firebase_auth.User?>((ref) {
+  return firebase_auth.FirebaseAuth.instance.authStateChanges();
 });
 
 // Enhanced auth user provider that works with Firebase
-final authUserProvider = Provider<User?>((ref) {
+final authUserProvider = Provider<firebase_auth.User?>((ref) {
+  final firebaseUser = ref.watch(firebaseAuthUserProvider);
+  return firebaseUser.when(
+    data: (user) => user, // Return Firebase User directly
+    loading: () => null,
+    error: (_, __) => null,
+  );
+});
+
+// AppUser provider for when you need your custom user model
+final appUserProvider = Provider<AppUser?>((ref) {
   final firebaseUser = ref.watch(firebaseAuthUserProvider);
   return firebaseUser.when(
     data: (user) => user != null 
-        ? User(uid: user.uid, email: user.email ?? 'No email') 
+        ? AppUser(id: user.uid, email: user.email ?? 'No email') 
         : null,
     loading: () => null,
     error: (_, __) => null,
@@ -35,7 +45,7 @@ final authUserProvider = Provider<User?>((ref) {
 });
 
 // A StateNotifier for fetching and managing the list of proposals.
-class ProposalsNotifier extends StateNotifier<AsyncValue<List<Proposal>>> {
+class ProposalsNotifier extends StateNotifier<AsyncValue<List<app_models.Proposal>>> {
   ProposalsNotifier() : super(const AsyncValue.loading());
 
   Future<void> fetchProposals({required String status, required String idToken}) async {
@@ -50,11 +60,11 @@ class ProposalsNotifier extends StateNotifier<AsyncValue<List<Proposal>>> {
 
       // Mock data based on status filter - replace with real API call to your Flask backend
       final allProposals = [
-        Proposal(
+        app_models.Proposal(
           id: '1',
           title: 'Community Garden Initiative',
           description: 'A proposal to establish a community garden in the central park to promote sustainability and community engagement.',
-          proposerId: 'user123',
+          proposerUserId: 'user123',
           status: 'ACTIVE',
           voteEndTime: DateTime.now().add(const Duration(days: 5)),
           votesFor: 120,
@@ -62,11 +72,11 @@ class ProposalsNotifier extends StateNotifier<AsyncValue<List<Proposal>>> {
           createdAt: DateTime.now().subtract(const Duration(days: 2)),
           requiredVotes: 200,
         ),
-        Proposal(
+        app_models.Proposal(
           id: '2',
           title: 'Upgrade Public WiFi Infrastructure',
           description: 'Allocate funds to improve the public WiFi network in the city center for better connectivity.',
-          proposerId: 'user456',
+          proposerUserId: 'user456',
           status: 'ACTIVE',
           voteEndTime: DateTime.now().add(const Duration(days: 10)),
           votesFor: 85,
@@ -74,11 +84,11 @@ class ProposalsNotifier extends StateNotifier<AsyncValue<List<Proposal>>> {
           createdAt: DateTime.now().subtract(const Duration(days: 4)),
           requiredVotes: 150,
         ),
-        Proposal(
+        app_models.Proposal(
           id: '3',
           title: 'Youth Sports Program Funding',
           description: 'Increase funding for youth sports programs to encourage physical activity among children.',
-          proposerId: 'user789',
+          proposerUserId: 'user789',
           status: 'PASSED',
           voteEndTime: DateTime.now().subtract(const Duration(days: 1)),
           votesFor: 180,
@@ -86,11 +96,11 @@ class ProposalsNotifier extends StateNotifier<AsyncValue<List<Proposal>>> {
           createdAt: DateTime.now().subtract(const Duration(days: 15)),
           requiredVotes: 200,
         ),
-        Proposal(
+        app_models.Proposal(
           id: '4',
           title: 'Downtown Parking Fees Increase',
           description: 'Proposal to increase downtown parking fees to fund public transportation improvements.',
-          proposerId: 'user101',
+          proposerUserId: 'user101',
           status: 'FAILED',
           voteEndTime: DateTime.now().subtract(const Duration(days: 3)),
           votesFor: 60,
@@ -117,7 +127,7 @@ class ProposalsNotifier extends StateNotifier<AsyncValue<List<Proposal>>> {
 }
 
 // The provider to access the ProposalsNotifier state.
-final proposalsProvider = StateNotifierProvider<ProposalsNotifier, AsyncValue<List<Proposal>>>((ref) {
+final proposalsProvider = StateNotifierProvider<ProposalsNotifier, AsyncValue<List<app_models.Proposal>>>((ref) {
   return ProposalsNotifier();
 });
 
@@ -128,13 +138,11 @@ final autoFetchProvider = Provider<void>((ref) {
   
   if (user != null) {
     // Get Firebase ID token
-    FirebaseAuth.instance.currentUser?.getIdToken().then((idToken) {
-      if (idToken != null) {
-        ref.read(proposalsProvider.notifier).fetchProposals(
-          status: status, 
-          idToken: idToken,
-        );
-      }
+    user.getIdToken().then((idToken) {
+      ref.read(proposalsProvider.notifier).fetchProposals(
+        status: status, 
+        idToken: idToken,
+      );
     }).catchError((error) {
       // Handle token error
       ref.read(proposalsProvider.notifier).fetchProposals(
@@ -181,7 +189,7 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
   
   Future<void> _onRefresh() async {
     final status = ref.read(selectedStatusProvider);
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
     
     if (currentUser == null) {
       if (mounted) {
@@ -216,7 +224,7 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
   }
 
   void _showCreateProposalForm() {
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
     
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -388,7 +396,7 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
     );
   }
 
-  SliverAppBar _buildSliverAppBar(ThemeData theme, User firebaseUser) {
+  SliverAppBar _buildSliverAppBar(ThemeData theme, firebase_auth.User firebaseUser) {
     return SliverAppBar(
       title: Text(
         'Governance', 
@@ -440,7 +448,7 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
     );
   }
 
-  SliverToBoxAdapter _buildHeader(ThemeData theme, User firebaseUser) {
+  SliverToBoxAdapter _buildHeader(ThemeData theme, firebase_auth.User firebaseUser) {
     return SliverToBoxAdapter(
       child: FadeTransition(
         opacity: _headerAnimationController,
@@ -571,7 +579,7 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
     );
   }
 
-  Widget _buildProposalList(ThemeData theme, AsyncValue<List<Proposal>> proposalsAsync) {
+  Widget _buildProposalList(ThemeData theme, AsyncValue<List<app_models.Proposal>> proposalsAsync) {
     return proposalsAsync.when(
       loading: () => _buildLoadingShimmer(theme),
       error: (err, stack) => SliverFillRemaining(
@@ -707,35 +715,4 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
       ),
     );
   }
-}
-
-// Enhanced Proposal model with additional fields
-class Proposal {
-  final String id;
-  final String title;
-  final String description;
-  final String proposerId;
-  final String status;
-  final DateTime voteEndTime;
-  final int votesFor;
-  final int votesAgainst;
-  final DateTime createdAt;
-  final int requiredVotes;
-
-  Proposal({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.proposerId,
-    required this.status,
-    required this.voteEndTime,
-    required this.votesFor,
-    required this.votesAgainst,
-    required this.createdAt,
-    required this.requiredVotes,
-  });
-
-  double get votingProgress => (votesFor + votesAgainst) / requiredVotes;
-  bool get isActive => status == 'ACTIVE' && DateTime.now().isBefore(voteEndTime);
-  Duration get timeRemaining => voteEndTime.difference(DateTime.now());
 }

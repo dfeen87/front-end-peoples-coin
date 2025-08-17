@@ -103,7 +103,7 @@ class WalletService {
   }
 
   Future<String> signTransactionBase64({required Uint8List privateKeyBytes, required String data}) async {
-    final signatureBytes = await signTransaction(privateKeyBytes: privateKeyBytes, data: utf8.encode(data) as Uint8List);
+    final signatureBytes = await signTransaction(privateKeyBytes: privateKeyBytes, data: Uint8List.fromList(utf8.encode(data)));
     return base64Encode(signatureBytes);
   }
 

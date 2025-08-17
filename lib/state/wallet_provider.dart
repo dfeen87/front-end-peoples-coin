@@ -8,7 +8,7 @@ import '../service/wallet_manager.dart';
 import '../state/user_provider.dart';
 import '../models/user_account.dart';
 import '../models/wallet_models.dart';
-import '../service/api_client.dart'; // Assuming this is your API client
+import '../service/api_client.dart';
 
 /// The primary provider for all wallet-related state and actions.
 /// It combines the functionality of the old WalletFacilitator and WalletManager.
@@ -36,10 +36,25 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       );
     });
 
-    final userAccount = await ref.watch(userAccountProvider.future);
-    if (userAccount != null) {
-      await initializeWallet(userAccount);
-    }
+    // Fix: Handle the AsyncValue properly instead of using .future
+    final userAccountAsync = ref.watch(userAccountProvider);
+    UserAccount? userAccount;
+    
+    await userAccountAsync.when(
+      data: (user) async {
+        userAccount = user;
+        if (user != null) {
+          await initializeWallet(user);
+        }
+      },
+      loading: () async {
+        // Wait for loading to complete
+      },
+      error: (e, st) async {
+        // Handle error case
+        userAccount = null;
+      },
+    );
     
     // Initial state with a null wallet.
     return WalletState(
@@ -59,7 +74,19 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       }
 
       final walletManager = ref.read(walletManagerProvider);
-      final wallet = await walletManager.initializeWallet(userAccount: userAccount, sessionToken: sessionToken);
+      // Fix: WalletManager.initializeWallet returns void, not a Wallet
+      await walletManager.initializeWallet(
+        userAccount: userAccount, 
+        sessionToken: sessionToken,
+      );
+      
+      // Get the wallet from the manager's state
+      final walletState = walletManager.state;
+      final wallet = walletState.value;
+      
+      if (wallet == null) {
+        throw Exception('Failed to initialize wallet');
+      }
 
       final balance = await _fetchBalance(wallet.id);
 
@@ -79,7 +106,13 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
   /// Fetches the wallet balance from the backend.
   Future<double> _fetchBalance(String walletId) async {
     try {
-      final response = await _apiClient.getWalletBalance(walletId);
+      // Fix: Add required sessionToken parameter
+      final sessionToken = await _getSessionToken();
+      if (sessionToken == null) {
+        throw Exception('Session token not available');
+      }
+      
+      final response = await _apiClient.getWalletDetails(walletId, sessionToken);
       return response['balance'] as double;
     } catch (e) {
       // In a real app, you might want to handle API errors more gracefully.
@@ -107,6 +140,67 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       return null;
+    }
+  }
+  
+  /// Fetch wallet by ID
+  Future<void> fetchWallet(String walletId) async {
+    state = const AsyncValue.loading();
+    try {
+      final sessionToken = await _getSessionToken();
+      if (sessionToken == null) {
+        throw Exception('Session token not available');
+      }
+      
+      final response = await _apiClient.getWalletDetails(walletId, sessionToken);
+      // You'll need to convert the response to a Wallet object
+      // This depends on your API response structure
+      
+      final currentState = state.value;
+      if (currentState != null) {
+        state = AsyncValue.data(currentState.copyWith(
+          balance: response['balance'] as double? ?? 0.0,
+        ));
+      }
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+  
+  /// ADDED: Clear wallet state - This method was missing and causing auth_provider.dart errors
+  void clearWallet() {
+    // Reset to initial empty state
+    state = AsyncValue.data(
+      WalletState(
+        currentWallet: null,
+        userAccount: null,
+        balance: 0.0,
+        isLoading: false,
+        errorMessage: null,
+      ),
+    );
+    
+    // Also clear any secure storage if needed
+    _clearSecureStorage();
+  }
+  
+  /// ADDED: Reset method as alternative to clearWallet
+  void reset() {
+    clearWallet(); // Just call clearWallet for consistency
+  }
+  
+  /// ADDED: Helper method to clear secure storage when wallet is cleared
+  Future<void> _clearSecureStorage() async {
+    try {
+      const secureStorage = FlutterSecureStorage();
+      // Clear wallet-related keys - adjust these based on what your app stores
+      await secureStorage.delete(key: 'wallet_private_key');
+      await secureStorage.delete(key: 'wallet_public_key');
+      await secureStorage.delete(key: 'wallet_address');
+      // Add any other wallet-related keys your app stores
+    } catch (e) {
+      // Log error but don't throw - clearing storage is best effort
+      print('Warning: Failed to clear wallet secure storage: $e');
     }
   }
   

@@ -114,10 +114,10 @@ class BackendStatus {
   factory BackendStatus.fromJson(Map<String, dynamic> json) {
     return BackendStatus(
       nodeVersion: json['node_version'] ?? json['nodeVersion'] ?? 'Unknown',
-      metabolicActive: json['metabolic_active'] ?? json['metabolicActive'] ?? false,
-      nervousActive: json['nervous_active'] ?? json['nervousActive'] ?? false,
-      endocrineActive: json['endocrine_active'] ?? json['endocrineActive'] ?? false,
-      immuneActive: json['immune_active'] ?? json['immuneActive'] ?? false,
+      metabolicActive: json['metabolic_active'] ?? json['metabolicActive'] == false,
+      nervousActive: json['nervous_active'] ?? json['nervousActive'] == false,
+      endocrineActive: json['endocrine_active'] ?? json['endocrineActive'] == false,
+      immuneActive: json['immune_active'] ?? json['immuneActive'] == false,
       recentEvents: List<String>.from(json['recent_events'] ?? json['recentEvents'] ?? []),
       totalSubmissions: (json['total_submissions'] ?? json['totalSubmissions'] ?? 0).toInt(),
       pendingCount: (json['pending_count'] ?? json['pendingCount'] ?? 0).toInt(),
@@ -278,7 +278,7 @@ class FlaskGoodwillService {
     required String impactLevel,
     required int durationMinutes,
   }) {
-    int baseFromDescription = (description.trim().length / 2).clamp(10, 50).toInt();
+    int baseFromDescription = (description.trim()?.length ?? 0 / 2).clamp(10, 50).toInt();
     int durationScore = ((durationMinutes.clamp(0, 120) / 120) * 50).toInt();
 
     final impactMultipliers = {
@@ -542,7 +542,7 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
   }
 
   Future<void> _updateLovesScore() async {
-    if (_actionType.isEmpty || _description.trim().isEmpty) return;
+    if (_actionType?.isEmpty == true || _description.trim()?.isEmpty == true) return;
     
     setState(() => _isCalculatingLoves = true);
     
@@ -591,7 +591,7 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
   bool _validateAndSaveStep(int step) {
     switch (step) {
       case 0:
-        if (_actionType.isEmpty) {
+        if (_actionType?.isEmpty == true) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Please choose a type of act.'), backgroundColor: Colors.redAccent),
@@ -600,7 +600,7 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
         }
         return true;
       case 1:
-        if (!(_formKey.currentState?.validate() ?? false)) return false;
+        if (!(_formKey.currentState?.validate() == false)) return false;
         _formKey.currentState!.save();
         _updateLovesScore();
         return true;
@@ -790,10 +790,10 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
           helperText: 'Be specific about what you did, who it helped, and the impact it had.',
         ),
         validator: (val) {
-          if (val == null || val.trim().isEmpty) {
+          if (val == null || val.trim()?.isEmpty == true) {
             return 'Description cannot be empty';
           }
-          if (val.trim().length < 10) {
+          if ((val?.trim()?.length ?? 0) < 10) {
             return 'Please provide a more detailed description (at least 10 characters)';
           }
           return null;
@@ -875,15 +875,15 @@ class _SubmitGoodwillPageState extends ConsumerState<SubmitGoodwillPage> with Ti
             helperText: 'How long did this action take?',
           ),
           onChanged: (val) {
-            final parsed = int.tryParse(val);
+            final parsed = int.tryParse(val!);
             if (parsed != null) {
               setState(() => _durationMinutes = parsed);
               _updateLovesScore();
             }
           },
           validator: (val) {
-            if (val == null || val.isEmpty) return 'Duration required';
-            final parsed = int.tryParse(val);
+            if (val == null || val?.isEmpty == true) return 'Duration required';
+            final parsed = int.tryParse(val!);
             if (parsed == null || parsed <= 0) return 'Enter valid positive minutes';
             return null;
           },
@@ -1150,7 +1150,7 @@ class _BackendStatusTab extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    if (goodwillState.pendingSubmissions.isEmpty)
+                    if (goodwillState.pendingSubmissions?.isEmpty == true)
                       const Text('No pending submissions.', style: TextStyle(color: Colors.white70))
                     else
                       _PendingSubmissionsList(pending: goodwillState.pendingSubmissions),
@@ -1177,7 +1177,7 @@ class _BackendStatusTab extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    if (goodwillState.recentSubmissions.isEmpty)
+                    if (goodwillState.recentSubmissions?.isEmpty == true)
                       const Text('No recent submissions.', style: TextStyle(color: Colors.white70))
                     else
                       _RecentSubmissionsList(recent: goodwillState.recentSubmissions),

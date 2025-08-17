@@ -1,0 +1,538 @@
+import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
+import '../models/user_account.dart';
+import '../models/goodwill_token.dart';
+
+/// Unified user account service that combines both social features and goodwill token economy
+class UserAccountService {
+  final http.Client _client;
+  final String _baseUrl;
+
+  UserAccountService({
+    http.Client? client,
+    String? baseUrl,
+  }) : _client = client ?? http.Client(),
+       _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+
+  // MARK: - Private Helper Methods
+  
+  Map<String, String> _getHeaders({String? authToken}) {
+    final headers = Map<String, String>.from(ApiConfig.defaultHeaders);
+    if (authToken != null) {
+      headers['Authorization'] = 'Bearer $authToken';
+    }
+    return headers;
+  }
+
+  Future<Map<String, dynamic>> _handleResponse(http.Response response) async {
+    try {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      
+      if (ApiConfig.isSuccessStatusCode(response.statusCode)) {
+        return data;
+      } else {
+        throw UserAccountServiceException(
+          data['message'] ?? ApiConfig.getErrorMessage(response.statusCode),
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is UserAccountServiceException) rethrow;
+      throw UserAccountServiceException('Invalid response format');
+    }
+  }
+
+  Future<T> _executeRequest<T>(
+    Future<http.Response> request,
+    T Function(Map<String, dynamic>) parser,
+    String errorMessage,
+  ) async {
+    try {
+      final response = await request;
+      final data = await _handleResponse(response);
+      return parser(data);
+    } catch (e) {
+      throw UserAccountServiceException('$errorMessage: $e');
+    }
+  }
+
+  // MARK: - Core Profile Management
+
+  /// Get the current authenticated user's profile
+  Future<UserAccount> getCurrentUser({required String idToken}) async {
+    return _executeRequest(
+      _client.get(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/me'),
+        headers: _getHeaders(authToken: idToken),
+      ),
+      (data) => UserAccount.fromJson(data['user'] as Map<String, dynamic>),
+      'Failed to fetch current user profile',
+    );
+  }
+
+  /// Get user profile by ID
+  Future<UserAccount> getUserProfile({
+    required String userId,
+    String? authToken,
+  }) async {
+    return _executeRequest(
+      _client.get(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/$userId'),
+        headers: _getHeaders(authToken: authToken),
+      ),
+      (data) => UserAccount.fromJson(data['user'] as Map<String, dynamic>),
+      'Failed to fetch user profile',
+    );
+  }
+
+  /// Update user profile with comprehensive options
+  Future<UserAccount> updateUserProfile({
+    required String idToken,
+    String? username,
+    String? email,
+    String? displayName,
+    String? bio,
+    String? profileImageUrl,
+    String? avatarUrl,
+    Map<String, dynamic>? preferences,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final updateData = <String, dynamic>{};
+    if (username != null) updateData['username'] = username;
+    if (email != null) updateData['email'] = email;
+    if (displayName != null) updateData['displayName'] = displayName;
+    if (bio != null) updateData['bio'] = bio;
+    if (profileImageUrl != null) updateData['profile_image_url'] = profileImageUrl;
+    if (avatarUrl != null) updateData['avatarUrl'] = avatarUrl;
+    if (preferences != null) updateData['preferences'] = preferences;
+    if (metadata != null) updateData['metadata'] = metadata;
+
+    return _executeRequest(
+      _client.put(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/me'),
+        headers: _getHeaders(authToken: idToken),
+        body: json.encode(updateData),
+      ),
+      (data) => UserAccount.fromJson(data['user'] as Map<String, dynamic>),
+      'Failed to update user profile',
+    );
+  }
+
+  /// Check if a username is available
+  Future<bool> checkUsernameAvailability(String username) async {
+    return _executeRequest(
+      _client.get(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/check-username?username=${Uri.encodeComponent(username)}'),
+        headers: _getHeaders(),
+      ),
+      (data) => data['available'] as bool? == false,
+      'Failed to check username availability',
+    );
+  }
+
+  // MARK: - Goodwill Token Economy
+
+  /// Get user's goodwill tokens earned from verified blockchain actions
+  Future<List<GoodwillToken>> getUserGoodwillTokens({required String idToken}) async {
+    try {
+      return await _executeRequest(
+        _client.get(
+          Uri.parse('$_baseUrl/users/goodwill-tokens'),
+          headers: _getHeaders(authToken: idToken),
+        ),
+        (data) => (data['tokens'] as List? ?? [])
+            .map((json) => GoodwillToken.fromJson(json))
+            .toList(),
+        'Failed to fetch goodwill tokens',
+      );
+    } catch (e) {
+      return []; // Return empty list on error for backwards compatibility
+    }
+  }
+
+  /// Get total available loves that can be sent
+  Future<int> getTotalAvailableLoves({required String idToken}) async {
+    final tokens = await getUserGoodwillTokens(idToken: idToken!);
+    return tokens.fold(0, (sum, token) => sum + token.remainingLoves);
+  }
+
+  /// Get tokens that still have loves remaining to send
+  Future<List<GoodwillToken>> getActiveGoodwillTokens({required String idToken}) async {
+    final allTokens = await getUserGoodwillTokens(idToken: idToken!);
+    return allTokens.where((token) => token.hasLovesRemaining).toList();
+  }
+
+  /// Check if user has enough loves to send a specific amount
+  Future<bool> canSendLoves({required String idToken, required int lovesToSend}) async {
+    final availableLoves = await getTotalAvailableLoves(idToken: idToken!);
+    return availableLoves >= lovesToSend;
+  }
+
+  /// Get summary of user's goodwill economy stats
+  Future<Map<String, dynamic>> getGoodwillSummary({required String idToken}) async {
+    final tokens = await getUserGoodwillTokens(idToken: idToken!);
+    
+    final totalTokens = tokens.length;
+    final totalLovesEarned = tokens.fold(0, (sum, token) => sum + token.lovesAmount);
+    final totalLovesUsed = tokens.fold(0, (sum, token) => sum + token.lovesUsed);
+    final totalLovesRemaining = tokens.fold(0, (sum, token) => sum + token.remainingLoves);
+    final activeTokens = tokens.where((token) => token.hasLovesRemaining).length;
+    
+    return {
+      'totalGoodwillActions': totalTokens,
+      'totalLovesEarned': totalLovesEarned,
+      'totalLovesUsed': totalLovesUsed,
+      'totalLovesRemaining': totalLovesRemaining,
+      'activeTokens': activeTokens,
+    };
+  }
+
+  /// Simulate spending loves from tokens (for UI preview)
+  Future<List<GoodwillToken>> simulateSpendingLoves({
+    required List<GoodwillToken> tokens,
+    required int lovesToSpend,
+  }) async {
+    var remainingToSpend = lovesToSpend;
+    final updatedTokens = <GoodwillToken>[];
+
+    for (final token in tokens) {
+      if (remainingToSpend <= 0) {
+        updatedTokens.add(token);
+        continue;
+      }
+
+      final availableInToken = token.remainingLoves;
+      if (availableInToken > 0) {
+        final toSpendFromToken = remainingToSpend > availableInToken 
+            ? availableInToken 
+            : remainingToSpend;
+        
+        final updatedToken = token.copyWith(
+          lovesUsed: token.lovesUsed + toSpendFromToken,
+          isFullyUsed: (token.lovesUsed + toSpendFromToken) >= token.lovesAmount,
+          usedAt: DateTime.now(),
+        );
+        
+        updatedTokens.add(updatedToken);
+        remainingToSpend -= toSpendFromToken;
+      } else {
+        updatedTokens.add(token);
+      }
+    }
+
+    return updatedTokens;
+  }
+
+  // MARK: - Social Features
+
+  /// Search users by query
+  Future<List<UserAccount>> searchUsers({
+    required String query,
+    String? authToken,
+    int? limit,
+    int? offset,
+  }) async {
+    final queryParams = {'q': query};
+    if (limit != null) queryParams['limit'] = limit.toString();
+    if (offset != null) queryParams['offset'] = offset.toString();
+
+    final queryString = queryParams.entries
+        .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+
+    return _executeRequest(
+      _client.get(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/search?$queryString'),
+        headers: _getHeaders(authToken: authToken),
+      ),
+      (data) => (data['users'] as List<dynamic>? ?? [])
+          .map((userData) => UserAccount.fromJson(userData as Map<String, dynamic>))
+          .toList(),
+      'Failed to search users',
+    );
+  }
+
+  /// Follow a user
+  Future<void> followUser({
+    required String userId,
+    required String authToken,
+  }) async {
+    await _executeRequest(
+      _client.post(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/$userId/follow'),
+        headers: _getHeaders(authToken: authToken),
+        body: json.encode({}),
+      ),
+      (data) => null,
+      'Failed to follow user',
+    );
+  }
+
+  /// Unfollow a user
+  Future<void> unfollowUser({
+    required String userId,
+    required String authToken,
+  }) async {
+    await _executeRequest(
+      _client.delete(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/$userId/follow'),
+        headers: _getHeaders(authToken: authToken),
+      ),
+      (data) => null,
+      'Failed to unfollow user',
+    );
+  }
+
+  /// Get user followers with pagination
+  Future<List<UserAccount>> getUserFollowers({
+    required String userId,
+    String? authToken,
+    int? limit,
+    int? offset,
+  }) async {
+    final queryParams = <String, String>{};
+    if (limit != null) queryParams['limit'] = limit.toString();
+    if (offset != null) queryParams['offset'] = offset.toString();
+
+    final query = queryParams?.isEmpty == true 
+        ? '' 
+        : '?' + queryParams.entries.map((e) => '${e.key}=${e.value}').join('&');
+
+    return _executeRequest(
+      _client.get(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/$userId/followers$query'),
+        headers: _getHeaders(authToken: authToken),
+      ),
+      (data) => (data['followers'] as List<dynamic>? ?? [])
+          .map((userData) => UserAccount.fromJson(userData as Map<String, dynamic>))
+          .toList(),
+      'Failed to fetch user followers',
+    );
+  }
+
+  /// Get users that a user is following
+  Future<List<UserAccount>> getUserFollowing({
+    required String userId,
+    String? authToken,
+    int? limit,
+    int? offset,
+  }) async {
+    final queryParams = <String, String>{};
+    if (limit != null) queryParams['limit'] = limit.toString();
+    if (offset != null) queryParams['offset'] = offset.toString();
+
+    final query = queryParams?.isEmpty == true 
+        ? '' 
+        : '?' + queryParams.entries.map((e) => '${e.key}=${e.value}').join('&');
+
+    return _executeRequest(
+      _client.get(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/$userId/following$query'),
+        headers: _getHeaders(authToken: authToken),
+      ),
+      (data) => (data['following'] as List<dynamic>? ?? [])
+          .map((userData) => UserAccount.fromJson(userData as Map<String, dynamic>))
+          .toList(),
+      'Failed to fetch user following',
+    );
+  }
+
+  // MARK: - Moderation Features
+
+  /// Block a user
+  Future<void> blockUser({
+    required String userId,
+    required String authToken,
+  }) async {
+    await _executeRequest(
+      _client.post(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/$userId/block'),
+        headers: _getHeaders(authToken: authToken),
+        body: json.encode({}),
+      ),
+      (data) => null,
+      'Failed to block user',
+    );
+  }
+
+  /// Unblock a user
+  Future<void> unblockUser({
+    required String userId,
+    required String authToken,
+  }) async {
+    await _executeRequest(
+      _client.delete(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/$userId/block'),
+        headers: _getHeaders(authToken: authToken),
+      ),
+      (data) => null,
+      'Failed to unblock user',
+    );
+  }
+
+  /// Get list of blocked users
+  Future<List<UserAccount>> getBlockedUsers({
+    required String authToken,
+    int? limit,
+    int? offset,
+  }) async {
+    final queryParams = <String, String>{};
+    if (limit != null) queryParams['limit'] = limit.toString();
+    if (offset != null) queryParams['offset'] = offset.toString();
+
+    final query = queryParams?.isEmpty == true 
+        ? '' 
+        : '?' + queryParams.entries.map((e) => '${e.key}=${e.value}').join('&');
+
+    return _executeRequest(
+      _client.get(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/me/blocked$query'),
+        headers: _getHeaders(authToken: authToken),
+      ),
+      (data) => (data['blockedUsers'] as List<dynamic>? ?? [])
+          .map((userData) => UserAccount.fromJson(userData as Map<String, dynamic>))
+          .toList(),
+      'Failed to fetch blocked users',
+    );
+  }
+
+  /// Report a user for violations
+  Future<void> reportUser({
+    required String userId,
+    required String reason,
+    String? description,
+    required String authToken,
+  }) async {
+    final reportData = {
+      'reason': reason,
+      if (description != null && description.isNotEmpty) 'description': description,
+    };
+
+    await _executeRequest(
+      _client.post(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/$userId/report'),
+        headers: _getHeaders(authToken: authToken),
+        body: json.encode(reportData),
+      ),
+      (data) => null,
+      'Failed to report user',
+    );
+  }
+
+  // MARK: - Statistics and Analytics
+
+  /// Get user statistics
+  Future<Map<String, dynamic>> getUserStatistics({
+    required String userId,
+    String? authToken,
+  }) async {
+    return _executeRequest(
+      _client.get(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/$userId/stats'),
+        headers: _getHeaders(authToken: authToken),
+      ),
+      (data) => data,
+      'Failed to fetch user statistics',
+    );
+  }
+
+  /// Get user's current balance (may include both loves and other currency)
+  Future<double> getUserBalance({required String idToken}) async {
+    final user = await getCurrentUser(idToken: idToken!);
+    return user.balance;
+  }
+
+  // MARK: - Account Management
+
+  /// Update user preferences
+  Future<UserAccount> updateUserPreferences({
+    required String authToken,
+    required Map<String, dynamic> preferences,
+  }) async {
+    return _executeRequest(
+      _client.put(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/me/preferences'),
+        headers: _getHeaders(authToken: authToken),
+        body: json.encode({'preferences': preferences}),
+      ),
+      (data) => UserAccount.fromJson(data['user'] as Map<String, dynamic>),
+      'Failed to update user preferences',
+    );
+  }
+
+  /// Deactivate account
+  Future<void> deactivateAccount({
+    required String authToken,
+    String? reason,
+  }) async {
+    final deactivationData = {
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    };
+
+    await _executeRequest(
+      _client.post(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/me/deactivate'),
+        headers: _getHeaders(authToken: authToken),
+        body: json.encode(deactivationData),
+      ),
+      (data) => null,
+      'Failed to deactivate account',
+    );
+  }
+
+  /// Reactivate account
+  Future<UserAccount> reactivateAccount({
+    required String authToken,
+  }) async {
+    return _executeRequest(
+      _client.post(
+        Uri.parse('$_baseUrl${ApiConfig.usersEndpoint}/me/reactivate'),
+        headers: _getHeaders(authToken: authToken),
+        body: json.encode({}),
+      ),
+      (data) => UserAccount.fromJson(data['user'] as Map<String, dynamic>),
+      'Failed to reactivate account',
+    );
+  }
+
+  // MARK: - Cleanup
+
+  void dispose() {
+    _client.close();
+  }
+}
+
+// MARK: - Exception Class
+
+class UserAccountServiceException implements Exception {
+  final String message;
+  final int? statusCode;
+  final dynamic details;
+
+  const UserAccountServiceException(
+    this.message, {
+    this.statusCode,
+    this.details,
+  });
+
+  @override
+  String toString() {
+    if (statusCode != null) {
+      return 'UserAccountServiceException($statusCode): $message';
+    }
+    return 'UserAccountServiceException: $message';
+  }
+}
+
+// MARK: - Riverpod Provider
+
+final userAccountServiceProvider = Provider<UserAccountService>((ref) {
+  return UserAccountService();
+});
+
+// Optional: Separate provider for custom HTTP client if needed
+final userAccountServiceWithClientProvider = Provider.family<UserAccountService, http.Client>((ref, client) {
+  return UserAccountService(client: client);
+});

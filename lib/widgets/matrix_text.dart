@@ -83,7 +83,7 @@ class _MatrixTextState extends State<MatrixText> with SingleTickerProviderStateM
     _typingCharacters = widget.targetText.split('');
     _displayedText = '';
     _typingIndex = 0;
-    if (widget.speed.inMilliseconds == 0 || (widget.targetText ?? '').isEmpty) {
+    if (widget.speed.inMilliseconds == 0 || (widget.targetText ?? '')?.isEmpty == true) {
       setState(() {
         _displayedText = widget.targetText;
         _isTypingAnimating = false;

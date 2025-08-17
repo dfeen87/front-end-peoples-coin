@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../service/api_client.dart';
-import '../models/wallet_models.dart'; // <-- ensure you have Wallet model
+import '../models/wallet_models.dart';
 
 enum WalletStatus { idle, loading, loaded, error }
 
@@ -54,8 +54,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
 
     try {
       final idToken = await _getIdToken();
-      final walletJson =
-          await _apiClient.getWalletDetails(walletIdFromUser, idToken);
+      final walletJson = await _apiClient.getWalletDetails(walletIdFromUser, idToken);
 
       final wallet = Wallet.fromJson(walletJson);
 
@@ -66,7 +65,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
     } catch (e) {
       state = state.copyWith(
         status: WalletStatus.error,
-        error: 'Failed to fetch wallet: $e',
+        error: 'Wallet fetch failed: ${e.toString()}',
       );
       if (kDebugMode) print('[WalletNotifier] Error fetching wallet: $e');
     }
@@ -77,27 +76,28 @@ class WalletNotifier extends StateNotifier<WalletState> {
     required String recipientWalletId,
     required double amount,
   }) async {
-    if (state.wallet?.id == null) throw Exception('No wallet loaded');
+    final walletId = state.wallet?.id;
+    if (walletId == null) throw Exception('No wallet loaded');
 
     state = state.copyWith(status: WalletStatus.loading, error: null);
 
     try {
       final idToken = await _getIdToken();
       await _apiClient.sendFunds(
-        fromWalletId: state.wallet!.id,
+        fromWalletId: walletId,
         toWalletId: recipientWalletId,
         amount: amount,
         idToken: idToken,
       );
 
       // Refresh wallet balance after transaction
-      await fetchWallet(state.wallet!.id);
+      await fetchWallet(walletId);
 
       state = state.copyWith(status: WalletStatus.loaded);
     } catch (e) {
       state = state.copyWith(
         status: WalletStatus.error,
-        error: 'Failed to send funds: $e',
+        error: 'Failed to send funds: ${e.toString()}',
       );
       if (kDebugMode) print('[WalletNotifier] Error sending funds: $e');
       rethrow;

@@ -1,49 +1,66 @@
-// lib/providers/user_provider.dart
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_account.dart';
 import '../models/goodwill_action.dart';
 import '../service/api_client.dart';
+import 'app_state_providers.dart'; // <-- contains apiClientProvider
 
-/// Manages user profile data and goodwill actions, including loading states and error handling.
-class UserProvider with ChangeNotifier {
+// --- State ---
+class UserState {
+  final UserAccount? currentUser;
+  final bool isLoadingUser;
+  final String? userError;
+
+  final List<GoodwillAction> userActions;
+  final bool isLoadingActions;
+  final String? actionsError;
+
+  const UserState({
+    this.currentUser,
+    this.isLoadingUser = false,
+    this.userError,
+    this.userActions = const [],
+    this.isLoadingActions = false,
+    this.actionsError,
+  });
+
+  bool get isLoading => isLoadingUser || isLoadingActions;
+
+  UserState copyWith({
+    UserAccount? currentUser,
+    bool? isLoadingUser,
+    String? userError,
+    List<GoodwillAction>? userActions,
+    bool? isLoadingActions,
+    String? actionsError,
+  }) {
+    return UserState(
+      currentUser: currentUser ?? this.currentUser,
+      isLoadingUser: isLoadingUser ?? this.isLoadingUser,
+      userError: userError,
+      userActions: userActions ?? this.userActions,
+      isLoadingActions: isLoadingActions ?? this.isLoadingActions,
+      actionsError: actionsError,
+    );
+  }
+
+  factory UserState.initial() => const UserState();
+}
+
+// --- Notifier ---
+class UserNotifier extends StateNotifier<UserState> {
   final PeoplesCoinApiClient _apiClient;
 
-  // --- State for current user ---
-  UserAccount? _currentUser;
-  bool _isLoadingUser = false;
-  String? _userError;
+  UserNotifier(this._apiClient) : super(UserState.initial());
 
-  // --- State for goodwill actions ---
-  List<GoodwillAction> _userActions = [];
-  bool _isLoadingActions = false;
-  String? _actionsError;
-
-  UserProvider(this._apiClient);
-
-  // --- Getters ---
-  UserAccount? get currentUser => _currentUser;
-  bool get isLoadingUser => _isLoadingUser;
-  String? get userError => _userError;
-
-  List<GoodwillAction> get userActions => _userActions;
-  bool get isLoadingActions => _isLoadingActions;
-  String? get actionsError => _actionsError;
-
-  /// Combined loading state (true if either user data or goodwill actions are loading).
-  bool get isLoading => _isLoadingUser || _isLoadingActions;
-
-  /// Maps known exceptions to user-friendly error messages.
   String _mapErrorToMessage(Object error) {
     if (error is TimeoutException) {
       return "Request timed out. Please try again.";
     }
-    // Extend with other error mappings as needed.
     return error.toString();
   }
 
-  /// Fetches a fresh Firebase ID token safely with a timeout.
   Future<String> _getIdToken() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('User is not signed in.');
@@ -53,68 +70,64 @@ class UserProvider with ChangeNotifier {
       onTimeout: () => throw TimeoutException('ID token fetch timed out'),
     );
 
-    if (token.isEmpty) {
+    if ((token ?? '')?.isEmpty == true) {
       throw Exception('Failed to get Firebase ID token.');
     }
 
-    return token;
+    return token!;
   }
 
-  /// Fetches user account details securely from the API.
-  Future<void> fetchUser(String userId) async {
-    _isLoadingUser = true;
-    _userError = null;
-    notifyListeners();
-
+  Future<void> fetchUser({required String userId}) async {
+    state = state.copyWith(isLoadingUser: true, userError: null);
     try {
       final idToken = await _getIdToken();
-      _currentUser = await _apiClient.getUserAccount(userId, idToken);
-      if (kDebugMode) {
-        print('[UserProvider] Loaded user: ${_currentUser?.username}');
-      }
+      final user = await _apiClient.getUserAccount(userId, idToken);
+      state = state.copyWith(currentUser: user, isLoadingUser: false);
     } catch (e) {
-      _userError = _mapErrorToMessage(e);
-      _currentUser = null;
-      if (kDebugMode) {
-        print('[UserProvider] Error fetching user: $e');
-      }
-    } finally {
-      _isLoadingUser = false;
-      notifyListeners();
+      state = state.copyWith(
+        userError: _mapErrorToMessage(e),
+        currentUser: null,
+        isLoadingUser: false,
+      );
     }
   }
 
-  /// Fetches goodwill actions for the specified user securely from the API.
-  Future<void> fetchUserActions(String userId) async {
-    _isLoadingActions = true;
-    _actionsError = null;
-    notifyListeners();
-
+  Future<void> fetchUserActions({required String userId}) async {
+    state = state.copyWith(isLoadingActions: true, actionsError: null);
     try {
       final idToken = await _getIdToken();
-      _userActions = await _apiClient.getUserGoodwillActions(userId, idToken);
-      if (kDebugMode) {
-        print('[UserProvider] Loaded ${_userActions.length} goodwill actions');
-      }
+      final actions = await _apiClient.getUserGoodwillActions(
+        userId: userId,
+        idToken: idToken!,
+      );
+      state = state.copyWith(userActions: actions, isLoadingActions: false);
     } catch (e) {
-      _actionsError = _mapErrorToMessage(e);
-      _userActions = [];
-      if (kDebugMode) {
-        print('[UserProvider] Error fetching goodwill actions: $e');
-      }
-    } finally {
-      _isLoadingActions = false;
-      notifyListeners();
+      state = state.copyWith(
+        actionsError: _mapErrorToMessage(e),
+        userActions: [],
+        isLoadingActions: false,
+      );
     }
   }
 
-  /// Clears all stored user-related data (typically called on logout).
+  void updateGoodwillAction(GoodwillAction updatedAction) {
+    final updatedList = [...state.userActions];
+    final index = updatedList.indexWhere((a) => a.id == updatedAction.id);
+    if (index != -1) {
+      updatedList[index] = updatedAction;
+      state = state.copyWith(userActions: updatedList);
+    }
+  }
+
   void clearUserData() {
-    _currentUser = null;
-    _userActions = [];
-    _userError = null;
-    _actionsError = null;
-    notifyListeners();
+    state = UserState.initial();
   }
 }
+
+// --- Provider ---
+final userProviderNotifier =
+    StateNotifierProvider<UserNotifier, UserState>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return UserNotifier(apiClient);
+});
 

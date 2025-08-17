@@ -57,7 +57,7 @@ class ProposalNotifier extends StateNotifier<ProposalDetailState> {
   Future<void> fetchProposalDetails(String proposalId, {required String idToken}) async {
     state = ProposalDetailState(isLoading: true);
     try {
-      final fetchedProposal = await _service.fetchProposalDetails(proposalId, idToken: idToken);
+      final fetchedProposal = await _service.fetchProposalDetails(proposalId, idToken: idToken!);
       state = ProposalDetailState(proposal: fetchedProposal);
     } catch (e) {
       state = ProposalDetailState(error: 'Failed to fetch proposal details.');
@@ -70,7 +70,7 @@ class ProposalNotifier extends StateNotifier<ProposalDetailState> {
     state = ProposalDetailState(proposal: state.proposal, isSubmittingVote: true);
     
     try {
-      final success = await _service.submitVote(vote: vote, idToken: idToken);
+      final success = await _service.submitVote(vote: vote, idToken: idToken!);
       if (success) {
         // If the vote was successful, update the local state to reflect the change
         // This is a simple optimistic update. A more robust solution might refetch the data.
@@ -143,7 +143,7 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
         if (idToken != null) {
           await ref.read(proposalDetailProvider(widget.proposalId).notifier).fetchProposalDetails(
             widget.proposalId,
-            idToken: idToken,
+            idToken: idToken!,
           );
           if (mounted) {
             _animationController.forward();
@@ -224,7 +224,7 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
                     voterUserId: user.uid,
                     voteValue: voteValue,
                   );
-                  final success = await ref.read(proposalDetailProvider(widget.proposalId).notifier).submitVote(vote: vote, idToken: idToken);
+                  final success = await ref.read(proposalDetailProvider(widget.proposalId).notifier).submitVote(vote: vote, idToken: idToken!);
                   if (success && mounted) {
                     _showVoteSuccessDialog();
                   } else if (mounted) {

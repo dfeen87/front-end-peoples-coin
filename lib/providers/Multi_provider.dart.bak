@@ -1,36 +1,39 @@
-// lib/app_state_providers.dart
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../service/api_client.dart';
+import 'user_provider.dart';
+import 'goodwill_processing_provider.dart';
+import 'proposal_provider.dart';
+import 'ledger_provider.dart';
+import 'voting_provider.dart';
 
-// Import your providers
-import 'state/user_provider.dart';
-import 'state/goodwill_processing_provider.dart';
-import 'state/proposal_provider.dart';
-import 'state/ledger_provider.dart';
-import 'state/voting_provider.dart';
-import 'service/api_client.dart';
+// API client provider
+final apiClientProvider = Provider<PeoplesCoinApiClient>((ref) {
+  throw UnimplementedError('API Client must be overridden in main.dart');
+});
 
-class AppStateProviders extends StatelessWidget {
-  final PeoplesCoinApiClient apiClient;
-  final Widget child;
+// State providers
+final userProvider = ChangeNotifierProvider<UserProvider>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return UserProvider(apiClient);
+});
 
-  const AppStateProviders({
-    super.key,
-    required this.apiClient,
-    required this.child,
-  });
+final goodwillProcessingProvider = ChangeNotifierProvider<GoodwillProcessingProvider>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return GoodwillProcessingProvider(apiClient);
+});
 
-  @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => UserProvider(apiClient)),
-        ChangeNotifierProvider(create: (_) => GoodwillProcessingProvider(apiClient)),
-        ChangeNotifierProvider(create: (_) => ProposalProvider(apiClient)),
-        ChangeNotifierProvider(create: (_) => LedgerProvider(apiClient)),
-        ChangeNotifierProvider(create: (_) => VotingProvider(apiClient)),
-      ],
-      child: child,
-    );
-  }
-}
+final proposalProvider = ChangeNotifierProvider<ProposalProvider>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return ProposalProvider(apiClient);
+});
+
+final ledgerProvider = ChangeNotifierProvider<LedgerProvider>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return LedgerProvider(apiClient);
+});
+
+final votingProvider = ChangeNotifierProvider<VotingProvider>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return VotingProvider(apiClient);
+});
+

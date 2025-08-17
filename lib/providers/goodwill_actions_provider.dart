@@ -53,7 +53,7 @@ class GoodwillActionsNotifier extends StateNotifier<GoodwillActionsState> {
     try {
       final rawList = await _apiClient.getUserGoodwillActions(
         userId: userId,
-        idToken: idToken,
+        idToken: idToken!,
       );
       final actions = rawList.map((json) => GoodwillAction.fromJson(json)).toList();
       state = state.copyWith(actions: actions);
@@ -73,7 +73,7 @@ class GoodwillActionsNotifier extends StateNotifier<GoodwillActionsState> {
     try {
       final response = await _apiClient.submitGoodwill(
         goodwillAction: actionToSend,
-        idToken: idToken,
+        idToken: idToken!,
       );
 
       final String actionId = response['id'] as String;
@@ -104,7 +104,7 @@ class GoodwillActionsNotifier extends StateNotifier<GoodwillActionsState> {
 
       try {
         final statusString = await _apiClient.getGoodwillStatus(actionId, idToken);
-        if (statusString == null || statusString.isEmpty) {
+        if (statusString == null || statusString?.isEmpty == true) {
           done = true;
           continue;
         }

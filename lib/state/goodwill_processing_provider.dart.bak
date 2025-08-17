@@ -12,9 +12,15 @@ class GoodwillProcessingProvider with ChangeNotifier {
   String? _error;
   GoodwillAction? _lastSubmittedAction;
 
+  /// List to track goodwill actions currently pending backend confirmation
+  final List<GoodwillAction> _pendingSubmissions = [];
+
   bool get isProcessingGoodwill => _isProcessingGoodwill;
   String? get error => _error;
   GoodwillAction? get lastSubmittedAction => _lastSubmittedAction;
+
+  /// Public unmodifiable view of pending goodwill submissions
+  List<GoodwillAction> get pendingSubmissions => List.unmodifiable(_pendingSubmissions);
 
   GoodwillProcessingProvider(this._apiClient);
 
@@ -23,11 +29,14 @@ class GoodwillProcessingProvider with ChangeNotifier {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('User is not signed in.');
     final token = await user.getIdToken();
-    if (token.isEmpty) throw Exception('Failed to get Firebase ID token.');
-    return token;
+    if (token == null || token?.isEmpty == true) throw Exception('Failed to get Firebase ID token.');
+    return token!;
   }
 
   /// Submits a goodwill action securely with ID token
+  ///
+  /// Adds the action to the pending queue immediately, then attempts submission.
+  /// On success, removes it from pending and stores last submitted action.
   Future<bool> submitGoodwill({
     required String performerUserId,
     required String actionType,
@@ -40,30 +49,59 @@ class GoodwillProcessingProvider with ChangeNotifier {
     _lastSubmittedAction = null;
     notifyListeners();
 
+    final finalContextualData = contextualData ?? {};
+
+    // Create the action to send and a corresponding GoodwillAction for local tracking
+    final actionToSend = GoodwillActionToSend(
+      performerUserId: performerUserId,
+      actionType: actionType,
+      description: description,
+      lovesValue: lovesValue,
+      contextualData: finalContextualData,
+      timestamp: DateTime.now().toUtc(),
+    );
+
+    // Create a pending GoodwillAction object to track
+    final pendingAction = GoodwillAction(
+      id: null, // not yet assigned by backend
+      performerUserId: performerUserId,
+      actionType: actionType,
+      description: description,
+      lovesValue: lovesValue,
+      contextualData: finalContextualData,
+      timestamp: actionToSend.timestamp,
+      status: 'pending', // you may want to add a status field in GoodwillAction model
+    );
+
+    // Add to pending submissions immediately
+    _pendingSubmissions.insert(0, pendingAction);
+    notifyListeners();
+
     try {
       final idToken = await _getIdToken();
-      final finalContextualData = contextualData ?? {};
 
-      final actionToSend = GoodwillActionToSend(
-        performerUserId: performerUserId,
-        actionType: actionType,
-        description: description,
-        lovesValue: lovesValue,
-        contextualData: finalContextualData,
-        timestamp: DateTime.now().toUtc(),
+      final result = await _apiClient.submitGoodwill(
+        goodwillAction: actionToSend.toJson(),
+        idToken: idToken!,
       );
 
-      final result = await _apiClient.submitGoodwill(actionToSend, idToken);
-
       if (result['success'] == true) {
+        // Remove from pending by matching on unique fields like timestamp & description
+        _pendingSubmissions.removeWhere((action) =>
+            action.timestamp == pendingAction.timestamp &&
+            action.description == pendingAction.description);
+
         _lastSubmittedAction = GoodwillAction.fromJson(result['data']);
+        notifyListeners();
         return true;
       } else {
         _error = result['error'] ?? 'An unknown error occurred during submission.';
+        notifyListeners();
         return false;
       }
     } catch (e) {
       _error = "An unexpected error occurred: $e";
+      notifyListeners();
       return false;
     } finally {
       _isProcessingGoodwill = false;

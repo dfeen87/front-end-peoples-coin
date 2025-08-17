@@ -1,99 +1,118 @@
-import 'package:flutter/foundation.dart';
+// lib/providers/ledger_provider.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/public_ledger_entry.dart';
 import '../service/api_client.dart';
 
-class LedgerProvider with ChangeNotifier {
+// --- State ---
+class LedgerState {
+  final List<PublicLedgerEntry> entries;
+  final bool isInitialLoading;
+  final bool isFetchingMore;
+  final bool isSendingLoves;
+  final String? errorMessage;
+  final String? currentSearchQuery;
+
+  const LedgerState({
+    this.entries = const [],
+    this.isInitialLoading = false,
+    this.isFetchingMore = false,
+    this.isSendingLoves = false,
+    this.errorMessage,
+    this.currentSearchQuery,
+  });
+
+  LedgerState copyWith({
+    List<PublicLedgerEntry>? entries,
+    bool? isInitialLoading,
+    bool? isFetchingMore,
+    bool? isSendingLoves,
+    String? errorMessage,
+    String? currentSearchQuery,
+  }) {
+    return LedgerState(
+      entries: entries ?? this.entries,
+      isInitialLoading: isInitialLoading ?? this.isInitialLoading,
+      isFetchingMore: isFetchingMore ?? this.isFetchingMore,
+      isSendingLoves: isSendingLoves ?? this.isSendingLoves,
+      errorMessage: errorMessage,
+      currentSearchQuery: currentSearchQuery ?? this.currentSearchQuery,
+    );
+  }
+
+  factory LedgerState.initial() => const LedgerState();
+}
+
+// --- Notifier ---
+class LedgerNotifier extends StateNotifier<LedgerState> {
   final PeoplesCoinApiClient _apiClient;
-  String? _currentSearchQuery;
 
-  // --- State for Public Ledger Entries (with Pagination) ---
-  List<PublicLedgerEntry> _publicLedgerEntries = [];
-  bool _isInitialLoading = false;
-  bool _isFetchingMore = false;
-  String? _errorMessage;
+  LedgerNotifier(this._apiClient) : super(LedgerState.initial());
 
-  // --- State for sending loves ---
-  bool _isSendingLoves = false;
-
-  // --- Getters ---
-  List<PublicLedgerEntry> get publicLedgerEntries => _publicLedgerEntries;
-  bool get isInitialLoading => _isInitialLoading;
-  bool get isFetchingMore => _isFetchingMore;
-  String? get errorMessage => _errorMessage;
-  bool get isSendingLoves => _isSendingLoves;
-
-  LedgerProvider(this._apiClient);
-
-  /// Fetches public ledger entries with optional refresh.
-  /// Supports pagination based on last fetched entry ID.
+  /// Fetch ledger entries (with optional refresh)
   Future<void> fetchPublicLedgerEntries({bool isRefresh = false}) async {
-    if (_isInitialLoading || _isFetchingMore) return;
+    if (state.isInitialLoading || state.isFetchingMore) return;
 
-    _errorMessage = null;
-    if (isRefresh) {
-      _isInitialLoading = true;
-      _publicLedgerEntries = [];
-    } else {
-      _isFetchingMore = true;
-    }
-    notifyListeners();
+    state = state.copyWith(
+      errorMessage: null,
+      isInitialLoading: isRefresh,
+      isFetchingMore: !isRefresh,
+      entries: isRefresh ? [] : state.entries,
+    );
 
     try {
-      final lastId = _publicLedgerEntries.isNotEmpty ? _publicLedgerEntries.last.id : null;
-
+      final lastId = state.entries.isNotEmpty ? state.entries.last.id : null;
       final newEntries = await _apiClient.getLedgerEntries(
         lastId: lastId,
-        query: _currentSearchQuery,
+        query: state.currentSearchQuery,
       );
 
-      if (isRefresh) {
-        _publicLedgerEntries = newEntries;
-      } else {
-        _publicLedgerEntries.addAll(newEntries);
-      }
+      state = state.copyWith(
+        entries: isRefresh ? newEntries : [...state.entries, ...newEntries],
+      );
     } catch (e) {
-      _errorMessage = 'Failed to fetch ledger entries: $e';
-      if (kDebugMode) print('Error fetching ledger entries: $e');
+      state = state.copyWith(errorMessage: 'Failed to fetch ledger entries: $e');
     } finally {
-      _isInitialLoading = false;
-      _isFetchingMore = false;
-      notifyListeners();
+      state = state.copyWith(isInitialLoading: false, isFetchingMore: false);
     }
   }
 
-  /// Search ledger entries with query and refresh the list.
-  Future<void> search(String query) async {
-    _currentSearchQuery = query.isEmpty ? null : query;
+  /// Set search query and refresh ledger
+  Future<void> search(String? query) async {
+    final cleanedQuery = (query ?? '').trim();
+    state = state.copyWith(currentSearchQuery: cleanedQuery?.isEmpty == true ? null : cleanedQuery);
     await fetchPublicLedgerEntries(isRefresh: true);
   }
 
-  /// Sends loves transaction and refreshes ledger after success.
+  /// Send loves and refresh ledger
   Future<void> sendLoves({
     required String senderWalletId,
     required String recipientWalletId,
     required int amount,
     String? memo,
   }) async {
-    _isSendingLoves = true;
-    _errorMessage = null;
-    notifyListeners();
+    state = state.copyWith(isSendingLoves: true, errorMessage: null);
 
     try {
       await _apiClient.sendLoves(
         senderWalletId: senderWalletId,
         recipientWalletId: recipientWalletId,
-        amount: amount,
+        amount: amount!,
         memo: memo,
       );
 
       await fetchPublicLedgerEntries(isRefresh: true);
     } catch (e) {
-      _errorMessage = 'Failed to send loves: $e';
-      if (kDebugMode) print('Error sending loves: $e');
+      state = state.copyWith(errorMessage: 'Failed to send loves: $e');
     } finally {
-      _isSendingLoves = false;
-      notifyListeners();
+      state = state.copyWith(isSendingLoves: false);
     }
   }
 }
+
+// --- Provider ---
+final ledgerProviderNotifier =
+    StateNotifierProvider<LedgerNotifier, LedgerState>((ref) {
+  final apiClient = PeoplesCoinApiClient();
+  return LedgerNotifier(apiClient);
+});
 

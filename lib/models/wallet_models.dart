@@ -7,14 +7,14 @@ part 'wallet_models.g.dart';
 class Wallet {
   final String id;
   final String userId;
-  final String? publicAddress; // previously publicKey
+  final String? publicAddress;
   final String? encryptedPrivateKey;
   final double balance;
-  final bool isPrimary; // merged from UserWallet
+  final bool isPrimary; 
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isActive;
-  final String? networkType; // blockchain network
+  final String? networkType;
   final Map<String, dynamic>? metadata;
 
   const Wallet({

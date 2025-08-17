@@ -7,28 +7,29 @@ import '../service/api_client.dart';
 
 class ProposalProvider with ChangeNotifier {
   final PeoplesCoinApiClient _apiClient;
-
+  
   List<Proposal> _proposals = [];
   bool _isFetchingProposals = false;
   String? _proposalsError;
-
+  
   Proposal? _selectedProposal;
   bool _isFetchingDetails = false;
   String? _detailsError;
-
+  
   bool _isCreatingProposal = false;
   bool _isSubmittingVote = false;
 
+  // Getters
   List<Proposal> get proposals => _proposals;
   bool get isFetchingProposals => _isFetchingProposals;
   bool get hasProposalsError => _proposalsError != null;
   String? get proposalsError => _proposalsError;
-
+  
   Proposal? get selectedProposal => _selectedProposal;
   bool get isFetchingDetails => _isFetchingDetails;
   bool get hasDetailsError => _detailsError != null;
   String? get detailsError => _detailsError;
-
+  
   bool get isCreatingProposal => _isCreatingProposal;
   bool get isSubmittingVote => _isSubmittingVote;
 
@@ -73,8 +74,10 @@ class ProposalProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> createProposal(
-      {required ProposalToSend proposal, required String idToken}) async {
+  Future<Map<String, dynamic>> createProposal({
+    required ProposalToSend proposal, 
+    required String idToken
+  }) async {
     _isCreatingProposal = true;
     notifyListeners();
 
@@ -94,8 +97,10 @@ class ProposalProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> submitVote(
-      {required VoteToSend vote, required String idToken}) async {
+  Future<Map<String, dynamic>> submitVote({
+    required VoteToSend vote, 
+    required String idToken
+  }) async {
     _isSubmittingVote = true;
     notifyListeners();
 
@@ -105,11 +110,12 @@ class ProposalProvider with ChangeNotifier {
         idToken: idToken,
       );
       if (kDebugMode) print('[ProposalProvider] Vote submitted successfully.');
-
+      
+      // Refresh the proposal details after voting
       if (_selectedProposal != null) {
-        // You were missing the idToken here.
         await fetchProposalDetails(_selectedProposal!.id, idToken: idToken);
       }
+      
       return {'success': true, 'data': response};
     } catch (e) {
       if (kDebugMode) print('[ProposalProvider] Failed to submit vote: $e');
