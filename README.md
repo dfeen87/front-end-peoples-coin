@@ -126,9 +126,9 @@ Contact / Support
 
 Author: Don Michael Feeney Jr
 
-Email: your-email@example.com
+Email: dfeen87@gmail.com
 
-LinkedIn: linkedin.com/in/don-feeney
+LinkedIn: www.linkedin.com/in/don-michael-feeney-jr-908a96351
 
 License
 
