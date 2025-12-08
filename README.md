@@ -46,7 +46,7 @@ Firebase project configuration (optional for auth + analytics)
 
 Installation & Run:
 
-git clone https://github.com/YourUsername/BrightActs-Frontend.git
+git clone https://github.com/dfeen87/front-end-peoples-coin.git
 cd BrightActs-Frontend
 flutter pub get
 flutter run
