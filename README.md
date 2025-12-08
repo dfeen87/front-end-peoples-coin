@@ -2,7 +2,7 @@ BrightActs Front-End (Dart/Flutter)
 
 Version: 1.0.0
 Language: Dart / Flutter
-License: MIT (or your choice)
+License: MIT
 
 Overview
 
