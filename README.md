@@ -2,7 +2,7 @@
 
 **Cross-Platform Flutter Interface for the BrightActs Ecosystem**
 
-**Version:** 1.0.0  
+**Version:** 1.0.1 
 **Language:** Dart / Flutter  
 **License:** MIT
 
