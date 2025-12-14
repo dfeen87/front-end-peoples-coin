@@ -1,82 +1,112 @@
-BrightActs Front-End (Dart/Flutter)
+# BrightActs Front-End
 
-Version: 1.0.0 | Language: Dart / Flutter | License: MIT
+**Cross-Platform Flutter Interface for the BrightActs Ecosystem**
 
-Overview
+**Version:** 1.0.0  
+**Language:** Dart / Flutter  
+**License:** MIT
 
-BrightActs is a bio-inspired, blockchain-backed digital ecosystem designed to securely capture, process, and display Goodwill Actions across a global network. The Flutter/Dart front-end provides a modern, cross-platform interface for users to interact with the BrightActs system, view their impact, and participate in governance.
+## Overview
 
-Featuring a dynamic nebula background with persistent, clear transparent windows, the interface offers an immersive, visually engaging experience while keeping all user data and dashboards clear and readable.
+BrightActs is a bio-inspired, blockchain-backed digital ecosystem designed to securely capture, process, and visualize Goodwill Actions across a global network. This repository contains the Flutter/Dart front-end, providing a modern, responsive, cross-platform interface that allows users to:
 
-Key Features
+* Interact with the BrightActs network
+* Track personal and global impact
+* Participate in governance and decision-making
+* Visualize data through real-time dashboards
 
-Real-Time Dashboards – Track Goodwill Actions, tokenized balances, and impact scores with instantaneous updates.
+The UI features a dynamic nebula background with persistent, transparent data windows, delivering an immersive experience while preserving clarity, readability, and data focus.
 
-User Interaction & Rewards – Submit, track, and visualize Goodwill Actions via secure, auditable transaction pipelines.
+## Key Features
 
-Governance & Voting – Seamlessly view proposals, cast votes, and monitor council decisions directly from the front-end.
+### 🌐 Real-Time Dashboards
+* Live tracking of Goodwill Actions, tokenized balances, and impact scores
+* Instant updates via synchronized back-end data streams
 
-Portfolio & Analytics – Historical performance, scoring analytics, and interactive charts powered by back-end cognitive modules.
+### 🤝 User Interaction & Rewards
+* Secure submission and tracking of Goodwill Actions
+* Auditable transaction pipelines aligned with back-end validation logic
 
-Secure Authentication – Firebase-backed login ensures secure, auditable access for all users.
+### 🏛 Governance & Voting
+* View active proposals and council decisions
+* Cast votes and monitor outcomes directly from the front-end
 
-Cross-Platform – Fully compatible with Android, iOS, and web builds via Flutter.
+### 📊 Portfolio & Analytics
+* Historical performance views and scoring analytics
+* Interactive charts powered by cognitive back-end modules
 
-Architecture Highlights
+### 🔐 Secure Authentication
+* Firebase-backed authentication for secure, auditable access
+* Supports scalable identity management
 
-Modular Flutter Components – Each view (Portfolio, Ledger, Governance) is encapsulated for easy extension and maintainability.
+### 📱 Cross-Platform Support
+* Single codebase targeting Android, iOS, and Web using Flutter
 
-Real-Time Back-End Sync – Connects to Python back-end APIs via REST or WebSockets to ensure live data and audit logging.
+## Architecture Highlights
 
-Data Validation & Integrity – All user interactions are rigorously validated before submission to guarantee accuracy and auditability.
+* **Modular Flutter Design** - Each major view (Portfolio, Ledger, Governance) is encapsulated into reusable, maintainable components.
+* **Real-Time Back-End Synchronization** - Integrates with Python back-end services via REST and/or WebSockets to ensure live updates and audit logging.
+* **Data Validation & Integrity** - All user inputs are validated locally and server-side before submission to maintain correctness and trust.
+* **Immersive Visual Layer** - A persistent nebula background enhances user experience without interfering with foreground data visibility.
 
-Dynamic Nebula Background – Persistent visual effect enhances UI immersion without interfering with clarity of data windows.
+## Getting Started
 
-Getting Started
+### Prerequisites
 
-Prerequisites:
+* Flutter SDK ≥ 3.10.0
+* Dart SDK ≥ 3.2.0
+* Node.js / npm (optional, for build tooling)
+* Firebase project configuration (optional, for authentication & analytics)
 
-Flutter SDK >= 3.10.0
+### Installation & Run
 
-Dart SDK >= 3.2.0
-
-Node/npm (optional for build tooling)
-
-Firebase project configuration (optional for auth + analytics)
-
-Installation & Run:
-
+```bash
 git clone https://github.com/dfeen87/front-end-peoples-coin.git
 cd BrightActs-Frontend
 flutter pub get
 flutter run
+```
 
-Folder Structure
+## Project Structure
+
+```
 lib/
-├─ main.dart           # Entry point
-├─ screens/            # UI screens: Portfolio, Governance, Ledger
-├─ widgets/            # Reusable UI components
-├─ models/             # Dart classes mirroring back-end schemas
-├─ services/           # API & Firebase integration
-├─ utils/              # Helpers, constants, formatting
-└─ state/              # State management (Provider/Bloc)
+├── main.dart        # Application entry point
+├── screens/         # UI screens (Portfolio, Governance, Ledger)
+├── widgets/         # Reusable UI components
+├── models/          # Dart models mirroring back-end schemas
+├── services/        # API clients & Firebase integration
+├── utils/           # Helpers, constants, formatting utilities
+└── state/           # State management (Provider / Bloc)
+```
 
-Contributing
+## Contributing
 
-We welcome developers, designers, and blockchain enthusiasts to contribute, extend, and help scale BrightActs globally.
+We welcome developers, designers, and blockchain enthusiasts to help evolve and scale BrightActs.
 
-Workflow:
+### Workflow
 
-Fork the repo
+1. Fork the repository
+2. Create a feature branch
+   ```bash
+   git checkout -b feature/your-feature
+   ```
+3. Commit your changes
+   ```bash
+   git commit -am "Add your feature"
+   ```
+4. Push to your branch
+   ```bash
+   git push origin feature/your-feature
+   ```
+5. Open a Pull Request
 
-Create a feature branch: git checkout -b feature/your-feature
+All contributions are reviewed with a focus on clarity, maintainability, and alignment with system architecture.
 
-Commit your changes: git commit -am 'Add feature'
+## License
 
-Push to the branch: git push origin feature/your-feature
+This project is released under the MIT License. See the `LICENSE` file for full terms.
 
-Open a Pull Request
+## About
 
-License
-
-MIT License – See LICENSE for details.
+BrightActs Front-End is a cross-platform Flutter application that enables users to securely submit, track, and visualize Goodwill Actions in real time. It integrates seamlessly with the BrightActs back-end to provide governance participation, analytics, and interactive dashboards while maintaining strong data integrity and secure authentication.
