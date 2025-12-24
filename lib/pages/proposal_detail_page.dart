@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'dart:ui';
 import 'dart:async';
 
@@ -12,20 +13,6 @@ import '../models/proposal.dart';
 import '../models/vote.dart';
 
 // --- DATA MODELS AND PROVIDERS ---
-
-// User model - should be replaced with your actual user model
-class User {
-  final String uid;
-  final String? walletId;
-  
-  User({required this.uid, this.walletId});
-  
-  // This should be implemented in your actual authentication system
-  Future<String?> getIdToken() async {
-    // TODO: Implement actual ID token retrieval
-    throw UnimplementedError('ID token retrieval not implemented');
-  }
-}
 
 class VoteToSend {
   final String proposalId;
@@ -57,7 +44,7 @@ class ProposalNotifier extends StateNotifier<ProposalDetailState> {
   Future<void> fetchProposalDetails(String proposalId, {required String idToken}) async {
     state = ProposalDetailState(isLoading: true);
     try {
-      final fetchedProposal = await _service.fetchProposalDetails(proposalId, idToken: idToken!);
+      final fetchedProposal = await _service.fetchProposalDetails(proposalId, idToken: idToken);
       state = ProposalDetailState(proposal: fetchedProposal);
     } catch (e) {
       state = ProposalDetailState(error: 'Failed to fetch proposal details.');
@@ -70,7 +57,7 @@ class ProposalNotifier extends StateNotifier<ProposalDetailState> {
     state = ProposalDetailState(proposal: state.proposal, isSubmittingVote: true);
     
     try {
-      final success = await _service.submitVote(vote: vote, idToken: idToken!);
+      final success = await _service.submitVote(vote: vote, idToken: idToken);
       if (success) {
         // If the vote was successful, update the local state to reflect the change
         // This is a simple optimistic update. A more robust solution might refetch the data.
@@ -105,11 +92,8 @@ final proposalServiceProvider = Provider<ProposalService>((ref) {
   return ProposalService();
 });
 
-// TODO: Replace this with your actual authentication provider
-final authProvider = Provider<User?>((ref) {
-  // This should be replaced with your actual authentication provider
-  // For example: return ref.watch(firebaseAuthProvider).currentUser;
-  return null; // Return null when no user is authenticated
+final authProvider = StreamProvider<auth.User?>((ref) {
+  return auth.FirebaseAuth.instance.authStateChanges();
 });
 
 // --- APP-WIDE WIDGETS ---
@@ -136,39 +120,29 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
   }
 
   Future<void> _fetchProposalData() async {
-    final user = ref.read(authProvider);
-    if (user != null) {
-      try {
-        final idToken = await user.getIdToken();
-        if (idToken != null) {
-          await ref.read(proposalDetailProvider(widget.proposalId).notifier).fetchProposalDetails(
-            widget.proposalId,
-            idToken: idToken!,
-          );
-          if (mounted) {
-            _animationController.forward();
-          }
-        } else {
-          // Handle case where user exists but can't get ID token
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Authentication error. Please sign in again.')),
-            );
-          }
-        }
-      } catch (e) {
-        // Handle authentication errors
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Authentication error. Please sign in again.')),
-          );
-        }
-      }
-    } else {
-      // Handle case where no user is authenticated
+    final user = auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please sign in to view proposal details.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final idToken = await user.getIdToken();
+      await ref.read(proposalDetailProvider(widget.proposalId).notifier).fetchProposalDetails(
+        widget.proposalId,
+        idToken: idToken,
+      );
+      if (mounted) {
+        _animationController.forward();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Authentication error. Please sign in again.')),
         );
       }
     }
@@ -182,9 +156,9 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
 
   void _onVotePressed(String voteValue) async {
     final state = ref.read(proposalDetailProvider(widget.proposalId));
-    final user = ref.read(authProvider);
+    final user = auth.FirebaseAuth.instance.currentUser;
 
-    if (state.proposal == null || user?.uid == null) {
+    if (state.proposal == null || user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error: User not authenticated or proposal not loaded.'), backgroundColor: Colors.redAccent),
       );
@@ -192,13 +166,7 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
     }
 
     try {
-      final idToken = await user!.getIdToken();
-      if (idToken == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Authentication error. Please sign in again.'), backgroundColor: Colors.redAccent),
-        );
-        return;
-      }
+      final idToken = await user.getIdToken();
 
       showDialog(
         context: context,
@@ -224,7 +192,7 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
                     voterUserId: user.uid,
                     voteValue: voteValue,
                   );
-                  final success = await ref.read(proposalDetailProvider(widget.proposalId).notifier).submitVote(vote: vote, idToken: idToken!);
+                  final success = await ref.read(proposalDetailProvider(widget.proposalId).notifier).submitVote(vote: vote, idToken: idToken);
                   if (success && mounted) {
                     _showVoteSuccessDialog();
                   } else if (mounted) {
@@ -256,10 +224,17 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
   @override
   Widget build(BuildContext context) {
     final proposalState = ref.watch(proposalDetailProvider(widget.proposalId));
-    final user = ref.watch(authProvider);
+    final authState = ref.watch(authProvider);
 
     // Show authentication prompt if user is not signed in
-    if (user == null) {
+    if (authState.isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (authState.hasError || authState.value == null) {
       return Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
