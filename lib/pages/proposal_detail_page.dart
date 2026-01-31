@@ -117,6 +117,12 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
       duration: const Duration(milliseconds: 800),
     );
     _fetchProposalData();
+    ref.listen<AsyncValue<auth.User?>>(authProvider, (previous, next) {
+      final user = next.value;
+      if (user != null && previous?.value == null) {
+        _fetchProposalData();
+      }
+    });
   }
 
   Future<void> _fetchProposalData() async {
