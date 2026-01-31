@@ -4,14 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 // Assume these models and providers exist in your project
 import '../models/proposal_to_send.dart';
 import '../models/user.dart' as app_user;
 import '../service/api_service.dart';
-import '../config/api_config.dart';
 
 // -- RIVERPOD PROVIDERS --
 // A simple provider for the form's state. We'll use a `StateProvider` for a simple value.
@@ -182,7 +179,7 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
     final title = ref.read(proposalTitleProvider);
     final description = ref.read(proposalDescriptionProvider);
     
-    if (title?.isEmpty == true || description?.isEmpty == true) {
+    if (title.isEmpty || description.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -260,7 +257,7 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
   void _nextStep() async {
     bool isValid = false;
     if (_currentStep == 0) {
-      isValid = _formKeyStep1.currentState?.validate() == false;
+      isValid = _formKeyStep1.currentState?.validate() ?? false;
     } else if (_currentStep == 1) {
       isValid = true; // Step 2 has no validation fields
     }
@@ -755,24 +752,39 @@ class _CreateProposalPageContentState extends ConsumerState<CreateProposalPageCo
   }
 }
 
-class _SuccessDialog extends ConsumerWidget {
+class _SuccessDialog extends ConsumerStatefulWidget {
   const _SuccessDialog();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SuccessDialog> createState() => _SuccessDialogState();
+}
+
+class _SuccessDialogState extends ConsumerState<_SuccessDialog> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _controller.forward();
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
-    // Use a FutureProvider to handle the delayed closing
-    ref.listen(
-      FutureProvider((ref) async => await Future.delayed(const Duration(seconds: 2))),
-      (_, __) {
-        if (context.mounted) Navigator.of(context).pop();
-      }
-    );
 
     return ScaleTransition(
       scale: CurvedAnimation(
-        parent: AnimationController(vsync: Navigator.of(context), duration: const Duration(milliseconds: 600))..forward(),
+        parent: _controller,
         curve: Curves.elasticOut,
       ),
       child: AlertDialog(
@@ -801,49 +813,6 @@ class _SuccessDialog extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// Enhanced ProposalToSend model with better JSON serialization
-class ProposalToSend {
-  final String proposerUserId;
-  final String title;
-  final String description;
-  final String proposalType;
-  final Map<String, dynamic>? details;
-  final DateTime? voteEndTime;
-
-  ProposalToSend({
-    required this.proposerUserId,
-    required this.title,
-    required this.description,
-    required this.proposalType,
-    this.details,
-    this.voteEndTime,
-  });
-
-  Map<String, dynamic> toJson() {
-    return {
-      'proposer_user_id': proposerUserId,
-      'title': title,
-      'description': description,
-      'proposal_type': proposalType,
-      'details': details,
-      'vote_end_time': voteEndTime?.toIso8601String(),
-    };
-  }
-
-  factory ProposalToSend.fromJson(Map<String, dynamic> json) {
-    return ProposalToSend(
-      proposerUserId: json['proposer_user_id'],
-      title: json['title'],
-      description: json['description'],
-      proposalType: json['proposal_type'],
-      details: json['details'],
-      voteEndTime: json['vote_end_time'] != null 
-          ? DateTime.parse(json['vote_end_time'])
-          : null,
     );
   }
 }
