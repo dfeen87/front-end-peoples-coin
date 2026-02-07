@@ -773,15 +773,9 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
   @override
   void didUpdateWidget(covariant PublicActionCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_shouldRefreshCachedEntry(oldWidget.entry)) {
+    if (widget.entry != oldWidget.entry) {
       _cacheEntryFields();
     }
-  }
-
-  bool _shouldRefreshCachedEntry(PublicLedgerEntry previousEntry) {
-    return previousEntry.createdAt != widget.entry.createdAt ||
-        previousEntry.walletId != widget.entry.walletId ||
-        previousEntry.title != widget.entry.title;
   }
 
   void _cacheEntryFields() {
