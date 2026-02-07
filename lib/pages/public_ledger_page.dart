@@ -747,6 +747,8 @@ class PublicActionCard extends StatefulWidget {
 }
 
 class _PublicActionCardState extends State<PublicActionCard> with TickerProviderStateMixin {
+  static final DateFormat _dateFormat = DateFormat.yMMMd().add_jm();
+
   bool _isExpanded = false;
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
@@ -754,6 +756,9 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
   bool _isSending = false;
 
   late final AnimationController _formAnimationController;
+  late String _formattedDate;
+  late String _abbreviatedWallet;
+  late String _titleInitial;
 
   @override
   void initState() {
@@ -762,6 +767,27 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    _cacheEntryFields();
+  }
+
+  @override
+  void didUpdateWidget(covariant PublicActionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_shouldRefreshCachedEntry(oldWidget.entry)) {
+      _cacheEntryFields();
+    }
+  }
+
+  bool _shouldRefreshCachedEntry(PublicLedgerEntry previousEntry) {
+    return previousEntry.createdAt != widget.entry.createdAt ||
+        previousEntry.walletId != widget.entry.walletId ||
+        previousEntry.title != widget.entry.title;
+  }
+
+  void _cacheEntryFields() {
+    _formattedDate = _dateFormat.format(widget.entry.createdAt);
+    _abbreviatedWallet = _abbreviateWallet(widget.entry.walletId);
+    _titleInitial = widget.entry.title.isNotEmpty ? widget.entry.title[0].toUpperCase() : '?';
   }
 
   @override
@@ -783,7 +809,8 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
   }
 
   Future<void> _handleSend() async {
-    if (!_formKey.currentState!.validate()) return;
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) return;
     final amount = int.tryParse(_amountController.text);
     if (amount == null) return;
     final memo = _memoController.text.trim();
@@ -856,7 +883,7 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
         CircleAvatar(
           backgroundColor: Colors.amber.withOpacity(0.2),
           child: Text(
-            widget.entry.title.isNotEmpty ? widget.entry.title[0].toUpperCase() : '?',
+            _titleInitial,
             style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
           ),
         ),
@@ -873,7 +900,7 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
               GestureDetector(
                 onTap: () => _copyWallet(context, widget.entry.walletId),
                 child: Text(
-                  _abbreviateWallet(widget.entry.walletId),
+                  _abbreviatedWallet,
                   style: const TextStyle(color: Colors.white54, fontSize: 12, fontFamily: 'monospace'),
                 ),
               ),
@@ -893,7 +920,7 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          DateFormat.yMMMd().add_jm().format(widget.entry.createdAt),
+          _formattedDate,
           style: const TextStyle(color: Colors.white54, fontSize: 12),
         ),
         TextButton.icon(
