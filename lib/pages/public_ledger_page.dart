@@ -803,7 +803,8 @@ class _PublicActionCardState extends State<PublicActionCard> with TickerProvider
   }
 
   Future<void> _handleSend() async {
-    if (!_formKey.currentState!.validate()) return;
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) return;
     final amount = int.tryParse(_amountController.text);
     if (amount == null) return;
     final memo = _memoController.text.trim();
