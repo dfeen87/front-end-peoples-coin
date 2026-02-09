@@ -12,17 +12,20 @@ jobs:
     defaults:
       run:
         shell: bash
+    permissions:
+      contents: read
 
     steps:
       # 1. Checkout the repository
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # 2. Install Flutter (stable 3.13.x)
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.13.6'
+          cache: true
 
       # 3. Enable Flutter Web
       - name: Enable Flutter Web
@@ -35,6 +38,9 @@ jobs:
       # 5. Build Flutter Web
       - name: Build Flutter Web
         run: flutter build web --release
+
+      - name: Validate build output
+        run: test -d build/web
 
       # 6. Deploy to Firebase Hosting
       - name: Deploy to Firebase Hosting
