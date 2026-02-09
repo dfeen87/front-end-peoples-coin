@@ -32,7 +32,7 @@ dependencies:
   dio: ^5.4.3+1
   
   # Local Authentication
-  local_auth: ^2.2.0
+  local_auth: ^2.1.8
   
   # JSON
   json_annotation: ^4.8.1
