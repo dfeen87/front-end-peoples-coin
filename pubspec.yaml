@@ -22,10 +22,14 @@ dependencies:
   firebase_core: ^2.31.1
   firebase_auth: ^4.19.6
   firebase_app_check: ^0.3.0
-  cloud_firestore: ^4.9.0
+  cloud_firestore: ^4.7.0
 
   # Web3 / Blockchain
-  web3dart: ^2.6.1
+  # MUST be <=2.7.1 because 2.7.2+ requires stream_channel >2.1.1
+  web3dart: ^2.7.1
+  uuid: ^3.0.7
+
+  # Webview
   webview_flutter: ^4.4.2
 
   # HTTP & API
@@ -64,7 +68,6 @@ dependencies:
   path_provider: ^2.1.1
 
   # Utilities
-  uuid: ^4.2.1
   intl: ^0.19.0
   url_launcher: ^6.2.4
   flutter_dotenv: ^5.1.2
@@ -85,14 +88,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # Dart 3.1 compatible lints
-  flutter_lints: ^3.0.1
+  # Integration_test (only in dev)
+  integration_test:
+    sdk: flutter
 
+  flutter_lints: ^3.0.1
   json_serializable: ^6.7.1
   build_runner: ^2.4.9
   mockito: ^5.4.4
-  integration_test:
-    sdk: flutter
 
 flutter:
   uses-material-design: true
