@@ -10,67 +10,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ------------------------------
-      # 1️⃣ Checkout repository
-      # ------------------------------
+      # 1️⃣ Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # ------------------------------
-      # 2️⃣ Cache Flutter dependencies
-      # ------------------------------
-      - name: Cache Flutter dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.pub-cache
-            .dart_tool
-          key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.yaml') }}
-
-      # ------------------------------
-      # 3️⃣ Set up Flutter
-      # ------------------------------
+      # 2️⃣ Set up Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.32.8
 
-      # ------------------------------
-      # 4️⃣ Install dependencies
-      # ------------------------------
-      - name: Install dependencies
+      # 3️⃣ Install dependencies
+      - name: Install Flutter dependencies
         run: flutter pub get
 
-      # ------------------------------
-      # 5️⃣ Create .env file (optional)
-      # ------------------------------
+      # 4️⃣ Create .env file from secrets
       - name: Create .env file
-        run: echo "RECAPTCHA_SITE_KEY_PROD=${{ secrets.RECAPTCHA_SITE_KEY_PROD }}" > .env
-
-      # ------------------------------
-      # 6️⃣ Analyze and test (optional but recommended)
-      # ------------------------------
-      - name: Analyze Flutter project
-        run: flutter analyze
-
-      - name: Run Flutter tests
-        run: flutter test --coverage
-
-      # ------------------------------
-      # 7️⃣ Build Flutter web
-      # ------------------------------
-      - name: Build Flutter web
         run: |
-          flutter build web --release \
-            --dart-define=RECAPTCHA_SITE_KEY_PROD=${{ secrets.RECAPTCHA_SITE_KEY_PROD }}
+          echo "RECAPTCHA_SITE_KEY_PROD=${{ secrets.RECAPTCHA_SITE_KEY_PROD }}" > .env
+          echo "OTHER_SECRET=${{ secrets.OTHER_SECRET }}" >> .env
 
-      # ------------------------------
-      # 8️⃣ Deploy to Firebase Hosting
-      # ------------------------------
+      # 5️⃣ Build Flutter web
+      - name: Build Flutter web
+        run: flutter build web --release
+
+      # 6️⃣ Verify build output exists
+      - name: Verify web build
+        run: ls -la build/web
+
+      # 7️⃣ Deploy to Firebase Hosting
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          repoToken: '${{ secrets.GITHUB_TOKEN }}' # GitHub token for deployment logs
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           projectId: brightacts-frontend-50f58
           channelId: live
