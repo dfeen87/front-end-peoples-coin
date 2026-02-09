@@ -1,9 +1,4 @@
-import 'package:json_annotation/json_annotation.dart';
-
-part 'wallet_models.g.dart';
-
 /// Core Wallet model
-@JsonSerializable()
 class Wallet {
   final String id;
   final String userId;
@@ -31,8 +26,32 @@ class Wallet {
     this.metadata,
   });
 
-  factory Wallet.fromJson(Map<String, dynamic> json) => _$WalletFromJson(json);
-  Map<String, dynamic> toJson() => _$WalletToJson(this);
+  factory Wallet.fromJson(Map<String, dynamic> json) => Wallet(
+        id: json['id'] as String,
+        userId: json['userId'] as String,
+        publicAddress: json['publicAddress'] as String?,
+        encryptedPrivateKey: json['encryptedPrivateKey'] as String?,
+        balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
+        isPrimary: json['isPrimary'] as bool? ?? false,
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        updatedAt: DateTime.parse(json['updatedAt'] as String),
+        isActive: json['isActive'] as bool? ?? true,
+        networkType: json['networkType'] as String? ?? 'mainnet',
+        metadata: json['metadata'] as Map<String, dynamic>?,
+      );
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'userId': userId,
+        'publicAddress': publicAddress,
+        'encryptedPrivateKey': encryptedPrivateKey,
+        'balance': balance,
+        'isPrimary': isPrimary,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+        'isActive': isActive,
+        'networkType': networkType,
+        'metadata': metadata,
+      };
 
   Wallet copyWith({
     String? id,
@@ -64,7 +83,6 @@ class Wallet {
 }
 
 /// Wallet Transaction
-@JsonSerializable()
 class WalletTransaction {
   final String id;
   final String walletId;
@@ -92,9 +110,32 @@ class WalletTransaction {
     this.fee,
   });
 
-  factory WalletTransaction.fromJson(Map<String, dynamic> json) =>
-      _$WalletTransactionFromJson(json);
-  Map<String, dynamic> toJson() => _$WalletTransactionToJson(this);
+  factory WalletTransaction.fromJson(Map<String, dynamic> json) => WalletTransaction(
+        id: json['id'] as String,
+        walletId: json['walletId'] as String,
+        type: json['type'] as String,
+        amount: (json['amount'] as num).toDouble(),
+        toAddress: json['toAddress'] as String?,
+        fromAddress: json['fromAddress'] as String?,
+        transactionHash: json['transactionHash'] as String?,
+        status: json['status'] as String,
+        timestamp: DateTime.parse(json['timestamp'] as String),
+        metadata: json['metadata'] as Map<String, dynamic>?,
+        fee: (json['fee'] as num?)?.toDouble(),
+      );
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'walletId': walletId,
+        'type': type,
+        'amount': amount,
+        'toAddress': toAddress,
+        'fromAddress': fromAddress,
+        'transactionHash': transactionHash,
+        'status': status,
+        'timestamp': timestamp.toIso8601String(),
+        'metadata': metadata,
+        'fee': fee,
+      };
 
   WalletTransaction copyWith({
     String? id,
@@ -126,7 +167,6 @@ class WalletTransaction {
 }
 
 /// Wallet Balance
-@JsonSerializable()
 class WalletBalance {
   final String walletId;
   final double availableBalance;
@@ -144,9 +184,22 @@ class WalletBalance {
     required this.lastUpdated,
   });
 
-  factory WalletBalance.fromJson(Map<String, dynamic> json) =>
-      _$WalletBalanceFromJson(json);
-  Map<String, dynamic> toJson() => _$WalletBalanceToJson(this);
+  factory WalletBalance.fromJson(Map<String, dynamic> json) => WalletBalance(
+        walletId: json['walletId'] as String,
+        availableBalance: (json['availableBalance'] as num).toDouble(),
+        pendingBalance: (json['pendingBalance'] as num).toDouble(),
+        totalBalance: (json['totalBalance'] as num).toDouble(),
+        currency: json['currency'] as String? ?? 'LOVES',
+        lastUpdated: DateTime.parse(json['lastUpdated'] as String),
+      );
+  Map<String, dynamic> toJson() => {
+        'walletId': walletId,
+        'availableBalance': availableBalance,
+        'pendingBalance': pendingBalance,
+        'totalBalance': totalBalance,
+        'currency': currency,
+        'lastUpdated': lastUpdated.toIso8601String(),
+      };
 
   WalletBalance copyWith({
     String? walletId,
@@ -168,7 +221,6 @@ class WalletBalance {
 }
 
 /// Wallet Key Pair
-@JsonSerializable()
 class WalletKeyPair {
   final String publicKey;
   final String privateKey;
@@ -182,9 +234,18 @@ class WalletKeyPair {
     this.mnemonic,
   });
 
-  factory WalletKeyPair.fromJson(Map<String, dynamic> json) =>
-      _$WalletKeyPairFromJson(json);
-  Map<String, dynamic> toJson() => _$WalletKeyPairToJson(this);
+  factory WalletKeyPair.fromJson(Map<String, dynamic> json) => WalletKeyPair(
+        publicKey: json['publicKey'] as String,
+        privateKey: json['privateKey'] as String,
+        address: json['address'] as String,
+        mnemonic: json['mnemonic'] as String?,
+      );
+  Map<String, dynamic> toJson() => {
+        'publicKey': publicKey,
+        'privateKey': privateKey,
+        'address': address,
+        'mnemonic': mnemonic,
+      };
 }
 
 /// Wallet State for UI/Views (to avoid conflict with provider state)
@@ -275,4 +336,3 @@ extension WalletTransactionStatusExtension on WalletTransactionStatus {
     }
   }
 }
-

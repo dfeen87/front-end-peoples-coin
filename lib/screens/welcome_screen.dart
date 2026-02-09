@@ -13,7 +13,7 @@ import 'package:brightacts_frontend_app/widgets/dynamic_nebula_background.dart';
 // ENHANCEMENT: App-specific card content
 final List<TechSystem> backendSystems = [
   const TechSystem(
-    icon: Icons.edit_document,
+    iconKey: TechSystemIcon.actSubmission,
     title: 'Act Submission',
     description: 'Captures and validates user-submitted acts of goodwill.',
     color: Color(0xFFDA70D6),
@@ -29,7 +29,7 @@ class ActValidator {
 ''',
   ),
   const TechSystem(
-    icon: Icons.gavel,
+    iconKey: TechSystemIcon.governance,
     title: 'Governance Protocol',
     description: 'Manages community proposals and on-chain voting.',
     color: Color(0xFF8A2BE2),
@@ -48,7 +48,7 @@ contract Governance {
 ''',
   ),
   const TechSystem(
-    icon: Icons.public,
+    iconKey: TechSystemIcon.ledger,
     title: 'Immutable Ledger',
     description: 'Records all verified acts on a transparent, public chain.',
     color: Color(0xFF00BFFF),
@@ -69,7 +69,7 @@ class Ledger {
 ''',
   ),
   const TechSystem(
-    icon: Icons.wallet,
+    iconKey: TechSystemIcon.tokenomics,
     title: 'Tokenomics Engine',
     description: 'Mints and distributes "Loves" tokens as rewards.',
     color: Color(0xFF6A5ACD),

@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
+import 'dart:js_util' as js_util;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -216,7 +217,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
     final completer = Completer<String?>();
     
     // Call grecaptcha.enterprise.execute
-    html.window.callMethod('eval', ['''
+    js_util.callMethod(html.window, 'eval', ['''
       if (typeof grecaptcha !== 'undefined' && grecaptcha.enterprise) {
         grecaptcha.enterprise.execute('${RecaptchaConfig.siteKey}', {
           action: '${RecaptchaConfig.action}'
@@ -233,11 +234,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
     ''']);
 
     // Set up callback
-    html.window['recaptchaCallback'] = (String? token) {
+    js_util.setProperty(html.window, 'recaptchaCallback', (String? token) {
       if (!completer.isCompleted) {
         completer.complete(token);
       }
-    };
+    });
 
     // Timeout after 30 seconds
     Timer(const Duration(seconds: 30), () {
@@ -505,8 +506,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> with TickerProvider
 
     try {
       await authService.signUp(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
         username: _usernameController.text.trim(),
         recaptchaToken: recaptchaToken,
       );
