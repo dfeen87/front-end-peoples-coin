@@ -26,7 +26,7 @@ dependencies:
 
   # Web3 / Blockchain
   web3dart: ^2.6.1
-  webview_flutter: ^4.8.0
+  webview_flutter: ^4.4.2
 
   # HTTP & API (Dart 3.1 compatible)
   http: ^1.0.0
