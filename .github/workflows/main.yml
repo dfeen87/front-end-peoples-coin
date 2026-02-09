@@ -1,0 +1,59 @@
+name: Build and Deploy Flutter Web to Firebase Hosting
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.32.8
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Flutter web
+        run: flutter build web --release
+
+      - name: Validate firebase.json hosting config
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('firebase.json')
+          if not path.exists():
+              raise SystemExit('firebase.json not found at repository root')
+
+          data = json.loads(path.read_text())
+          hosting = data.get('hosting', {})
+          public = hosting.get('public')
+          if public != 'build/web':
+              raise SystemExit(f'firebase.json hosting.public must be "build/web", got: {public!r}')
+
+          print('firebase.json hosting.public is build/web')
+          PY
+
+      - name: Deploy to Firebase Hosting (live)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          projectId: <your Firebase project ID>
+          channelId: live
+          entryPoint: firebase
+
+    # Ensure the Firebase service account has Firebase Hosting Admin and
+    # sufficient IAM permissions to deploy (e.g., Firebase Hosting Admin,
+    # and Service Account User if needed).
