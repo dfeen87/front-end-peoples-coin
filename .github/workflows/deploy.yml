@@ -1,52 +1,48 @@
-name: Flutter Web CI/CD
+name: Deploy Flutter Web to Firebase
 
 on:
   push:
     branches:
-      - main   # Deploy on main branch
-  workflow_dispatch:
+      - main  # deploy on main branch pushes
 
 jobs:
   build-and-deploy:
+    name: Build and Deploy
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
+
+    env:
+      # Firebase project ID
+      FIREBASE_PROJECT_ID: brightacts-frontend-50f58
 
     steps:
-      # 1️⃣ Checkout the repository
+      # 1️⃣ Checkout the repo
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # 2️⃣ Setup Flutter with compatible version (Dart 3.8+)
+      # 2️⃣ Setup Flutter with Dart >= 3.8.1
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '4.2.0' 
+          flutter-version: '4.2.0'  # Flutter version with Dart 3.8+
 
-      # 3️⃣ Enable Flutter web
-      - name: Enable web support
+      # 3️⃣ Enable flutter web
+      - name: Enable Flutter Web
         run: flutter config --enable-web
 
-      # 4️⃣ Install dependencies
-      - name: Get Flutter dependencies
+      # 4️⃣ Get Flutter dependencies
+      - name: Install dependencies
         run: flutter pub get
 
       # 5️⃣ Build Flutter web
       - name: Build Flutter Web
         run: flutter build web --release
 
-      # 6️⃣ Install Firebase CLI
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
-
-      # 7️⃣ Deploy to Firebase Hosting
-      - name: Deploy to Firebase Hosting
+      # 6️⃣ Setup Firebase CLI
+      - name: Setup Firebase CLI
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: "${{ secrets.GITHUB_TOKEN }}" 
-          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" 
-          projectId: brightacts-frontend-50f58
-          channelId: live  
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: ${{ env.FIREBASE_PROJECT_ID }}
           target: hosting
-          public: build/web  
