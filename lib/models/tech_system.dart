@@ -4,6 +4,16 @@ import 'package:flutter/material.dart';
 /// A data model for a technical system, including visual and descriptive data.
 @immutable
 class TechSystem {
+  static const Map<int, IconData> _iconByCodePoint = {
+    Icons.cloud.codePoint: Icons.cloud,
+    Icons.settings.codePoint: Icons.settings,
+    Icons.security.codePoint: Icons.security,
+    Icons.storage.codePoint: Icons.storage,
+    Icons.code.codePoint: Icons.code,
+    Icons.memory.codePoint: Icons.memory,
+    Icons.account_tree.codePoint: Icons.account_tree,
+  };
+
   final IconData icon;
   final String title;
   final String description;
@@ -51,13 +61,9 @@ class TechSystem {
 
   /// Creates a [TechSystem] instance from a JSON map.
   factory TechSystem.fromJson(Map<String, dynamic> json) {
+    final iconCodePoint = json['icon_code_point'] as int?;
     return TechSystem(
-      icon: IconData(
-        json['icon_code_point'] as int,
-        fontFamily: json['icon_font_family'] as String?,
-        fontPackage: json['icon_font_package'] as String?,
-        matchTextDirection: (json['icon_match_text_direction'] as bool?) ?? false,
-      ),
+      icon: _iconByCodePoint[iconCodePoint] ?? Icons.settings,
       title: json['title'] as String,
       description: json['description'] as String,
       color: Color(json['color'] as int),
@@ -95,4 +101,3 @@ class TechSystem {
     return 'TechSystem(title: $title, description: $description)';
   }
 }
-
