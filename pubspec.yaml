@@ -79,7 +79,7 @@ dependencies:
   connectivity_plus: ^5.0.2
 
   # AI / ML
-  tflite_flutter: ^0.11.0
+  tflite_flutter: ^0.10.4
 
 dev_dependencies:
   flutter_test:
