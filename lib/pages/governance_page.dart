@@ -48,6 +48,19 @@ final appUserProvider = Provider<AppUser?>((ref) {
 class ProposalsNotifier extends StateNotifier<AsyncValue<List<app_models.Proposal>>> {
   ProposalsNotifier() : super(const AsyncValue.loading());
 
+  app_models.ProposalStatus _statusFromKey(String status) {
+    switch (status.toUpperCase()) {
+      case 'ACTIVE':
+        return app_models.ProposalStatus.active;
+      case 'PASSED':
+        return app_models.ProposalStatus.closed;
+      case 'FAILED':
+        return app_models.ProposalStatus.rejected;
+      default:
+        return app_models.ProposalStatus.unknown;
+    }
+  }
+
   Future<void> fetchProposals({required String status, required String idToken}) async {
     // We only set to loading if there's no data yet, to avoid flashing on a refresh.
     if (state is! AsyncData) {
@@ -59,59 +72,67 @@ class ProposalsNotifier extends StateNotifier<AsyncValue<List<app_models.Proposa
       await Future.delayed(const Duration(seconds: 1));
 
       // Mock data based on status filter - replace with real API call to your Flask backend
-      final allProposals = [
+      final allProposals = <app_models.Proposal>[
         app_models.Proposal(
           id: '1',
           title: 'Community Garden Initiative',
           description: 'A proposal to establish a community garden in the central park to promote sustainability and community engagement.',
           proposerUserId: 'user123',
-          status: 'ACTIVE',
+          status: app_models.ProposalStatus.active,
           voteEndTime: DateTime.now().add(const Duration(days: 5)),
-          votesFor: 120,
-          votesAgainst: 30,
+          forVotes: 120,
+          againstVotes: 30,
           createdAt: DateTime.now().subtract(const Duration(days: 2)),
-          requiredVotes: 200,
+          updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+          requiredQuorum: 200,
+          proposalType: 'Community',
         ),
         app_models.Proposal(
           id: '2',
           title: 'Upgrade Public WiFi Infrastructure',
           description: 'Allocate funds to improve the public WiFi network in the city center for better connectivity.',
           proposerUserId: 'user456',
-          status: 'ACTIVE',
+          status: app_models.ProposalStatus.active,
           voteEndTime: DateTime.now().add(const Duration(days: 10)),
-          votesFor: 85,
-          votesAgainst: 15,
+          forVotes: 85,
+          againstVotes: 15,
           createdAt: DateTime.now().subtract(const Duration(days: 4)),
-          requiredVotes: 150,
+          updatedAt: DateTime.now().subtract(const Duration(days: 2)),
+          requiredQuorum: 150,
+          proposalType: 'Infrastructure',
         ),
         app_models.Proposal(
           id: '3',
           title: 'Youth Sports Program Funding',
           description: 'Increase funding for youth sports programs to encourage physical activity among children.',
           proposerUserId: 'user789',
-          status: 'PASSED',
+          status: app_models.ProposalStatus.closed,
           voteEndTime: DateTime.now().subtract(const Duration(days: 1)),
-          votesFor: 180,
-          votesAgainst: 45,
+          forVotes: 180,
+          againstVotes: 45,
           createdAt: DateTime.now().subtract(const Duration(days: 15)),
-          requiredVotes: 200,
+          updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+          requiredQuorum: 200,
+          proposalType: 'Funding',
         ),
         app_models.Proposal(
           id: '4',
           title: 'Downtown Parking Fees Increase',
           description: 'Proposal to increase downtown parking fees to fund public transportation improvements.',
           proposerUserId: 'user101',
-          status: 'FAILED',
+          status: app_models.ProposalStatus.rejected,
           voteEndTime: DateTime.now().subtract(const Duration(days: 3)),
-          votesFor: 60,
-          votesAgainst: 140,
+          forVotes: 60,
+          againstVotes: 140,
           createdAt: DateTime.now().subtract(const Duration(days: 20)),
-          requiredVotes: 150,
+          updatedAt: DateTime.now().subtract(const Duration(days: 3)),
+          requiredQuorum: 150,
+          proposalType: 'Policy',
         ),
       ];
 
       final filteredProposals = allProposals
-          .where((p) => p.status == status)
+          .where((p) => p.status == _statusFromKey(status))
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Sort by newest first
 
@@ -139,16 +160,15 @@ final autoFetchProvider = Provider<void>((ref) {
   if (user != null) {
     // Get Firebase ID token
     user.getIdToken().then((idToken) {
+      if (idToken == null || idToken.isEmpty) {
+        return;
+      }
       ref.read(proposalsProvider.notifier).fetchProposals(
-        status: status, 
+        status: status,
         idToken: idToken,
       );
     }).catchError((error) {
-      // Handle token error
-      ref.read(proposalsProvider.notifier).fetchProposals(
-        status: status, 
-        idToken: 'fallback_token',
-      );
+      // Ignore token errors; UI will handle auth states.
     });
   }
 });
@@ -205,6 +225,9 @@ class _GovernancePageState extends ConsumerState<GovernancePage> with TickerProv
 
     try {
       final idToken = await currentUser.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Missing authentication token');
+      }
       await ref.read(proposalsProvider.notifier).refreshProposals(
         status: status, 
         idToken: idToken,
