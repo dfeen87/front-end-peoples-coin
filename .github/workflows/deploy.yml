@@ -1,46 +1,51 @@
-name: Build and Deploy Bright Acts Frontend
+name: CI/CD - BrightActs Frontend
 
 on:
   push:
     branches:
-      - main  
+      - main
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
-    name: Build & Deploy Flutter Web
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
-      # Step 1: Checkout the repo
+      # Checkout the repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Set up Flutter (stable 3.13.6)
+      # Set up Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.13.6'
+          flutter-version: '4.2.0'
           channel: stable
 
-      # Step 3: Enable web support
+      # Enable web support
       - name: Enable Flutter web
         run: flutter config --enable-web
 
-      # Step 4: Install dependencies
+      # Install dependencies
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      # Step 5: Build the web app
+      # Run tests (optional)
+      - name: Run Flutter tests
+        run: flutter test
+
+      # Build Flutter web app
       - name: Build Flutter web
         run: flutter build web --release
 
-      # Step 6: Deploy to Firebase Hosting
+      # Deploy to Firebase Hosting
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: "${{ secrets.GITHUB_TOKEN }}"
-          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
-          projectId: "brightacts-frontend-50f58" 
-          channelId: "live"  
-          publicDir: "build/web"
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: brightacts-frontend-50f58
