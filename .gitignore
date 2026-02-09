@@ -25,6 +25,7 @@ node_modules/
 
 # Environment config
 *.env
+!config.env
 lib/config/*.env
 
 # Android Studio & iOS build files
@@ -49,4 +50,3 @@ linux/flutter/ephemeral/
 *.symbols
 app.*.map.json
 public/
-
