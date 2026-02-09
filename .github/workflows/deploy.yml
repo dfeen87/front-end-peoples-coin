@@ -10,7 +10,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      FLUTTER_ROOT: /opt/flutter
       PUB_CACHE: ${{ github.workspace }}/.pub-cache
 
     steps:
@@ -18,19 +17,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Install Flutter manually (stable channel, 3.20.5)
-      - name: Install Flutter 3.20.5
-        run: |
-          git clone https://github.com/flutter/flutter.git -b stable --depth 1 $FLUTTER_ROOT
-          export PATH="$FLUTTER_ROOT/bin:$PATH"
-          flutter --version
-          flutter doctor
+      # 2. Set up Flutter (stable 3.20.5)
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.20.5'
+          channel: 'stable'
 
-      # 3. Enable Flutter web
+      # 3. Enable Flutter Web
       - name: Enable Flutter Web
         run: flutter config --enable-web
 
-      # 4. Install dependencies
+      # 4. Get dependencies
       - name: Get Flutter packages
         run: flutter pub get
 
@@ -38,8 +36,8 @@ jobs:
       - name: Build Flutter web
         run: flutter build web --release
 
-      # 6. Setup Firebase CLI
-      - name: Setup Firebase CLI
+      # 6. Deploy to Firebase Hosting
+      - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
@@ -47,6 +45,5 @@ jobs:
           projectId: brightacts-frontend-50f58
           channelId: live
           public: build/web
-          # Optional: keep previous deploys for rollback
           ignore: |
             **/.*  
