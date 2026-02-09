@@ -1,47 +1,52 @@
-name: CI/CD - Bright Acts Frontend
+name: Deploy BrightActs Frontend
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
-    name: Build & Deploy Flutter Web
     runs-on: ubuntu-latest
+    env:
+      FLUTTER_ROOT: /opt/flutter
+      PUB_CACHE: ${{ github.workspace }}/.pub-cache
+
     steps:
-      # 1️⃣ Checkout repo
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # 2️⃣ Setup Flutter
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.20.5' # stable Flutter with Dart 3.8+
+      # 2. Install Flutter manually (stable channel, 3.20.5)
+      - name: Install Flutter 3.20.5
+        run: |
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1 $FLUTTER_ROOT
+          export PATH="$FLUTTER_ROOT/bin:$PATH"
+          flutter --version
+          flutter doctor
 
-      # 3️⃣ Enable Flutter web
-      - name: Enable Web Support
+      # 3. Enable Flutter web
+      - name: Enable Flutter Web
         run: flutter config --enable-web
 
-      # 4️⃣ Install dependencies
-      - name: Get Flutter Packages
+      # 4. Install dependencies
+      - name: Get Flutter packages
         run: flutter pub get
 
-      # 5️⃣ Build Web
-      - name: Build Flutter Web
+      # 5. Build web release
+      - name: Build Flutter web
         run: flutter build web --release
 
-      # 6️⃣ Deploy to Firebase Hosting
-      - name: Deploy to Firebase Hosting
+      # 6. Setup Firebase CLI
+      - name: Setup Firebase CLI
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: "${{ secrets.GITHUB_TOKEN }}" # optional for PR previews
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
-          channelId: live
           projectId: brightacts-frontend-50f58
-          target: hosting
+          channelId: live
           public: build/web
+          # Optional: keep previous deploys for rollback
+          ignore: |
+            **/.*  
