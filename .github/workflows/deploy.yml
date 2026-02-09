@@ -22,7 +22,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.13.6' 
+          flutter-version: '4.2.0' 
 
       # 3️⃣ Enable Flutter web
       - name: Enable web support
