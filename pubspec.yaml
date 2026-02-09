@@ -18,17 +18,17 @@ dependencies:
   provider: ^6.1.2
   flutter_bloc: ^9.1.1
 
-  # Firebase
+  # Firebase (Dart 3.1 compatible)
   firebase_core: ^3.1.1
-  firebase_auth: ^5.7.0
+  firebase_auth: ^5.6.2
   firebase_app_check: ^0.3.0
-  cloud_firestore: ^5.0.0
+  cloud_firestore: ^4.9.0
 
   # Web3 / Blockchain
   web3dart: ^2.6.1
   webview_flutter: ^4.4.2
 
-  # HTTP & API (Dart 3.1 compatible)
+  # HTTP & API
   http: ^1.0.0
   dio: ^5.4.0
 
@@ -38,7 +38,7 @@ dependencies:
   # JSON Serialization
   json_annotation: ^4.9.0
 
-  # Crypto & Security (Dart 3.1 compatible)
+  # Crypto & Security
   cryptography: ^2.0.0
   encrypt: ^5.0.3
   crypto: ^3.0.3
@@ -78,14 +78,14 @@ dependencies:
   package_info_plus: ^4.2.0
   connectivity_plus: ^5.0.2
 
-  # AI / ML (Dart 3.1 compatible)
+  # AI / ML
   tflite_flutter: ^0.10.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # Last Dart 3.1 compatible lints
+  # Dart 3.1 compatible lints
   flutter_lints: ^3.0.1
 
   json_serializable: ^6.7.1
