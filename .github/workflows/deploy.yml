@@ -14,8 +14,6 @@ jobs:
         shell: bash
     permissions:
       contents: read
-      checks: write
-      pull-requests: write
 
     steps:
       # 1. Checkout the repository
@@ -40,6 +38,9 @@ jobs:
       # 5. Build Flutter Web
       - name: Build Flutter Web
         run: flutter build web --release
+
+      - name: Validate build output
+        run: test -d build/web
 
       # 6. Deploy to Firebase Hosting
       - name: Deploy to Firebase Hosting
