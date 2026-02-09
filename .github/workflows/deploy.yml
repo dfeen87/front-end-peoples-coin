@@ -1,4 +1,4 @@
-name: Build and Deploy to Firebase Hosting
+name: Flutter Web Deploy
 
 on:
   push:
@@ -6,43 +6,30 @@ on:
       - main
 
 jobs:
-  build_and_deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-      # 1️⃣ Checkout code
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Set up Flutter
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.32.8
+          flutter-version: '3.13.6' # or your Flutter version
 
-      # 3️⃣ Install dependencies
-      - name: Install Flutter dependencies
+      - name: Install dependencies
         run: flutter pub get
 
-      # 4️⃣ Create .env file for secrets
-      - name: Create .env file
-        run: |
-          echo "RECAPTCHA_SITE_KEY_PROD=${{ secrets.RECAPTCHA_SITE_KEY_PROD }}" > .env
-
-      # 5️⃣ Build Flutter web
       - name: Build Flutter web
         run: flutter build web --release
 
-      # 6️⃣ Verify web build directory exists
-      - name: Verify web build
+      - name: Verify build/web
         run: ls -la build/web
 
-      # 7️⃣ Deploy to Firebase Hosting
-      - name: Deploy to Firebase Hosting
+      - name: Setup Firebase CLI
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          repoToken: ${{ secrets.GITHUB_TOKEN }}  # Github token for Actions
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: brightacts-frontend-50f58
           channelId: live
-          entryPoint: firebase
+          projectId: brightacts-frontend-50f58
