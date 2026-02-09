@@ -1,32 +1,19 @@
-import 'package:json_annotation/json_annotation.dart';
-
-part 'user_account.g.dart';
-
 /// Immutable data model for a user account.
 /// Mirrors the `user_accounts` table in the backend.
-@JsonSerializable()
 class UserAccount {
   final String id;
-  @JsonKey(name: 'firebase_uid')
   final String firebaseUid;
   final String email;
   final String username;
   final double balance;
   final String? bio;
-  @JsonKey(name: 'profile_image_url')
   final String? profileImageUrl;
-  @JsonKey(name: 'created_at')
   final DateTime createdAt;
-  @JsonKey(name: 'updated_at')
   final DateTime updatedAt;
-  @JsonKey(name: 'wallet_id')
   final String? walletId;
-  @JsonKey(name: 'public_key')
   final String? publicKey;
-  @JsonKey(name: 'encrypted_private_key')
   final String? encryptedPrivateKey;
   final String role;
-  @JsonKey(name: 'is_email_verified')
   final bool isEmailVerified;
 
   const UserAccount({
@@ -47,11 +34,40 @@ class UserAccount {
   });
 
   /// Factory constructor for creating a new `UserAccount` instance from JSON.
-  factory UserAccount.fromJson(Map<String, dynamic> json) =>
-      _$UserAccountFromJson(json);
+  factory UserAccount.fromJson(Map<String, dynamic> json) => UserAccount(
+        id: json['id'] as String,
+        firebaseUid: json['firebase_uid'] as String,
+        email: json['email'] as String,
+        username: json['username'] as String,
+        balance: (json['balance'] as num).toDouble(),
+        bio: json['bio'] as String?,
+        profileImageUrl: json['profile_image_url'] as String?,
+        createdAt: DateTime.parse(json['created_at'] as String),
+        updatedAt: DateTime.parse(json['updated_at'] as String),
+        walletId: json['wallet_id'] as String?,
+        publicKey: json['public_key'] as String?,
+        encryptedPrivateKey: json['encrypted_private_key'] as String?,
+        role: json['role'] as String? ?? 'user',
+        isEmailVerified: json['is_email_verified'] as bool? ?? false,
+      );
 
   /// Converts this instance into JSON.
-  Map<String, dynamic> toJson() => _$UserAccountToJson(this);
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'firebase_uid': firebaseUid,
+        'email': email,
+        'username': username,
+        'balance': balance,
+        'bio': bio,
+        'profile_image_url': profileImageUrl,
+        'created_at': createdAt.toIso8601String(),
+        'updated_at': updatedAt.toIso8601String(),
+        'wallet_id': walletId,
+        'public_key': publicKey,
+        'encrypted_private_key': encryptedPrivateKey,
+        'role': role,
+        'is_email_verified': isEmailVerified,
+      };
 
   /// Clone with optional overrides.
   UserAccount copyWith({
@@ -100,4 +116,3 @@ class UserAccount {
   @override
   int get hashCode => id.hashCode;
 }
-

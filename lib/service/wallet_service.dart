@@ -56,7 +56,7 @@ class WalletService {
   }) async {
     final ed25519 = Ed25519();
     final keyPair = await ed25519.newKeyPair();
-    final privateKeyBytes = await keyPair.extractPrivateKeyBytes();
+    final privateKeyBytes = Uint8List.fromList(await keyPair.extractPrivateKeyBytes());
     final publicKeyBytes = await keyPair.extractPublicKey().then((pub) => pub.bytes);
 
     final salt = _generateRandomBytes(32); // Generate a fresh salt
