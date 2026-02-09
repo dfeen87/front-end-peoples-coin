@@ -157,6 +157,9 @@ final sendLovesProvider = Provider<Future<void> Function({
         throw Exception('User is not signed in.');
       }
       final token = await user.getIdToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Missing Firebase ID token.');
+      }
       
       // Fix: Remove sendLovesData parameter wrapper
       // Pass the parameters directly to match the API method signature
