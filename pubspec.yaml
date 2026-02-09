@@ -6,7 +6,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.1.3 <4.0.0'  # Updated to match Flutter stable 3.13.x
+  sdk: '>=3.1.3 <4.0.0'  # Matches Flutter stable 3.13.x
 
 dependencies:
   flutter:
@@ -79,12 +79,12 @@ dependencies:
   connectivity_plus: ^5.0.2
 
   # AI / ML
-  tflite_flutter: ^0.11.0
+  tflite_flutter: ^0.10.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^4.0.0
   json_serializable: ^6.7.1
   build_runner: ^2.4.9
   mockito: ^5.4.4
