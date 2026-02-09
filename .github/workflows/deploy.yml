@@ -1,48 +1,41 @@
-name: Deploy Flutter Web to Firebase
+name: Deploy Bright Acts Frontend
 
 on:
   push:
     branches:
-      - main  # deploy on main branch pushes
+      - main  # deploy when main branch is updated
+  workflow_dispatch:  # allows manual trigger
 
 jobs:
   build-and-deploy:
-    name: Build and Deploy
+    name: Build & Deploy to Firebase
     runs-on: ubuntu-latest
 
-    env:
-      # Firebase project ID
-      FIREBASE_PROJECT_ID: brightacts-frontend-50f58
-
     steps:
-      # 1️⃣ Checkout the repo
+      # 1. Checkout repo
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # 2️⃣ Setup Flutter with Dart >= 3.8.1
+      # 2. Setup Flutter (latest stable version compatible with Dart >=3.8.1)
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '4.2.0'  # Flutter version with Dart 3.8+
+          flutter-version: '4.2.0'  # matches your Dart requirement
 
-      # 3️⃣ Enable flutter web
-      - name: Enable Flutter Web
-        run: flutter config --enable-web
-
-      # 4️⃣ Get Flutter dependencies
+      # 3. Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # 5️⃣ Build Flutter web
-      - name: Build Flutter Web
+      # 4. Build web
+      - name: Build Flutter web
         run: flutter build web --release
 
-      # 6️⃣ Setup Firebase CLI
-      - name: Setup Firebase CLI
+      # 5. Deploy to Firebase Hosting
+      - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
-          projectId: ${{ env.FIREBASE_PROJECT_ID }}
-          target: hosting
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
+          channelId: live  # use 'live' for production
+          projectId: brightacts-frontend-50f58
+          public: build/web
