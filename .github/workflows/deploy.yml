@@ -1,4 +1,4 @@
-name: Build and Deploy to Firebase Hosting
+name: Build and Deploy Flutter Web to Firebase Hosting
 
 on:
   push:
@@ -10,25 +10,63 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ------------------------------
+      # 1️⃣ Checkout repository
+      # ------------------------------
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # ------------------------------
+      # 2️⃣ Cache Flutter dependencies
+      # ------------------------------
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+            .dart_tool
+          key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.yaml') }}
+
+      # ------------------------------
+      # 3️⃣ Set up Flutter
+      # ------------------------------
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.32.8
 
+      # ------------------------------
+      # 4️⃣ Install dependencies
+      # ------------------------------
       - name: Install dependencies
         run: flutter pub get
 
-      # --- ADD THIS STEP ---
+      # ------------------------------
+      # 5️⃣ Create .env file (optional)
+      # ------------------------------
       - name: Create .env file
         run: echo "RECAPTCHA_SITE_KEY_PROD=${{ secrets.RECAPTCHA_SITE_KEY_PROD }}" > .env
 
-      # --- UPDATE THIS STEP ---
-      - name: Build Flutter web
-        run: flutter build web --release # The --dart-define flag is no longer needed
+      # ------------------------------
+      # 6️⃣ Analyze and test (optional but recommended)
+      # ------------------------------
+      - name: Analyze Flutter project
+        run: flutter analyze
 
+      - name: Run Flutter tests
+        run: flutter test --coverage
+
+      # ------------------------------
+      # 7️⃣ Build Flutter web
+      # ------------------------------
+      - name: Build Flutter web
+        run: |
+          flutter build web --release \
+            --dart-define=RECAPTCHA_SITE_KEY_PROD=${{ secrets.RECAPTCHA_SITE_KEY_PROD }}
+
+      # ------------------------------
+      # 8️⃣ Deploy to Firebase Hosting
+      # ------------------------------
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
