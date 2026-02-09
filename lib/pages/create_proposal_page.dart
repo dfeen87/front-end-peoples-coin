@@ -61,15 +61,13 @@ class ProposalSubmitNotifier extends StateNotifier<AsyncValue<Map<String, dynami
       }
 
       final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Missing authentication token');
+      }
       
       // Make API call to your Flask backend
-      final response = await _apiService.createProposal(proposal, idToken);
-      
-      if (response['success'] == true) {
-        state = AsyncValue.data({'success': true, 'data': response});
-      } else {
-        throw Exception(response['message'] ?? 'Failed to create proposal');
-      }
+      final createdProposal = await _apiService.createProposal(proposal.toJson(), authToken: idToken);
+      state = AsyncValue.data({'success': true, 'data': createdProposal});
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }

@@ -27,7 +27,7 @@ class ProposalService {
   Future<Map<String, dynamic>> _request(Future<http.Response> Function() call) async {
     try {
       final response = await call();
-      final data = response.body.isNotEmpty ? json.decode(response.body) as Map<String, dynamic> : {};
+      final data = response.body.isNotEmpty ? json.decode(response.body) as Map<String, dynamic> : <String, dynamic>{};
       if (ApiConfig.isSuccessStatusCode(response.statusCode)) return data;
       throw ProposalServiceException(
         data['message'] ?? ApiConfig.getErrorMessage(response.statusCode),
@@ -201,4 +201,3 @@ class ProposalServiceException implements Exception {
   @override
   String toString() => statusCode != null ? 'ProposalServiceException($statusCode): $message' : 'ProposalServiceException: $message';
 }
-

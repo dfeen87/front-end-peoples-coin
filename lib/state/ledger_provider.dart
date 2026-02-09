@@ -161,10 +161,9 @@ final sendLovesProvider = Provider<Future<void> Function({
       // Fix: Remove sendLovesData parameter wrapper
       // Pass the parameters directly to match the API method signature
       await apiClient.sendLoves(
-        senderWalletId: senderWallet,
-        recipientWalletId: recipientWallet,
+        recipientId: recipientWallet,
         amount: amount,
-        memo: memo,
+        message: memo,
         idToken: token,
       );
       
