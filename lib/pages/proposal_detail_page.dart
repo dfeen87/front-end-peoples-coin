@@ -44,7 +44,7 @@ class ProposalNotifier extends StateNotifier<ProposalDetailState> {
   Future<void> fetchProposalDetails(String proposalId, {required String idToken}) async {
     state = ProposalDetailState(isLoading: true);
     try {
-      final fetchedProposal = await _service.fetchProposalDetails(proposalId, idToken: idToken);
+      final fetchedProposal = await _service.getProposalDetails(proposalId: proposalId, idToken: idToken);
       state = ProposalDetailState(proposal: fetchedProposal);
     } catch (e) {
       state = ProposalDetailState(error: 'Failed to fetch proposal details.');
@@ -57,24 +57,20 @@ class ProposalNotifier extends StateNotifier<ProposalDetailState> {
     state = ProposalDetailState(proposal: state.proposal, isSubmittingVote: true);
     
     try {
-      final success = await _service.submitVote(vote: vote, idToken: idToken);
-      if (success) {
-        // If the vote was successful, update the local state to reflect the change
-        // This is a simple optimistic update. A more robust solution might refetch the data.
-        final newForVotes = vote.voteValue == 'FOR' ? state.proposal!.forVotes + 1 : state.proposal!.forVotes;
-        final newAgainstVotes = vote.voteValue == 'AGAINST' ? state.proposal!.againstVotes + 1 : state.proposal!.againstVotes;
+      await _service.submitVote(proposalId: vote.proposalId, choice: vote.voteValue, idToken: idToken);
+      // If the vote was successful, update the local state to reflect the change
+      // This is a simple optimistic update. A more robust solution might refetch the data.
+      final newForVotes = vote.voteValue == 'FOR' ? state.proposal!.forVotes + 1 : state.proposal!.forVotes;
+      final newAgainstVotes = vote.voteValue == 'AGAINST' ? state.proposal!.againstVotes + 1 : state.proposal!.againstVotes;
 
-        state = ProposalDetailState(
-          proposal: state.proposal!.copyWith(
-            forVotes: newForVotes,
-            againstVotes: newAgainstVotes,
-            userHasVoted: true,
-          ),
-        );
-      } else {
-        state = ProposalDetailState(proposal: state.proposal, error: 'Failed to submit vote.');
-      }
-      return success;
+      state = ProposalDetailState(
+        proposal: state.proposal!.copyWith(
+          forVotes: newForVotes,
+          againstVotes: newAgainstVotes,
+          userHasVoted: true,
+        ),
+      );
+      return true;
     } catch (e) {
       state = ProposalDetailState(proposal: state.proposal, error: 'Failed to submit vote.');
       return false;
@@ -138,6 +134,9 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
 
     try {
       final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Missing authentication token');
+      }
       await ref.read(proposalDetailProvider(widget.proposalId).notifier).fetchProposalDetails(
         widget.proposalId,
         idToken: idToken,
@@ -173,6 +172,9 @@ class _ProposalDetailPageState extends ConsumerState<ProposalDetailPage> with Ti
 
     try {
       final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Missing authentication token');
+      }
 
       showDialog(
         context: context,
