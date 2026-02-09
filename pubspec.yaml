@@ -6,77 +6,76 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.1.3 <4.0.0"
+  sdk: ">=3.7.0 <4.0.0"  # Latest stable Dart SDK requirement
 
 dependencies:
   flutter:
     sdk: flutter
   
-  # State Management
-  flutter_riverpod: ^2.4.10
-  riverpod: ^2.4.10
-  provider: ^6.1.1
-  flutter_bloc: ^8.1.3
+  # State Management - LATEST VERSIONS
+  flutter_riverpod: ^3.2.1
+  riverpod: ^3.2.1
+  provider: ^6.1.2
+  flutter_bloc: ^8.1.6
   
-  # Firebase (versions compatible with Dart 3.1.x)
-  firebase_core: ^2.31.1
-  firebase_auth: ^4.19.6
-  cloud_firestore: ^4.17.4
-  # firebase_app_check requires SDK >=3.2.0, so it's excluded
+  # Firebase - LATEST VERSIONS (Feb 2025)
+  firebase_core: ^4.4.0
+  firebase_auth: ^6.0.2
+  cloud_firestore: ^6.0.1
+  firebase_app_check: ^0.4.0
   
   # Web3 / Blockchain
   web3dart: ^2.7.3
   
-  # HTTP & API
-  http: ^1.1.2
-  dio: ^5.4.3+1
+  # HTTP & API - LATEST
+  http: ^1.2.2
+  dio: ^5.7.0
   
-  # Local Authentication
-  local_auth: ^2.1.8
+  # Local Authentication - LATEST
+  local_auth: ^3.0.0
   
   # JSON
-  json_annotation: ^4.8.1
+  json_annotation: ^4.9.0
   
-  # Crypto
-  cryptography: ^2.5.0
+  # Crypto - LATEST
+  cryptography: ^2.7.0
   encrypt: ^5.0.3
-  crypto: ^3.0.3
-  js: ^0.6.7
-  flutter_secure_storage: ^9.0.0
+  crypto: ^3.0.5
+  flutter_secure_storage: ^10.0.0
   
-  # UI
-  cupertino_icons: ^1.0.6
-  go_router: ^12.1.3
-  flutter_svg: ^2.0.10+1
-  cached_network_image: ^3.2.3
+  # UI - LATEST VERSIONS
+  cupertino_icons: ^1.0.8
+  go_router: ^16.2.0  # Latest version
+  flutter_svg: ^2.0.14
+  cached_network_image: ^3.4.1
   shimmer: ^3.0.0
-  animated_digit: ^3.2.2
+  animated_digit: ^3.3.1
   qr_flutter: ^4.1.0
-  confetti: ^0.7.0
+  confetti: ^0.8.0
   simple_animations: ^5.0.2
   flutter_animate: ^4.5.0
   flutter_syntax_view: ^4.0.0
-  lottie: ^3.1.0
-  shared_preferences: ^2.2.2
-  path_provider: ^2.1.3
+  lottie: ^3.1.3
+  shared_preferences: ^2.3.3
+  path_provider: ^2.1.5
   
-  # Utilities
-  uuid: ^4.4.0
-  intl: ^0.18.1
-  url_launcher: ^6.2.6
-  flutter_dotenv: ^5.1.0
-  logger: ^2.3.0
-  image_picker: ^1.0.7
-  device_info_plus: ^8.2.2
-  package_info_plus: ^4.2.0
-  connectivity_plus: ^4.0.2
+  # Utilities - LATEST
+  uuid: ^4.5.1
+  intl: ^0.20.0
+  url_launcher: ^6.3.1
+  flutter_dotenv: ^5.2.1
+  logger: ^2.4.0
+  image_picker: ^1.1.2
+  device_info_plus: ^11.1.0
+  package_info_plus: ^8.1.0
+  connectivity_plus: ^6.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.2
-  json_serializable: ^6.7.1
-  build_runner: ^2.4.9
+  flutter_lints: ^5.0.0
+  json_serializable: ^6.8.0
+  build_runner: ^2.4.13
   mockito: ^5.4.4
   integration_test:
     sdk: flutter
