@@ -75,8 +75,9 @@ class LedgerEntry {
     if (value is String) {
       try {
         return DateTime.parse(value);
-      } catch (_) {
+      } catch (e) {
         // Fallback to Unix epoch on parse failure
+        debugPrint('Warning: Failed to parse date string "$value": $e');
         return DateTime.fromMillisecondsSinceEpoch(0);
       }
     }

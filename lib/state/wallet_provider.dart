@@ -1,4 +1,5 @@
 // lib/state/wallet_provider.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -113,8 +114,9 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       }
       
       final response = await _apiClient.getWalletDetails(walletId, sessionToken);
-      return response['balance'] as double;
+      return _parseBalance(response['balance']);
     } catch (e) {
+      debugPrint('Error fetching wallet balance: $e');
       // In a real app, you might want to handle API errors more gracefully.
       return 0.0;
     }
@@ -159,7 +161,7 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       final currentState = state.value;
       if (currentState != null) {
         state = AsyncValue.data(currentState.copyWith(
-          balance: response['balance'] as double? ?? 0.0,
+          balance: _parseBalance(response['balance']),
         ));
       }
     } catch (e, st) {
@@ -200,13 +202,24 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       // Add any other wallet-related keys your app stores
     } catch (e) {
       // Log error but don't throw - clearing storage is best effort
-      print('Warning: Failed to clear wallet secure storage: $e');
+      debugPrint('Warning: Failed to clear wallet secure storage: $e');
     }
   }
   
   /// Helper to get the Firebase session token.
   Future<String?> _getSessionToken() async {
     return await FirebaseAuth.instance.currentUser?.getIdToken();
+  }
+  
+  /// Helper to safely parse balance values from API responses.
+  double _parseBalance(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    
+    debugPrint('Warning: Unexpected balance type: ${value.runtimeType}');
+    return 0.0;
   }
 }
 

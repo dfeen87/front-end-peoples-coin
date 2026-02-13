@@ -1,6 +1,7 @@
 // lib/service/wallet_manager.dart
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -113,7 +114,10 @@ class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
       // TODO: Replace with actual blockchain/backend call
       await Future.delayed(const Duration(milliseconds: 500));
       return true;
-    } catch (_) {
+    } catch (e, stackTrace) {
+      // Log the error for debugging
+      debugPrint('Error sending transaction: $e');
+      debugPrint('Stack trace: $stackTrace');
       return false;
     }
   }
