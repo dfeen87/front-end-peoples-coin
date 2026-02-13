@@ -1,6 +1,7 @@
 // lib/service/wallet_manager.dart
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -115,8 +116,8 @@ class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
       return true;
     } catch (e, stackTrace) {
       // Log the error for debugging
-      print('Error sending transaction: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Error sending transaction: $e');
+      debugPrint('Stack trace: $stackTrace');
       return false;
     }
   }

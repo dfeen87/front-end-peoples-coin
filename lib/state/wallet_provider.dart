@@ -114,15 +114,7 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       }
       
       final response = await _apiClient.getWalletDetails(walletId, sessionToken);
-      final balance = response['balance'];
-      
-      // Safely convert to double
-      if (balance is double) return balance;
-      if (balance is int) return balance.toDouble();
-      if (balance is String) return double.tryParse(balance) ?? 0.0;
-      
-      debugPrint('Warning: Unexpected balance type: ${balance.runtimeType}');
-      return 0.0;
+      return _parseBalance(response['balance']);
     } catch (e) {
       debugPrint('Error fetching wallet balance: $e');
       // In a real app, you might want to handle API errors more gracefully.
@@ -168,20 +160,8 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       
       final currentState = state.value;
       if (currentState != null) {
-        final balance = response['balance'];
-        double balanceValue = 0.0;
-        
-        // Safely convert to double
-        if (balance is double) {
-          balanceValue = balance;
-        } else if (balance is int) {
-          balanceValue = balance.toDouble();
-        } else if (balance is String) {
-          balanceValue = double.tryParse(balance) ?? 0.0;
-        }
-        
         state = AsyncValue.data(currentState.copyWith(
-          balance: balanceValue,
+          balance: _parseBalance(response['balance']),
         ));
       }
     } catch (e, st) {
@@ -222,13 +202,23 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       // Add any other wallet-related keys your app stores
     } catch (e) {
       // Log error but don't throw - clearing storage is best effort
-      print('Warning: Failed to clear wallet secure storage: $e');
+      debugPrint('Warning: Failed to clear wallet secure storage: $e');
     }
   }
   
   /// Helper to get the Firebase session token.
   Future<String?> _getSessionToken() async {
     return await FirebaseAuth.instance.currentUser?.getIdToken();
+  }
+  
+  /// Helper to safely parse balance values from API responses.
+  double _parseBalance(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    
+    debugPrint('Warning: Unexpected balance type: ${value.runtimeType}');
+    return 0.0;
   }
 }
 
