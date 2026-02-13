@@ -121,7 +121,8 @@ class GoodwillActionsNotifier extends StateNotifier<GoodwillActionsState> {
         if (status == GoodwillStatus.verified || status == GoodwillStatus.rejected) {
           done = true;
         }
-      } catch (_) {
+      } catch (e) {
+        debugPrint('Error polling goodwill action status for $actionId: $e');
         done = true;
       }
     }

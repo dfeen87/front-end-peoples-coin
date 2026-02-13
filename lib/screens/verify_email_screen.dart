@@ -30,17 +30,24 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   Future<void> _checkVerification() async {
-    await _auth.currentUser?.reload();
-    final user = _auth.currentUser;
-    if (user != null && user.emailVerified) {
-      setState(() {
-        _isVerified = true;
-      });
-      _timer.cancel();
-      if (mounted) {
-        // Navigate to home after verified
-        context.go('/home');
+    try {
+      await _auth.currentUser?.reload();
+      final user = _auth.currentUser;
+      if (user != null && user.emailVerified) {
+        if (mounted) {
+          setState(() {
+            _isVerified = true;
+          });
+        }
+        _timer.cancel();
+        if (mounted) {
+          // Navigate to home after verified
+          context.go('/home');
+        }
       }
+    } catch (e) {
+      // Log the error but don't show it to the user - it's a background check
+      debugPrint('Error checking email verification: $e');
     }
   }
 

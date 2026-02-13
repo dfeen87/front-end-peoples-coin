@@ -113,7 +113,10 @@ class WalletManager extends StateNotifier<AsyncValue<Wallet?>> {
       // TODO: Replace with actual blockchain/backend call
       await Future.delayed(const Duration(milliseconds: 500));
       return true;
-    } catch (_) {
+    } catch (e, stackTrace) {
+      // Log the error for debugging
+      print('Error sending transaction: $e');
+      print('Stack trace: $stackTrace');
       return false;
     }
   }

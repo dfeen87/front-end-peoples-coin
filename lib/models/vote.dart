@@ -74,7 +74,8 @@ class Vote {
     if (value is String) {
       try {
         return DateTime.parse(value);
-      } catch (_) {
+      } catch (e) {
+        debugPrint('Warning: Failed to parse date string "$value": $e');
         return DateTime.fromMillisecondsSinceEpoch(0);
       }
     }
