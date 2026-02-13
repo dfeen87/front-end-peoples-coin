@@ -2,6 +2,8 @@
 
 **Cross-Platform Flutter Interface for the BrightActs Ecosystem**
 
+> IMPORTANT NOTE: NOT AFFILIATED WITH ANY CRYPTO COINS. This project does not mind coins that are sold.
+
 **Version:** 1.0.1 
 **Language:** Dart / Flutter  
 **License:** MIT
