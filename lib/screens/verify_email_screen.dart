@@ -33,17 +33,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     try {
       await _auth.currentUser?.reload();
       final user = _auth.currentUser;
-      if (user != null && user.emailVerified) {
-        if (mounted) {
-          setState(() {
-            _isVerified = true;
-          });
-        }
+      if (user != null && user.emailVerified && mounted) {
+        setState(() {
+          _isVerified = true;
+        });
         _timer.cancel();
-        if (mounted) {
-          // Navigate to home after verified
-          context.go('/home');
-        }
+        // Navigate to home after verified
+        context.go('/home');
       }
     } catch (e) {
       // Log the error but don't show it to the user - it's a background check
