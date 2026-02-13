@@ -34,11 +34,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       await _auth.currentUser?.reload();
       final user = _auth.currentUser;
       if (user != null && user.emailVerified) {
+        _timer.cancel();
         if (!mounted) return;
         setState(() {
           _isVerified = true;
         });
-        _timer.cancel();
         if (!mounted) return;
         // Navigate to home after verified
         context.go('/home');
