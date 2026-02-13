@@ -1,4 +1,5 @@
 // lib/state/wallet_provider.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -113,8 +114,17 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       }
       
       final response = await _apiClient.getWalletDetails(walletId, sessionToken);
-      return response['balance'] as double;
+      final balance = response['balance'];
+      
+      // Safely convert to double
+      if (balance is double) return balance;
+      if (balance is int) return balance.toDouble();
+      if (balance is String) return double.tryParse(balance) ?? 0.0;
+      
+      debugPrint('Warning: Unexpected balance type: ${balance.runtimeType}');
+      return 0.0;
     } catch (e) {
+      debugPrint('Error fetching wallet balance: $e');
       // In a real app, you might want to handle API errors more gracefully.
       return 0.0;
     }
@@ -158,8 +168,20 @@ class WalletNotifier extends AsyncNotifier<WalletState> {
       
       final currentState = state.value;
       if (currentState != null) {
+        final balance = response['balance'];
+        double balanceValue = 0.0;
+        
+        // Safely convert to double
+        if (balance is double) {
+          balanceValue = balance;
+        } else if (balance is int) {
+          balanceValue = balance.toDouble();
+        } else if (balance is String) {
+          balanceValue = double.tryParse(balance) ?? 0.0;
+        }
+        
         state = AsyncValue.data(currentState.copyWith(
-          balance: response['balance'] as double? ?? 0.0,
+          balance: balanceValue,
         ));
       }
     } catch (e, st) {
