@@ -4,7 +4,6 @@
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.10.0+-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.2.0+-0175C2?logo=dart&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Web-lightgrey)
 
 **Cross-Platform Flutter Interface for the BrightActs Ecosystem**
@@ -774,11 +773,8 @@ Found a bug or have a feature request?
 
 ## License
 
-This project is released under the **MIT License**. See the [`license.md`](license.md) file for full terms.
-
-### MIT License Summary
-
-Permission is hereby granted, free of charge, to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, subject to the conditions in the license file.
+This project is available for **non‑commercial use only** under the terms of the included LICENSE file.  
+Commercial use requires a separate paid license.
 
 ---
 
