@@ -1,16 +1,13 @@
 // lib/pages/my_wallet_page.dart
 import 'dart:async';
-import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 
-// --- CONFIGURATION ---
-const String BACKEND_URL = 'https://your-flask-backend.com'; // Replace with your Flask backend URL
+import '../service/api_client.dart';
 
 // --- DATA MODELS ---
 
@@ -36,13 +33,13 @@ class Transaction {
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
-      id: json['id'],
-      description: json['description'],
-      amount: json['amount'].toDouble(),
-      date: DateTime.parse(json['date']),
-      isCredit: json['is_credit'],
-      fromUserId: json['from_user_id'],
-      toUserId: json['to_user_id'],
+      id: json['id']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
+      isCredit: json['is_credit'] as bool? ?? false,
+      fromUserId: json['from_user_id'] as String?,
+      toUserId: json['to_user_id'] as String?,
     );
   }
 }
@@ -90,57 +87,34 @@ class AuthService {
   }
 }
 
-/// API Service for backend communication
+/// API Service for backend communication — delegates to PeoplesCoinApiClient
 class ApiService {
+  final PeoplesCoinApiClient _apiClient;
   final AuthService _authService = AuthService();
 
-  Future<Map<String, String>> _getHeaders() async {
+  ApiService(this._apiClient);
+
+  Future<String> _getIdToken() async {
     final token = await _authService.getIdToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+    if (token == null || token.isEmpty) throw Exception('User not authenticated');
+    return token;
   }
 
   Future<Wallet> getWallet() async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.get(
-        Uri.parse('$BACKEND_URL/api/wallet'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        return Wallet.fromJson(json.decode(response.body));
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized - please login again');
-      } else {
-        throw Exception('Failed to load wallet: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
+    final idToken = await _getIdToken();
+    final json = await _apiClient.getJson('api/wallet', idToken: idToken);
+    return Wallet.fromJson(json);
   }
 
   Future<List<Transaction>> getTransactions({int limit = 50, int offset = 0}) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.get(
-        Uri.parse('$BACKEND_URL/api/transactions?limit=$limit&offset=$offset'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body)['transactions'];
-        return data.map((json) => Transaction.fromJson(json)).toList();
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized - please login again');
-      } else {
-        throw Exception('Failed to load transactions: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
+    final idToken = await _getIdToken();
+    final data = await _apiClient.getJson(
+      'api/transactions',
+      idToken: idToken,
+      queryParams: {'limit': limit, 'offset': offset},
+    );
+    final List<dynamic> transactions = data['transactions'] ?? [];
+    return transactions.map((j) => Transaction.fromJson(j as Map<String, dynamic>)).toList();
   }
 
   Future<void> sendLoves({
@@ -148,65 +122,41 @@ class ApiService {
     required double amount,
     required String description,
   }) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('$BACKEND_URL/api/send'),
-        headers: headers,
-        body: json.encode({
-          'recipient_email': recipientEmail,
-          'amount': amount,
-          'description': description,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        return; // Success
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized - please login again');
-      } else if (response.statusCode == 400) {
-        final error = json.decode(response.body)['error'];
-        throw Exception(error);
-      } else {
-        throw Exception('Failed to send loves: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
+    final idToken = await _getIdToken();
+    await _apiClient.postJson(
+      'api/send',
+      idToken: idToken,
+      body: {
+        'recipient_email': recipientEmail,
+        'amount': amount,
+        'description': description,
+      },
+    );
   }
 
   Future<Map<String, dynamic>> generateReceiveLink({
     required double amount,
     String? description,
   }) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('$BACKEND_URL/api/generate-receive-link'),
-        headers: headers,
-        body: json.encode({
-          'amount': amount,
-          'description': description,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized - please login again');
-      } else {
-        throw Exception('Failed to generate link: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
+    final idToken = await _getIdToken();
+    return await _apiClient.postJson(
+      'api/generate-receive-link',
+      idToken: idToken,
+      body: {
+        'amount': amount,
+        if (description != null) 'description': description,
+      },
+    );
   }
 }
 
 // --- PROVIDERS ---
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
-final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
+final apiServiceProvider = Provider<ApiService>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return ApiService(apiClient);
+});
 
 // Auth state provider
 final authStateProvider = StreamProvider<User?>((ref) {

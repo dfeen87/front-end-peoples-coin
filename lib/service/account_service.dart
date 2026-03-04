@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'package:your_app_name/service/api_client.dart';
-import 'package:your_app_name/models/user_account.dart';
-import 'package:your_app_name/models/wallet.dart';
+import 'package:brightacts_frontend_app/service/api_client.dart';
+import 'package:brightacts_frontend_app/models/user_account.dart';
+import 'package:brightacts_frontend_app/models/wallet_models.dart';
 import 'package:flutter/foundation.dart';
 
 /// A dedicated service for all user and wallet-related API calls.
@@ -40,7 +40,7 @@ class UserAccountService {
       'recaptcha_token': recaptchaToken,
     });
 
-    final response = await _client.post(url, body, idToken: idToken!);
+    final response = await _client.post(url, body, idToken: idToken);
     if (response.statusCode == 201) {
       final jsonMap = json.decode(response.body);
       return UserAccount.fromJson(jsonMap);
@@ -53,7 +53,7 @@ class UserAccountService {
   /// Get authenticated user's profile data
   Future<UserAccount> getAuthenticatedUserProfile({required String idToken}) async {
     const url = 'api/auth/users/me';
-    final response = await _client.get(url, idToken: idToken!);
+    final response = await _client.get(url, idToken: idToken);
     if (response.statusCode == 200) {
       try {
         final Map<String, dynamic> jsonMap = json.decode(response.body);
@@ -72,7 +72,7 @@ class UserAccountService {
     required String idToken,
   }) async {
     final url = 'api/auth/wallet/$walletId';
-    final response = await _client.get(url, idToken: idToken!);
+    final response = await _client.get(url, idToken: idToken);
     if (response.statusCode == 200) {
       return Wallet.fromJson(json.decode(response.body));
     } else {

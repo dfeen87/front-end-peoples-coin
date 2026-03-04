@@ -1,17 +1,14 @@
 // lib/pages/my_portfolio_page.dart
 
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart'; // for HapticFeedback
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 import 'dart:ui';
 
-// --- CONFIGURATION ---
-const String BACKEND_URL = 'https://your-flask-backend.com'; // Replace with your Flask backend URL
+import '../service/api_client.dart';
 
 // --- DATA MODELS ---
 
@@ -111,62 +108,38 @@ class PortfolioStats {
 
 // --- SERVICES ---
 
-/// Portfolio API Service
+/// Portfolio API Service — delegates to PeoplesCoinApiClient
 class PortfolioApiService {
+  final PeoplesCoinApiClient _apiClient;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  Future<Map<String, String>> _getHeaders() async {
+  PortfolioApiService(this._apiClient);
+
+  Future<String> _getIdToken() async {
     final user = _auth.currentUser;
-    if (user != null) {
-      final token = await user.getIdToken();
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
-    }
-    throw Exception('User not authenticated');
+    if (user == null) throw Exception('User not authenticated');
+    final token = await user.getIdToken();
+    if (token == null || token.isEmpty) throw Exception('Failed to obtain ID token');
+    return token;
   }
 
   Future<List<GoodwillAction>> getUserActions({int limit = 50, int offset = 0}) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.get(
-        Uri.parse('$BACKEND_URL/api/portfolio/actions?limit=$limit&offset=$offset'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final List<dynamic> actionsJson = data['actions'];
-        return actionsJson.map((json) => GoodwillAction.fromJson(json)).toList();
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized - please login again');
-      } else {
-        throw Exception('Failed to load actions: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
+    final idToken = await _getIdToken();
+    final data = await _apiClient.getJson(
+      'api/portfolio/actions',
+      idToken: idToken,
+      queryParams: {'limit': limit, 'offset': offset},
+    );
+    final List<dynamic> actionsJson = data['actions'] ?? [];
+    return actionsJson
+        .map((j) => GoodwillAction.fromJson(j as Map<String, dynamic>))
+        .toList();
   }
 
   Future<PortfolioStats> getPortfolioStats() async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.get(
-        Uri.parse('$BACKEND_URL/api/portfolio/stats'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        return PortfolioStats.fromJson(json.decode(response.body));
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized - please login again');
-      } else {
-        throw Exception('Failed to load portfolio stats: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
+    final idToken = await _getIdToken();
+    final data = await _apiClient.getJson('api/portfolio/stats', idToken: idToken);
+    return PortfolioStats.fromJson(data);
   }
 
   Future<GoodwillAction> submitAction({
@@ -175,60 +148,32 @@ class PortfolioApiService {
     required int score,
     String? evidence,
   }) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('$BACKEND_URL/api/portfolio/actions'),
-        headers: headers,
-        body: json.encode({
-          'title': title,
-          'description': description,
-          'score': score,
-          'evidence': evidence,
-        }),
-      );
-
-      if (response.statusCode == 201) {
-        return GoodwillAction.fromJson(json.decode(response.body));
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized - please login again');
-      } else if (response.statusCode == 400) {
-        final error = json.decode(response.body)['error'];
-        throw Exception(error);
-      } else {
-        throw Exception('Failed to submit action: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
+    final idToken = await _getIdToken();
+    final data = await _apiClient.postJson(
+      'api/portfolio/actions',
+      idToken: idToken,
+      body: {
+        'title': title,
+        'description': description,
+        'score': score,
+        if (evidence != null) 'evidence': evidence,
+      },
+    );
+    return GoodwillAction.fromJson(data);
   }
 
   Future<void> deleteAction(String actionId) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.delete(
-        Uri.parse('$BACKEND_URL/api/portfolio/actions/$actionId'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        return; // Success
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized - please login again');
-      } else if (response.statusCode == 404) {
-        throw Exception('Action not found');
-      } else {
-        throw Exception('Failed to delete action: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
+    final idToken = await _getIdToken();
+    await _apiClient.getJson('api/portfolio/actions/$actionId/delete', idToken: idToken);
   }
 }
 
 // --- PROVIDERS ---
 
-final portfolioApiServiceProvider = Provider<PortfolioApiService>((ref) => PortfolioApiService());
+final portfolioApiServiceProvider = Provider<PortfolioApiService>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return PortfolioApiService(apiClient);
+});
 
 // Auth user provider (assuming this exists from wallet page)
 final authUserProvider = StreamProvider<User?>((ref) {

@@ -18,12 +18,25 @@ import '../widgets/dynamic_nebula_background.dart';
 enum UsernameStatus { idle, checking, available, unavailable, tooShort, invalid }
 enum PasswordStrength { veryWeak, weak, fair, good, strong }
 
-// reCAPTCHA Enterprise configuration
+// reCAPTCHA Enterprise configuration — uses build-time environment variables.
+// Required --dart-define flags: RECAPTCHA_SITE_KEY, GCP_PROJECT_ID, RECAPTCHA_API_KEY
 class RecaptchaConfig {
-  static const String siteKey = 'YOUR_RECAPTCHA_SITE_KEY'; // Replace with your actual site key
-  static const String projectId = 'YOUR_PROJECT_ID'; // Replace with your GCP project ID
-  static const String apiKey = 'YOUR_API_KEY'; // Replace with your API key
+  static const String siteKey = String.fromEnvironment(
+    'RECAPTCHA_SITE_KEY',
+    defaultValue: '',
+  );
+  static const String projectId = String.fromEnvironment(
+    'GCP_PROJECT_ID',
+    defaultValue: '',
+  );
+  static const String apiKey = String.fromEnvironment(
+    'RECAPTCHA_API_KEY',
+    defaultValue: '',
+  );
   static const String action = 'signup';
+
+  static bool get isConfigured =>
+      siteKey.isNotEmpty && projectId.isNotEmpty && apiKey.isNotEmpty;
 }
 
 class SignUpScreen extends ConsumerStatefulWidget {

@@ -106,9 +106,10 @@ class AppBreakpoints {
 /// ------------------------
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: 'config.env');
 
   try {
+    await dotenv.load(fileName: 'config.env');
+
     final firebaseApiKey = dotenv.env['FIREBASE_API_KEY'];
     final recaptchaSiteKey = dotenv.env['RECAPTCHA_SITE_KEY'];
     final firebaseProjectId = dotenv.env['FIREBASE_PROJECT_ID'];
@@ -149,7 +150,7 @@ Future<void> main() async {
       print('[BrightActs] FATAL ERROR DURING BOOTSTRAP: $error');
       print(stackTrace);
     }
-    runApp(ErrorDisplayApp(error: error.toString()));
+    runApp(const ErrorDisplayApp());
   }
 }
 
@@ -157,20 +158,19 @@ Future<void> main() async {
 /// Error Display App
 /// ------------------------
 class ErrorDisplayApp extends StatelessWidget {
-  final String error;
-  const ErrorDisplayApp({super.key, required this.error});
+  const ErrorDisplayApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       home: Scaffold(
         backgroundColor: Colors.black,
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: EdgeInsets.all(16.0),
             child: Text(
-              "Fatal Application Error:\n\n$error",
-              style: const TextStyle(color: Colors.redAccent),
+              "Application failed to start. Please try again.",
+              style: TextStyle(color: Colors.redAccent),
               textAlign: TextAlign.center,
             ),
           ),

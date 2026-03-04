@@ -28,6 +28,10 @@ node_modules/
 !config.env
 lib/config/*.env
 
+# Backup and editor save files
+*.bak
+*.save
+
 # Android Studio & iOS build files
 /android/app/debug/
 /android/app/profile/

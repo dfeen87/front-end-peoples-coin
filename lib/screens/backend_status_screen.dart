@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../service/backend_status_service.dart';
-import 'package:provider/provider.dart';
+import '../service/api_client.dart';
 
-class BackendStatusScreen extends StatelessWidget {
+final backendStatusServiceProvider =
+    ChangeNotifierProvider<BackendStatusService>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return BackendStatusService(apiClient);
+});
+
+class BackendStatusScreen extends ConsumerWidget {
   const BackendStatusScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final backendStatusService = ref.watch(backendStatusServiceProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Backend Status')),
-      body: Consumer<BackendStatusService>(
-        builder: (context, backendStatusService, _) {
+      body: Builder(
+        builder: (context) {
           if (backendStatusService.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
