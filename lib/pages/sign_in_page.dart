@@ -15,8 +15,8 @@ class DevAccessScreen extends StatefulWidget {
 class _DevAccessScreenState extends State<DevAccessScreen> {
   final TextEditingController _codeController = TextEditingController();
   
-  // 2. Load credentials securely from the .env file
-  final String _devAccessCode = dotenv.env['DEV_ACCESS_CODE'] ?? 'letmein123';
+  // Load credentials securely from the .env file; no hardcoded fallback
+  final String? _devAccessCode = dotenv.env['DEV_ACCESS_CODE'];
 
   String? _errorText;
   bool _isLoading = false;
@@ -24,16 +24,25 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
   @override
   void initState() {
     super.initState();
+    if (_devAccessCode == null || _devAccessCode!.isEmpty) {
+      _errorText = 'Dev access not configured. Set DEV_ACCESS_CODE in your environment.';
+    }
     _codeController.addListener(() {
-      if (_errorText != null) {
-        setState(() {
-          _errorText = null;
-        });
+      // Only clear validation errors (invalid code), not configuration errors
+      if (_errorText != null && (_devAccessCode?.isNotEmpty ?? false)) {
+        setState(() => _errorText = null);
       }
     });
   }
 
   void _validateAccess() {
+    if (_devAccessCode == null || _devAccessCode!.isEmpty) {
+      setState(() {
+        _errorText = 'Dev access not configured. Set DEV_ACCESS_CODE in your environment.';
+      });
+      return;
+    }
+
     setState(() => _isLoading = true);
     
     // Add a small delay to simulate a network call and improve UX

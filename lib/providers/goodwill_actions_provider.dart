@@ -53,7 +53,7 @@ class GoodwillActionsNotifier extends StateNotifier<GoodwillActionsState> {
     try {
       final rawList = await _apiClient.getUserGoodwillActions(
         userId: userId,
-        idToken: idToken!,
+        idToken: idToken,
       );
       final actions = rawList.map((json) => GoodwillAction.fromJson(json)).toList();
       state = state.copyWith(actions: actions);
@@ -73,7 +73,7 @@ class GoodwillActionsNotifier extends StateNotifier<GoodwillActionsState> {
     try {
       final response = await _apiClient.submitGoodwill(
         goodwillAction: actionToSend,
-        idToken: idToken!,
+        idToken: idToken,
       );
 
       final String actionId = response['id'] as String;
@@ -98,13 +98,16 @@ class GoodwillActionsNotifier extends StateNotifier<GoodwillActionsState> {
   Future<void> _pollGoodwillStatus(String actionId, String idToken) async {
     bool done = false;
     const pollInterval = Duration(seconds: 5);
+    const maxRetries = 60; // 5 minutes maximum
+    int retryCount = 0;
 
-    while (!done) {
+    while (!done && retryCount < maxRetries) {
       await Future.delayed(pollInterval);
+      retryCount++;
 
       try {
         final statusString = await _apiClient.getGoodwillStatus(actionId, idToken);
-        if (statusString == null || statusString?.isEmpty == true) {
+        if (statusString == null || statusString.isEmpty) {
           done = true;
           continue;
         }
@@ -125,6 +128,10 @@ class GoodwillActionsNotifier extends StateNotifier<GoodwillActionsState> {
         debugPrint('Error polling goodwill action status for $actionId: $e');
         done = true;
       }
+    }
+
+    if (retryCount >= maxRetries) {
+      debugPrint('Polling for goodwill action $actionId timed out after $maxRetries retries.');
     }
   }
 }

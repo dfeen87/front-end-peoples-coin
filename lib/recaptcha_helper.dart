@@ -39,8 +39,13 @@ void initializeRecaptchaV3() {
 Future<String> getRecaptchaToken(String siteKey, String action) async {
   if (!kIsWeb) return '';
 
-  // Wait for the script to load
-  await _recaptchaLoadedCompleter.future;
+  // Wait for the script to load (with a 10-second timeout)
+  await _recaptchaLoadedCompleter.future.timeout(
+    const Duration(seconds: 10),
+    onTimeout: () => throw TimeoutException(
+      'reCAPTCHA script failed to load within 10 seconds.',
+    ),
+  );
 
   final completer = Completer<String>();
 

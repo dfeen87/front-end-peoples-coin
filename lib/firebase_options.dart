@@ -1,4 +1,16 @@
 // lib/firebase_options.dart
+//
+// All values are supplied via --dart-define at build time:
+//   --dart-define=FIREBASE_API_KEY=<value>
+//   --dart-define=FIREBASE_PROJECT_ID=<value>
+//   --dart-define=FIREBASE_APP_ID=<value>
+//   --dart-define=FIREBASE_MESSAGING_SENDER_ID=<value>
+//   --dart-define=FIREBASE_ANDROID_API_KEY=<value>
+//   --dart-define=FIREBASE_ANDROID_APP_ID=<value>
+//   --dart-define=FIREBASE_IOS_API_KEY=<value>
+//   --dart-define=FIREBASE_IOS_APP_ID=<value>
+//   --dart-define=FIREBASE_MACOS_API_KEY=<value>
+//   --dart-define=FIREBASE_MACOS_APP_ID=<value>
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
@@ -10,11 +22,11 @@ class DefaultFirebaseOptions {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return android; // Add your android config if you have it
+        return android;
       case TargetPlatform.iOS:
-        return ios; // Add your iOS config if you have it
+        return ios;
       case TargetPlatform.macOS:
-        return macos; // Add your macOS config if you have it
+        return macos;
       default:
         throw UnsupportedError(
           'DefaultFirebaseOptions are not supported for this platform.',
@@ -22,40 +34,45 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyD4YbE3GE4TEXSejQn06gmDZPMKYwQHcb4',
-    authDomain: 'brightacts-frontend-50f58.firebaseapp.com',
-    projectId: 'brightacts-frontend-50f58',
-    storageBucket: 'brightacts-frontend-50f58.firebasestorage.app',
-    messagingSenderId: '289762069070',
-    appId: "1:289762069070:web:2d9a9e1cd7fcb53d9a111f",
+  static const _apiKey = String.fromEnvironment('FIREBASE_API_KEY', defaultValue: '');
+  static const _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: '');
+  static const _appId = String.fromEnvironment('FIREBASE_APP_ID', defaultValue: '');
+  static const _messagingSenderId = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', defaultValue: '');
+
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: _apiKey,
+    authDomain: '$_projectId.firebaseapp.com',
+    projectId: _projectId,
+    storageBucket: '$_projectId.firebasestorage.app',
+    messagingSenderId: _messagingSenderId,
+    appId: _appId,
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR_ANDROID_API_KEY',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY', defaultValue: ''),
     authDomain: '',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    appId: 'YOUR_ANDROID_APP_ID',
+    projectId: _projectId,
+    storageBucket: '$_projectId.firebasestorage.app',
+    messagingSenderId: _messagingSenderId,
+    appId: String.fromEnvironment('FIREBASE_ANDROID_APP_ID', defaultValue: ''),
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'YOUR_IOS_API_KEY',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY', defaultValue: ''),
     authDomain: '',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    appId: 'YOUR_IOS_APP_ID',
+    projectId: _projectId,
+    storageBucket: '$_projectId.firebasestorage.app',
+    messagingSenderId: _messagingSenderId,
+    appId: String.fromEnvironment('FIREBASE_IOS_APP_ID', defaultValue: ''),
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'YOUR_MACOS_API_KEY',
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: String.fromEnvironment('FIREBASE_MACOS_API_KEY', defaultValue: ''),
     authDomain: '',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    appId: 'YOUR_MACOS_APP_ID',
+    projectId: _projectId,
+    storageBucket: '$_projectId.firebasestorage.app',
+    messagingSenderId: _messagingSenderId,
+    appId: String.fromEnvironment('FIREBASE_MACOS_APP_ID', defaultValue: ''),
   );
 }
 

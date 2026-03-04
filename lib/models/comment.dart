@@ -51,12 +51,12 @@ class Comment {
 
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       authorUserId: json['author_user_id'] as String?,
       proposalId: json['proposal_id'] as String?,
       goodwillActionId: json['goodwill_action_id'] as String?,
       parentCommentId: json['parent_comment_id'] as String?,
-      content: json['content'] as String,
+      content: json['content']?.toString() ?? '',
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,

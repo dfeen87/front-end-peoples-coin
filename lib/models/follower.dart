@@ -27,8 +27,8 @@ class Follower {
 
   factory Follower.fromJson(Map<String, dynamic> json) {
     return Follower(
-      followerUserId: json['follower_user_id'] as String,
-      followedUserId: json['followed_user_id'] as String,
+      followerUserId: json['follower_user_id']?.toString() ?? '',
+      followedUserId: json['followed_user_id']?.toString() ?? '',
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
