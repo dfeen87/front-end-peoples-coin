@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../service/api_client.dart';
 import 'user_provider.dart';
 import 'goodwill_processing_provider.dart';
-import 'proposal_provider.dart';
+import '../state/proposal_provider.dart';
 import 'ledger_provider.dart';
 import 'voting_provider.dart';
 

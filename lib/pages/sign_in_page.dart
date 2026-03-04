@@ -28,10 +28,9 @@ class _DevAccessScreenState extends State<DevAccessScreen> {
       _errorText = 'Dev access not configured. Set DEV_ACCESS_CODE in your environment.';
     }
     _codeController.addListener(() {
-      if (_errorText != null && (_devAccessCode != null && _devAccessCode!.isNotEmpty)) {
-        setState(() {
-          _errorText = null;
-        });
+      // Only clear validation errors (invalid code), not configuration errors
+      if (_errorText != null && (_devAccessCode?.isNotEmpty ?? false)) {
+        setState(() => _errorText = null);
       }
     });
   }
