@@ -3,7 +3,7 @@ description: >
   Bright Acts is where technology meets kindness — inspiring positive change,
   one good act at a time.
 publish_to: 'none'
-version: 1.4.0+1
+version: 1.4.1+1
 
 environment:
   sdk: ">=3.1.3 <4.0.0"

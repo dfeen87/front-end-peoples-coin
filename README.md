@@ -8,7 +8,7 @@
 
 **Cross-Platform Flutter Interface for the BrightActs Ecosystem**
 
-> IMPORTANT NOTE: NOT AFFILIATED WITH ANY CRYPTO COINS. This project does not mind coins that are sold.
+> IMPORTANT NOTE: NOT AFFILIATED WITH ANY CRYPTO COINS. This project does not mine, mint, or sell coins.
 
 [Features](#key-features) •
 [Getting Started](#getting-started) •
@@ -209,13 +209,14 @@ The application uses environment variables for configuration. Create and configu
    FIREBASE_PROJECT_ID=your_project_id
    ```
 
-3. **Firebase Setup** (if using Firebase)
+2. **Firebase Setup** (if using Firebase)
    - Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
    - Download configuration files:
      - `google-services.json` for Android → place in `android/app/`
      - `GoogleService-Info.plist` for iOS → place in `ios/Runner/`
    - Run Firebase configuration:
      ```bash
+     dart pub global activate flutterfire_cli
      flutterfire configure
      ```
 
@@ -733,7 +734,7 @@ Found a bug or have a feature request?
 
 ## Roadmap
 
-### Current Version: 1.0.1
+### Current Version: 1.4.1
 
 ### Planned Features
 
@@ -762,7 +763,7 @@ Found a bug or have a feature request?
 - [ ] Mobile app widgets
 
 ### Recently Completed
-- [x] Initial public release (v1.0.0)
+- [x] Initial public release (v1.4.1)
 - [x] Firebase authentication integration
 - [x] Basic wallet functionality
 - [x] Governance voting system
@@ -773,7 +774,7 @@ Found a bug or have a feature request?
 
 ## License
 
-This project is available for **non‑commercial use only** under the terms of the included LICENSE file.  
+This project is available for **non‑commercial use only** under the terms of the included `license.md` file.
 Commercial use requires a separate paid license.
 
 ---
@@ -828,7 +829,7 @@ This project was developed with a combination of original ideas, hands‑on codi
 
 **BrightActs Front-End** is a cross-platform Flutter application that enables users to securely submit, track, and visualize Goodwill Actions in real time. It integrates seamlessly with the BrightActs back-end to provide governance participation, analytics, and interactive dashboards while maintaining strong data integrity and secure authentication.
 
-**Project Version**: 1.0.1  
+**Project Version**: 1.4.1
 **Last Updated**: February 2026  
 **Maintained by**: BrightActs Development Team
 
