@@ -1,7 +1,8 @@
 # BrightActs Front-End
 
 <div align="center">
-
+  
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 ![Flutter](https://img.shields.io/badge/Flutter-3.10.0+-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.2.0+-0175C2?logo=dart&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Web-lightgrey)
